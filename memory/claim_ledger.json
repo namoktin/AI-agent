@@ -1,0 +1,40 @@
+[
+  {
+    "claim_id": "CLM-BENCH-001",
+    "claim_text": "Tập luyện thể thao aerobic kích thích biểu hiện BDNF trong hồi hải mã.",
+    "source_doi": "10.1016/j.neubiorev.2021.06.002",
+    "evidence_level": "Tier 1",
+    "verification_status": "VERIFIED",
+    "updated_at": "2026-10-20T11:33:59.991Z"
+  },
+  {
+    "intervention": "ngâm nước 14 độ C trong 1 giờ",
+    "outcome": "noradrenaline huyết tương ngoại vi tăng 530% và dopamine huyết tương ngoại vi tăng 250%",
+    "claim_id": "CLM-001",
+    "population": "10 nam giới khỏe mạnh",
+    "text": "Ngâm nước ở nhiệt độ 14°C trong 1 giờ làm tăng noradrenaline huyết tương ngoại vi lên 530% và dopamine huyết tương ngoại vi lên 250% (Šrámek et al., 2000).",
+    "species": "human",
+    "study_design": "RCT",
+    "updated_at": "2026-10-20T13:19:19.182Z"
+  },
+  {
+    "intervention": "Luyện tập có chủ đích (Deliberate Practice)",
+    "text": "Deliberate Practice kích hoạt tính dẻo tế bào ít nhánh (activity-dependent myelination) và tinh chỉnh spike-timing synchrony, tối ưu hóa tốc độ dẫn truyền qua eo Ranvier.",
+    "species": "human",
+    "claim_id": "CLM-002",
+    "population": "con người",
+    "outcome": "tăng tính dẻo tế bào ít nhánh và đồng bộ thời gian xung động (spike-timing synchrony) qua myelin hóa phụ thuộc hoạt động",
+    "study_design": "review",
+    "updated_at": "2026-10-20T13:19:19.182Z"
+  },
+  {
+    "intervention": "trải nghiệm dòng chảy (Flow State)",
+    "text": "Flow state liên quan đến giả thuyết Transient Hypofrontality của Dietrich và sự tương tác linh hoạt giữa DMN và FPN, với bằng chứng thực nghiệm còn thưa thớt (van der Linden et al., 2021).",
+    "species": "human",
+    "outcome": "giảm hoạt động thùy trán tạm thời (Transient Hypofrontality) nhưng không phải tắt hoàn toàn DMN",
+    "study_design": "review",
+    "claim_id": "CLM-003",
+    "population": "con người",
+    "updated_at": "2026-10-20T13:19:19.182Z"
+  }
+]
