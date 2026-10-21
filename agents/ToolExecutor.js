@@ -237,14 +237,18 @@ class ToolExecutor {
     getToolEndpoint(toolName) {
         const mapping = {
             'READ_FILE': '/api/read-file',
-            'WRITE_FILE': '/api/write-file',
+            'WRITE_FILE': '/api/save-file',
+            'SAVE_FILE': '/api/save-file',
             'LIST_FILES': '/api/list-files',
             'DELETE_FILE': '/api/delete-file',
-            'WEB_SEARCH': '/api/web-search',
+            'WEB_SEARCH': '/api/search',
+            'SEARCH': '/api/search',
             'ACADEMIC_SEARCH': '/api/academic/search',
             'READ_URL': '/api/fetch-webpage',
+            'FETCH_WEBPAGE': '/api/fetch-webpage',
             'BROWSE_WEB': '/api/browse-web',
             'SEARCH_EXPERIENCE': '/api/search-experiences',
+            'SEARCH_EXPERIENCES': '/api/search-experiences',
             'SAVE_EXPERIENCE': '/api/save-experience',
             'UPDATE_EXPERIENCE': '/api/update-experience',
             'RUN_CODE': '/api/run-code',
@@ -252,6 +256,160 @@ class ToolExecutor {
         };
 
         return mapping[toolName] || `/api/${toolName.toLowerCase().replace(/_/g, '-')}`;
+    }
+
+    /**
+     * Get Google Gemini Function Declarations for all available tools
+     */
+    getToolDefinitions() {
+        return [
+            {
+                name: 'READ_FILE',
+                description: 'Đọc nội dung của một file trong dự án hoặc thư mục làm việc.',
+                parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                        filePath: {
+                            type: 'STRING',
+                            description: 'Đường dẫn tương đối hoặc tuyệt đối tới file cần đọc'
+                        }
+                    },
+                    required: ['filePath']
+                }
+            },
+            {
+                name: 'WRITE_FILE',
+                description: 'Lưu hoặc tạo mới một file với nội dung cụ thể.',
+                parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                        filePath: {
+                            type: 'STRING',
+                            description: 'Đường dẫn file cần lưu (ví dụ: "src/app.js" hoặc "report.md")'
+                        },
+                        content: {
+                            type: 'STRING',
+                            description: 'Toàn bộ nội dung cần ghi vào file'
+                        }
+                    },
+                    required: ['filePath', 'content']
+                }
+            },
+            {
+                name: 'LIST_FILES',
+                description: 'Liệt kê danh sách các file và thư mục trong dự án.',
+                parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                        dirPath: {
+                            type: 'STRING',
+                            description: 'Thư mục cần quét (mặc định: ".")'
+                        },
+                        recursive: {
+                            type: 'BOOLEAN',
+                            description: 'Có quét đệ quy các thư mục con không'
+                        }
+                    }
+                }
+            },
+            {
+                name: 'WEB_SEARCH',
+                description: 'Tìm kiếm thông tin đa nguồn trên Internet (Dev.to, Wikipedia, Tin tức công nghệ).',
+                parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                        query: {
+                            type: 'STRING',
+                            description: 'Từ khóa tìm kiếm'
+                        },
+                        limit: {
+                            type: 'NUMBER',
+                            description: 'Số lượng kết quả tối đa cần lấy (mặc định: 6)'
+                        }
+                    },
+                    required: ['query']
+                }
+            },
+            {
+                name: 'ACADEMIC_SEARCH',
+                description: 'Tra cứu bài báo nghiên cứu khoa học trên PubMed, Crossref, Europe PMC, OpenAlex.',
+                parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                        query: {
+                            type: 'STRING',
+                            description: 'Từ khóa học thuật hoặc tên bài báo/tác giả'
+                        },
+                        limit: {
+                            type: 'NUMBER',
+                            description: 'Số lượng tài liệu cần lấy (mặc định: 6)'
+                        }
+                    },
+                    required: ['query']
+                }
+            },
+            {
+                name: 'READ_URL',
+                description: 'Đọc và trích xuất nội dung toàn văn từ một đường link web cụ thể.',
+                parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                        url: {
+                            type: 'STRING',
+                            description: 'Đường dẫn website cần đọc (bắt đầu bằng https://)'
+                        }
+                    },
+                    required: ['url']
+                }
+            },
+            {
+                name: 'SEARCH_EXPERIENCE',
+                description: 'Tìm kiếm các bài học kinh nghiệm, giải pháp và cách giải quyết bài toán đã tích lũy trong quá khứ.',
+                parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                        query: {
+                            type: 'STRING',
+                            description: 'Vấn đề hoặc từ khóa cần tra cứu trong trí nhớ dài hạn'
+                        }
+                    },
+                    required: ['query']
+                }
+            },
+            {
+                name: 'SAVE_EXPERIENCE',
+                description: 'Lưu bài học kinh nghiệm mới vào bộ não trí nhớ dài hạn của AI để tự tiến hóa.',
+                parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                        task: { type: 'STRING', description: 'Nhiệm vụ hoặc đề bài' },
+                        problem: { type: 'STRING', description: 'Thử thách hoặc khó khăn gặp phải' },
+                        solution: { type: 'STRING', description: 'Cách giải quyết thành công' },
+                        takeaway: { type: 'STRING', description: 'Bài học đúc kết cốt lõi' },
+                        tags: { type: 'ARRAY', items: { type: 'STRING' }, description: 'Các thẻ phân loại' }
+                    },
+                    required: ['problem', 'solution']
+                }
+            },
+            {
+                name: 'RUN_CODE',
+                description: 'Chạy thử nghiệm mã nguồn JavaScript trong sandbox an toàn để kiểm tra tính đúng đắn.',
+                parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                        code: {
+                            type: 'STRING',
+                            description: 'Đoạn mã JavaScript cần thực thi'
+                        },
+                        timeout: {
+                            type: 'NUMBER',
+                            description: 'Thời gian tối đa (ms, mặc định: 5000)'
+                        }
+                    },
+                    required: ['code']
+                }
+            }
+        ];
     }
 
     /**

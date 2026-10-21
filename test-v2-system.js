@@ -1,7 +1,8 @@
 /**
  * 🧪 TEST V2 SYSTEM
  */
-const fetch = require('node:fetch');
+// Global fetch is built-in in Node.js 18+
+const fetchFn = typeof fetch !== 'undefined' ? fetch : require('node-fetch');
 
 async function testV2System() {
     console.log('🧪 Testing V2 Multi-Agent System\n');
@@ -28,7 +29,7 @@ async function testV2System() {
         console.log(`🔬 Test: ${test.name}`);
 
         try {
-            const response = await fetch('http://localhost:3000/api/v2/execute', {
+            const response = await fetchFn('http://localhost:3000/api/v2/execute', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

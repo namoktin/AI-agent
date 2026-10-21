@@ -282,7 +282,7 @@ function validateFileSyntax(filePath, content) {
 }
 
 // Ghi file toàn phần (Có Snapshot & Kiểm tra cú pháp tự động)
-app.post('/api/save-file', (req, res) => {
+app.post(['/api/save-file', '/api/write-file'], (req, res) => {
     try {
         let { filePath, fileName, content } = req.body;
         const target = filePath || fileName || 'output.txt';
@@ -1219,7 +1219,7 @@ async function multiSourceWebSearch(query, limit = 6) {
 }
 
 // Tìm kiếm Web sâu rộng qua đa nguồn tri thức (Dev.to + Wikipedia + Google News RSS)
-app.post('/api/search', async (req, res) => {
+app.post(['/api/search', '/api/web-search'], async (req, res) => {
     const { query } = req.body;
     if (!query) return res.json({ success: false, error: 'Thiếu từ khóa tìm kiếm' });
 
@@ -4955,7 +4955,7 @@ app.post('/api/gemini-proxy', async (req, res) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return res.json({ success: false, error: 'GEMINI_API_KEY chưa được cấu hình trong .env' });
 
-    const { model = 'gemini-2.5-flash', messages, systemInstruction, tools, generationConfig, stream } = req.body;
+    const { model = 'gemini-3.8-flash', messages, systemInstruction, tools, generationConfig, stream } = req.body;
     const baseUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}`;
 
     try {

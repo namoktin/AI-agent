@@ -5,6 +5,7 @@
  */
 
 const fs = require('fs');
+const path = require('path');
 
 const BASE_URL = 'http://localhost:3000';
 
@@ -172,7 +173,9 @@ async function runBenchmark() {
     // TEST 9: Quality Gate V2 Full 9/9 Pass on 2026-10-20 Report
     // -------------------------------------------------------------------------
     try {
-        const content20 = fs.readFileSync('c:/Users/Nam/Desktop/gemini/2026-10-20/bao_cao_tiem_nang_con_nguoi.md', 'utf8');
+        const fixture20 = path.join(__dirname, 'tests/fixtures/bao_cao_tiem_nang_con_nguoi.md');
+        const file20 = fs.existsSync(fixture20) ? fixture20 : 'c:/Users/Nam/Desktop/gemini/2026-10-20/bao_cao_tiem_nang_con_nguoi.md';
+        const content20 = fs.readFileSync(file20, 'utf8');
         const res = await fetch(`${BASE_URL}/api/academic/quality-gate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -193,7 +196,9 @@ async function runBenchmark() {
     // TEST 10: Quality Gate V2 Full 9/9 Pass on 2026-10-19 Canonical Report
     // -------------------------------------------------------------------------
     try {
-        const content19 = fs.readFileSync('c:/Users/Nam/Desktop/gemini/2026-10-19/bao_cao_canonical_tong_hop.md', 'utf8');
+        const fixture19 = path.join(__dirname, 'tests/fixtures/bao_cao_canonical_tong_hop.md');
+        const file19 = fs.existsSync(fixture19) ? fixture19 : 'c:/Users/Nam/Desktop/gemini/2026-10-19/bao_cao_canonical_tong_hop.md';
+        const content19 = fs.readFileSync(file19, 'utf8');
         const res = await fetch(`${BASE_URL}/api/academic/quality-gate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

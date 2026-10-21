@@ -2433,14 +2433,14 @@
     
     // ---------------- CẤU HÌNH API GEMINI (TỰ ĐỘNG TỪ .ENV) ----------------
     let API_KEY = localStorage.getItem('CYBER_AGENT_API_KEY') || ""; 
-    const STABLE_DEFAULT_MODEL = "gemini-flash-lite-latest";
+    const STABLE_DEFAULT_MODEL = "gemini-3.8-flash";
     let MODEL_NAME = localStorage.getItem('CYBER_AGENT_MODEL') || STABLE_DEFAULT_MODEL; 
     // Tự động nâng cấp khỏi các model bị cạn kiệt Quota 20 lượt (HTTP 429) hoặc bị Google 503
     const QUOTA_EXHAUSTED_OR_DEAD_MODELS = [
         "gemini-3.5-flash", 
         "gemini-3.6-flash", 
         "gemini-3-flash-preview", 
-        "gemini-3.8-flash", 
+        "gemini-2.5-flash", 
         "gemini-3.1-flash-lite"
     ];
     if (!MODEL_NAME || (QUOTA_EXHAUSTED_OR_DEAD_MODELS.includes(MODEL_NAME) && MODEL_NAME !== 'custom-provider')) {

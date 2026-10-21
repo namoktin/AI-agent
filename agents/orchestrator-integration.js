@@ -4,9 +4,9 @@
  * Integration point for the new orchestrator
  */
 
-const { AgentOrchestrator } = require('./agents/AgentOrchestrator');
-const { ToolExecutor } = require('./agents/ToolExecutor');
-const { ContextCacheManager } = require('./agents/ContextCacheManager');
+const { AgentOrchestrator } = require('./AgentOrchestrator');
+const { ToolExecutor } = require('./ToolExecutor');
+const { ContextCacheManager } = require('./ContextCacheManager');
 
 // ============================================================================
 // MULTI-AGENT ORCHESTRATOR ENDPOINT (Insert this into server.js)

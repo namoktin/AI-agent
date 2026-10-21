@@ -5,7 +5,7 @@
     "source_doi": "10.1016/j.neubiorev.2021.06.002",
     "evidence_level": "Tier 1",
     "verification_status": "VERIFIED",
-    "updated_at": "2026-10-20T11:33:59.991Z"
+    "updated_at": "2026-10-21T14:42:17.510Z"
   },
   {
     "intervention": "ngâm nước 14 độ C trong 1 giờ",
@@ -36,5 +36,25 @@
     "claim_id": "CLM-003",
     "population": "con người",
     "updated_at": "2026-10-20T13:19:19.182Z"
+  },
+  {
+    "population": "10 nam giới khỏe mạnh",
+    "text": "Ngâm nước lạnh 14 độ C trong 1 giờ làm tăng nồng độ noradrenaline huyết tương ngoại vi lên 530% và dopamine huyết tương ngoại vi lên 250% (Šrámek et al., 2000).",
+    "intervention": "ngâm nước 14 độ C trong 1 giờ",
+    "claim_id": "CLM-CWI-01",
+    "study_design": "RCT",
+    "outcome": "noradrenaline huyết tương tăng 530% và dopamine huyết tương tăng 250%",
+    "species": "human",
+    "updated_at": "2026-10-21T15:07:10.395Z"
+  },
+  {
+    "population": "con người",
+    "text": "Tiếp xúc nước lạnh kích hoạt mạnh mẽ hệ thống thần kinh giao cảm (SNS), giải phóng catecholamine ngoại vi nhưng không vượt qua hàng rào máu não BBB.",
+    "study_design": "review",
+    "species": "human",
+    "intervention": "tiếp xúc nước lạnh cấp tính",
+    "outcome": "kích hoạt hệ thần kinh giao cảm và co mạch ngoại vi",
+    "claim_id": "CLM-CWI-02",
+    "updated_at": "2026-10-21T15:07:10.395Z"
   }
 ]

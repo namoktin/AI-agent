@@ -56,6 +56,8 @@ class ContextCacheManager {
         this.apiKey = geminiApiKey;
         this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
         this.caches = new Map();
+        this.inMemoryCache = new Map();
+        this.MIN_REMOTE_CACHE_TOKENS = 32768; // Gemini API CachedContents requires >= 32,768 tokens
         this.stats = {
             cacheHits: 0,
             cacheMisses: 0,
@@ -66,20 +68,41 @@ class ContextCacheManager {
     /**
      * Create or retrieve cached content
      */
-    async getCachedContent(name, content, model, ttlSeconds = 3600) {
+    async getCachedContent(name, content, model = 'gemini-3.8-flash', ttlSeconds = 3600) {
         // Check if cache exists and is valid
         const existing = this.caches.get(name);
         if (existing && existing.expireTime > new Date()) {
             this.stats.cacheHits++;
+            this.stats.totalSaved += existing.tokensCount || 0;
             console.log(`💾 Cache HIT: ${name}`);
             return existing.cacheName;
         }
 
         // Create new cached content
         this.stats.cacheMisses++;
-        console.log(`🔄 Cache MISS: Creating cache for ${name}`);
+        const estimatedTokens = this.estimateTokens(content || '');
+        console.log(`🔄 Cache MISS: Creating cache for ${name} (~${estimatedTokens} tokens)`);
+
+        // If content is below Gemini's 32,768 token threshold or no API key, use in-memory cache
+        if (estimatedTokens < this.MIN_REMOTE_CACHE_TOKENS || !this.apiKey) {
+            const cacheName = `in_memory_${name}`;
+            const meta = {
+                cacheName: cacheName,
+                content: content,
+                expireTime: new Date(Date.now() + ttlSeconds * 1000),
+                createTime: new Date(),
+                model: model,
+                tokensCount: estimatedTokens,
+                isLocal: true
+            };
+            this.caches.set(name, meta);
+            this.inMemoryCache.set(name, meta);
+            console.log(`💾 Stored in local memory cache (${estimatedTokens} tokens < ${this.MIN_REMOTE_CACHE_TOKENS} remote threshold): ${name}`);
+            return cacheName;
+        }
 
         try {
+            const cleanModel = model.replace(/^models\//, '');
             const response = await fetch(`${this.baseUrl}/cachedContents`, {
                 method: 'POST',
                 headers: {
@@ -87,7 +110,7 @@ class ContextCacheManager {
                     'x-goog-api-key': this.apiKey
                 },
                 body: JSON.stringify({
-                    model: `models/${model}`,
+                    model: `models/${cleanModel}`,
                     contents: [{
                         role: 'user',
                         parts: [{ text: content }]
@@ -99,7 +122,19 @@ class ContextCacheManager {
 
             if (!response.ok) {
                 const error = await response.text();
-                throw new Error(`Cache creation failed: ${error}`);
+                console.warn(`⚠️ Remote cache creation rejected: ${error}. Falling back to memory cache.`);
+                const fallbackName = `in_memory_${name}`;
+                const fallbackMeta = {
+                    cacheName: fallbackName,
+                    content: content,
+                    expireTime: new Date(Date.now() + ttlSeconds * 1000),
+                    createTime: new Date(),
+                    model: model,
+                    tokensCount: estimatedTokens,
+                    isLocal: true
+                };
+                this.caches.set(name, fallbackMeta);
+                return fallbackName;
             }
 
             const data = await response.json();
@@ -109,16 +144,27 @@ class ContextCacheManager {
                 cacheName: data.name,
                 expireTime: new Date(data.expireTime),
                 createTime: new Date(data.createTime),
-                model: model,
-                tokensCount: this.estimateTokens(content)
+                model: cleanModel,
+                tokensCount: estimatedTokens,
+                isLocal: false
             });
 
-            console.log(`✅ Cache created: ${data.name}`);
+            console.log(`✅ Remote cache created: ${data.name}`);
             return data.name;
 
         } catch (error) {
-            console.error(`❌ Cache creation error:`, error.message);
-            return null;
+            console.warn(`⚠️ Cache creation exception: ${error.message}. Using local memory cache.`);
+            const fallbackName = `in_memory_${name}`;
+            this.caches.set(name, {
+                cacheName: fallbackName,
+                content: content,
+                expireTime: new Date(Date.now() + ttlSeconds * 1000),
+                createTime: new Date(),
+                model: model,
+                tokensCount: estimatedTokens,
+                isLocal: true
+            });
+            return fallbackName;
         }
     }
 
@@ -188,13 +234,43 @@ Tags: ${exp.tags?.join(', ') || 'N/A'}
     /**
      * Generate content using cached context
      */
-    async generateWithCache(cacheName, prompt, model) {
+    async generateWithCache(cacheName, prompt, model = 'gemini-3.8-flash') {
         if (!cacheName) {
             throw new Error('Cache name is required');
         }
 
+        const cleanModel = model.replace(/^models\//, '');
+
+        if (cacheName.startsWith('in_memory_')) {
+            const cached = Array.from(this.caches.values()).find(c => c.cacheName === cacheName);
+            const body = {
+                contents: [{
+                    role: 'user',
+                    parts: [{ text: prompt }]
+                }]
+            };
+            if (cached && cached.content) {
+                body.systemInstruction = {
+                    parts: [{ text: cached.content }]
+                };
+            }
+            const response = await fetch(
+                `${this.baseUrl}/models/${cleanModel}:generateContent?key=${this.apiKey}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                }
+            );
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(`Generate with cache failed: ${error}`);
+            }
+            return await response.json();
+        }
+
         const response = await fetch(
-            `${this.baseUrl}/models/${model}:generateContent?key=${this.apiKey}`,
+            `${this.baseUrl}/models/${cleanModel}:generateContent?key=${this.apiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

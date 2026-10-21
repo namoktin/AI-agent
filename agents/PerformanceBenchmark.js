@@ -159,8 +159,61 @@ class PerformanceBenchmark {
             (hasExamples ? 25 : 0)
         );
 
-        // Accuracy: Manual verification needed, but we can check for common mistakes
-        scores.accuracy = 85; // Default, would need human eval
+        // Accuracy: Dynamic evaluation based on factual overlap, code syntax integrity, citations and penalty checks
+        let calculatedAccuracy = 70; // Baseline
+
+        // 1. Expected components presence strongly correlates with factual correctness
+        const compRatio = (task.expectedComponents && task.expectedComponents.length > 0)
+            ? (componentMatches.length / task.expectedComponents.length)
+            : 1;
+        calculatedAccuracy += Math.round(compRatio * 20); // Up to +20 points
+
+        // 2. Task-specific checks
+        if (task.category === 'coding' || task.category === 'debugging') {
+            if (hasCodeBlocks) {
+                calculatedAccuracy += 5;
+                // Syntax / balance sanity check
+                const codeMatch = responseText.match(/```(?:[a-zA-Z]*)\n([\s\S]*?)```/);
+                if (codeMatch && codeMatch[1]) {
+                    const code = codeMatch[1];
+                    const openBraces = (code.match(/\{/g) || []).length;
+                    const closeBraces = (code.match(/\}/g) || []).length;
+                    const openParens = (code.match(/\(/g) || []).length;
+                    const closeParens = (code.match(/\)/g) || []).length;
+                    if (openBraces === closeBraces && openParens === closeParens) {
+                        calculatedAccuracy += 5;
+                    }
+                }
+            } else {
+                calculatedAccuracy -= 15; // Code requested but none provided
+            }
+        }
+
+        if (task.category === 'security') {
+            const hasSecurityRemedy = /parameterized|prepared statement|sanitize|input validation|sql injection|authorization|jwt|auth middleware/i.test(responseText);
+            if (hasSecurityRemedy) calculatedAccuracy += 5;
+        }
+
+        if (task.category === 'research' || task.requiredGrounding) {
+            const hasCitations = /doi:|http|\b(?:19|20)\d{2}\b|et al\.|pmid|arxiv|study|clinical trial/i.test(responseText);
+            if (hasCitations) calculatedAccuracy += 5;
+        }
+
+        // 3. Penalty for hallucination / refusal / failure patterns
+        const failurePatterns = [
+            /cannot fulfill/i,
+            /as an ai language model/i,
+            /i am unable to/i,
+            /i don't have access/i,
+            /an error occurred/i
+        ];
+        for (const pattern of failurePatterns) {
+            if (pattern.test(responseText)) {
+                calculatedAccuracy -= 15;
+            }
+        }
+
+        scores.accuracy = Math.max(0, Math.min(100, calculatedAccuracy));
 
         const overallScore = (
             scores.completeness * 0.35 +
