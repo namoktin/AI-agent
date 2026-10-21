@@ -7,7 +7,48 @@
  * - Up-to-date information
  */
 
-const fetch = require('node:fetch');
+const https = require('https');
+const http = require('http');
+const { URL } = require('url');
+
+// Fetch polyfill
+function fetch(url, options = {}) {
+    return new Promise((resolve, reject) => {
+        const parsedUrl = new URL(url);
+        const client = parsedUrl.protocol === 'https:' ? https : http;
+
+        const requestOptions = {
+            method: options.method || 'GET',
+            headers: options.headers || {},
+            timeout: options.signal?._timeout || 180000
+        };
+
+        const req = client.request(url, requestOptions, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                resolve({
+                    ok: res.statusCode >= 200 && res.statusCode < 300,
+                    status: res.statusCode,
+                    json: async () => JSON.parse(data),
+                    text: async () => data
+                });
+            });
+        });
+
+        req.on('error', reject);
+        req.on('timeout', () => {
+            req.destroy();
+            reject(new Error('Request timeout'));
+        });
+
+        if (options.body) {
+            req.write(options.body);
+        }
+
+        req.end();
+    });
+}
 
 class GeminiGrounding {
     constructor(geminiApiKey) {

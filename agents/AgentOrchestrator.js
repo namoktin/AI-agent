@@ -10,12 +10,56 @@
  * - Self-healing với retry strategies
  */
 
-const fetch = require('node:fetch');
+const https = require('https');
+const http = require('http');
 const fs = require('fs').promises;
 const path = require('path');
+const { URL } = require('url');
+
+// Fetch polyfill using native http/https
+function fetch(url, options = {}) {
+    return new Promise((resolve, reject) => {
+        const parsedUrl = new URL(url);
+        const client = parsedUrl.protocol === 'https:' ? https : http;
+
+        const timeout = 180000; // 3 minutes
+        const requestOptions = {
+            method: options.method || 'GET',
+            headers: options.headers || {},
+            timeout: timeout
+        };
+
+        const req = client.request(url, requestOptions, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                resolve({
+                    ok: res.statusCode >= 200 && res.statusCode < 300,
+                    status: res.statusCode,
+                    statusText: res.statusMessage,
+                    headers: res.headers,
+                    json: async () => JSON.parse(data),
+                    text: async () => data
+                });
+            });
+        });
+
+        req.on('error', reject);
+        req.on('timeout', () => {
+            req.destroy();
+            reject(new Error('Request timeout'));
+        });
+
+        if (options.body) {
+            req.write(options.body);
+        }
+
+        req.end();
+    });
+}
 
 class AgentOrchestrator {
-    constructor(geminiApiKey, config = ) {
+    constructor(geminiApiKey, config = {}) {
         this.apiKey = geminiApiKey;
         this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
         this.config = {
@@ -39,7 +83,7 @@ class AgentOrchestrator {
             // 🎯 DIRECTOR: Strategic mastermind
             director: {
                 role: 'director',
-                model: 'gemini-2.0-flash-thinking-exp',
+                model: 'gemini-3.6-flash',
                 systemPrompt: `BẠN LÀ GIÁM ĐỐC ĐIỀU HÀNH (CEO/DIRECTOR) - BỘ NÃO CHIẾN LƯỢC CỦA TỔ CHỨC.
 
 **VAI TRÒ TUYỆT ĐỐI:**
@@ -72,7 +116,7 @@ class AgentOrchestrator {
             // 🎮 COORDINATOR: Task orchestration master
             coordinator: {
                 role: 'coordinator',
-                model: 'gemini-1.5-pro',
+                model: 'gemini-3.6-flash',
                 systemPrompt: `BẠN LÀ PHÓ GIÁM ĐỐC (COO/COORDINATOR) - TRUNG TÂM ĐIỀU PHỐI VẬN HÀNH.
 
 **VAI TRÒ:**
@@ -116,7 +160,7 @@ class AgentOrchestrator {
             // 🔬 RESEARCHER: Information gathering specialist
             researcher: {
                 role: 'researcher',
-                model: 'gemini-1.5-flash-8b',
+                model: 'gemini-3-flash-preview',
                 systemPrompt: `BẠN LÀ CHUYÊN GIA NGHIÊN CỨU (RESEARCH SPECIALIST).
 
 **NHIỆM VỤ:**
@@ -155,7 +199,7 @@ class AgentOrchestrator {
             // 💻 DEVELOPER: Technical implementation expert
             developer: {
                 role: 'developer',
-                model: 'gemini-1.5-pro',
+                model: 'gemini-3.6-flash',
                 systemPrompt: `BẠN LÀ CHUYÊN GIA LÂP TRÌNH (DEVELOPMENT SPECIALIST).
 
 **NHIỆM VỤ:**
@@ -202,7 +246,7 @@ class AgentOrchestrator {
             // 🛡️ CRITIC: Adversarial quality assurance
             critic: {
                 role: 'critic',
-                model: 'gemini-2.0-flash-thinking-exp',
+                model: 'gemini-3.6-flash',
                 systemPrompt: `BẠN LÀ CHUYÊN GIA THẨM ĐỊNH (CRITICAL ANALYST) - ĐỐI THỦ PHẢN BIỆN.
 
 **VAI TRÒ:**
@@ -555,12 +599,11 @@ class AgentOrchestrator {
                 }
             };
 
-            // Add thinking config for thinking agents
+            // For thinking models, no special config needed
+            // The model itself (gemini-2.0-flash-thinking-exp) handles thinking
+            // Just ensure we have enough output tokens
             if (agent.thinking) {
-                requestBody.generationConfig.thinkingConfig = {
-                    thinkingMode: 1, // THINKING_MODE_ENABLED
-                    includeThoughts: true
-                };
+                requestBody.generationConfig.maxOutputTokens = 16384; // More tokens for thinking
             }
 
             const response = await fetch(
@@ -568,8 +611,7 @@ class AgentOrchestrator {
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestBody),
-                    signal: AbortSignal.timeout(this.config.timeout)
+                    body: JSON.stringify(requestBody)
                 }
             );
 
@@ -692,4 +734,4 @@ class AgentOrchestrator {
     }
 }
 
-module.exports = { AgentOrchestrator };
+module.exports = AgentOrchestrator;

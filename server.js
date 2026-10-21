@@ -5083,11 +5083,20 @@ app.post('/api/v2/execute', async (req, res) => {
 
         // Execute with orchestrator
         const startTime = Date.now();
-        const result = await globalOrchestrator.execute(task, {
-            experiences: experiences.slice(-20),
-            groundingResult: groundingResult,
-            ...context
-        });
+        let result;
+        try {
+            console.log('🚀 Calling orchestrator.execute()...');
+            result = await globalOrchestrator.execute(task, {
+                experiences: experiences.slice(-20),
+                groundingResult: groundingResult,
+                ...context
+            });
+            console.log('✅ Orchestrator.execute() returned:', result.success);
+        } catch (execError) {
+            console.error('💥 Orchestrator.execute() threw error:', execError.message);
+            console.error('Stack:', execError.stack);
+            throw execError;
+        }
 
         const executionTime = Date.now() - startTime;
         const stats = globalOrchestrator.getStats();
