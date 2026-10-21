@@ -4999,15 +4999,275 @@ app.post('/api/gemini-proxy', async (req, res) => {
 });
 
 // ==========================================
+// 6.9. ULTIMATE MULTI-AGENT ORCHESTRATOR - 10/10 ARCHITECTURE
+// ==========================================
+
+const { AgentOrchestrator } = require('./agents/AgentOrchestrator');
+const { ToolExecutor } = require('./agents/ToolExecutor');
+const { ContextCacheManager } = require('./agents/ContextCacheManager');
+const { GeminiGrounding } = require('./agents/GeminiGrounding');
+const { PerformanceBenchmark } = require('./agents/PerformanceBenchmark');
+
+// Global instances
+let globalOrchestrator = null;
+let globalCacheManager = null;
+let globalToolExecutor = null;
+let globalGrounding = null;
+
+function getOrchestrator() {
+    if (!globalOrchestrator) {
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            throw new Error('GEMINI_API_KEY not configured');
+        }
+
+        globalOrchestrator = new AgentOrchestrator(apiKey, {
+            maxRetries: 3,
+            timeout: 180000,
+            parallelLimit: 5
+        });
+
+        globalCacheManager = new ContextCacheManager(apiKey);
+        globalToolExecutor = new ToolExecutor('http://localhost:3000');
+        globalGrounding = new GeminiGrounding(apiKey);
+
+        console.log('🚀 Ultimate Multi-Agent Orchestrator initialized');
+    }
+
+    return { globalOrchestrator, globalCacheManager, globalToolExecutor, globalGrounding };
+}
+
+/**
+ * POST /api/v2/execute
+ * MAIN ENDPOINT: Multi-agent execution with full orchestration
+ */
+app.post('/api/v2/execute', async (req, res) => {
+    try {
+        const { task, useCache = true, useGrounding = false, context = {} } = req.body;
+
+        if (!task) {
+            return res.json({ success: false, error: 'Task is required' });
+        }
+
+        console.log('🎬 V2 Multi-Agent Execution Started');
+        console.log('📋 Task:', task.slice(0, 150) + (task.length > 150 ? '...' : ''));
+
+        const { globalOrchestrator, globalCacheManager, globalGrounding } = getOrchestrator();
+
+        // Load experiences
+        let experiences = [];
+        try {
+            if (fs.existsSync(EXPERIENCES_FILE)) {
+                const content = fs.readFileSync(EXPERIENCES_FILE, 'utf8');
+                experiences = JSON.parse(content);
+                console.log(`📚 Loaded ${experiences.length} experiences`);
+            }
+        } catch (e) {
+            console.warn('⚠️ Could not load experiences:', e.message);
+        }
+
+        // Use grounding if requested
+        let groundingResult = null;
+        if (useGrounding) {
+            console.log('🔍 Using Gemini Grounding with Google Search');
+            groundingResult = await globalGrounding.generateWithGrounding(task, {
+                dynamicThreshold: 0.3
+            });
+        }
+
+        // Cache agent prompts
+        if (useCache) {
+            console.log('💾 Caching agent prompts...');
+            await globalCacheManager.cacheAgentPrompts(globalOrchestrator.agents);
+        }
+
+        // Execute with orchestrator
+        const startTime = Date.now();
+        const result = await globalOrchestrator.execute(task, {
+            experiences: experiences.slice(-20),
+            groundingResult: groundingResult,
+            ...context
+        });
+
+        const executionTime = Date.now() - startTime;
+        const stats = globalOrchestrator.getStats();
+
+        console.log('✅ Execution completed');
+        console.log(`⏱️ Total time: ${executionTime}ms`);
+
+        // Auto-save high-quality results
+        if (result.success && result.qualityScore >= 85) {
+            console.log('💾 Auto-saving high-quality result...');
+            try {
+                const saveRes = await fetch('http://localhost:3000/api/save-experience', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        task: task,
+                        solution: typeof result.result === 'string' ? result.result : JSON.stringify(result.result),
+                        takeaway: `Multi-agent orchestration (Quality: ${result.qualityScore}%). Agents: ${stats.agentCallsCount}, Time: ${executionTime}ms`,
+                        tags: ['v2-orchestrator', 'multi-agent', 'high-quality'],
+                        qualityScore: result.qualityScore
+                    })
+                });
+                if (saveRes.ok) console.log('✅ Experience saved');
+            } catch (e) {
+                console.warn('⚠️ Save experience failed:', e.message);
+            }
+        }
+
+        res.json({
+            success: result.success,
+            result: result.result,
+            qualityScore: result.qualityScore,
+            critique: result.critique,
+            grounding: groundingResult ? {
+                hasGrounding: groundingResult.grounding?.hasGrounding,
+                sources: groundingResult.grounding?.supports?.length || 0
+            } : null,
+            stats: {
+                executionTime: `${executionTime}ms`,
+                agentCalls: stats.agentCallsCount,
+                averageLatency: `${stats.averageLatency}ms`
+            },
+            version: 'v2.0-ultimate'
+        });
+
+    } catch (error) {
+        console.error('💥 V2 Execution Error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
+});
+
+/**
+ * POST /api/v2/fact-check
+ * Fact-check with grounding
+ */
+app.post('/api/v2/fact-check', async (req, res) => {
+    try {
+        const { claim } = req.body;
+        if (!claim) {
+            return res.json({ success: false, error: 'Claim is required' });
+        }
+
+        const { globalGrounding } = getOrchestrator();
+        const result = await globalGrounding.factCheck(claim);
+
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST /api/v2/research
+ * Deep research with grounding
+ */
+app.post('/api/v2/research', async (req, res) => {
+    try {
+        const { topic } = req.body;
+        if (!topic) {
+            return res.json({ success: false, error: 'Topic is required' });
+        }
+
+        const { globalGrounding } = getOrchestrator();
+        const result = await globalGrounding.researchTopic(topic);
+
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST /api/v2/benchmark
+ * Run performance benchmark suite
+ */
+app.post('/api/v2/benchmark', async (req, res) => {
+    try {
+        console.log('🏁 Starting Performance Benchmark Suite');
+
+        const { globalOrchestrator } = getOrchestrator();
+        const benchmark = new PerformanceBenchmark();
+
+        const report = await benchmark.runFullBenchmark(globalOrchestrator);
+
+        // Save report
+        const outputDir = path.join(MEMORY_DIR, 'benchmarks');
+        const files = await benchmark.saveReport(report, outputDir);
+
+        res.json({
+            success: true,
+            report: report,
+            files: files
+        });
+
+    } catch (error) {
+        console.error('💥 Benchmark Error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * GET /api/v2/stats
+ * Get orchestrator statistics
+ */
+app.get('/api/v2/stats', (req, res) => {
+    try {
+        const { globalOrchestrator, globalCacheManager, globalToolExecutor } = getOrchestrator();
+
+        const stats = {
+            orchestrator: globalOrchestrator.getStats(),
+            cache: globalCacheManager.getStats(),
+            tools: globalToolExecutor.getCacheStats(),
+            agents: Object.keys(globalOrchestrator.agents),
+            version: 'v2.0-ultimate',
+            status: 'operational'
+        };
+
+        res.json({ success: true, stats: stats });
+    } catch (error) {
+        res.json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST /api/v2/reset
+ * Reset orchestrator and clear caches
+ */
+app.post('/api/v2/reset', async (req, res) => {
+    try {
+        globalOrchestrator = null;
+        globalCacheManager = null;
+        globalToolExecutor = null;
+        globalGrounding = null;
+
+        console.log('🔄 V2 Orchestrator reset');
+
+        res.json({
+            success: true,
+            message: 'V2 Orchestrator reset successfully'
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ==========================================
 // 7. SERVER LAUNCH
 // ==========================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '127.0.0.1', () => {
     console.log('===============================================================');
-    console.log('⚡ CYBER AGENT PRO v2.0 S+ // SELF-LEARNING & AUTONOMOUS ENGINE');
+    console.log('🔥 CYBER AGENT PRO v3.0 ULTIMATE // 10/10 MULTI-AGENT SYSTEM');
     console.log(`🌐 Máy chủ: http://localhost:${PORT}`);
     console.log(`🧠 Kho trí nhớ: ${EXPERIENCES_FILE}`);
     console.log(`🔐 Bảo mật: Auth=${!!process.env.AGENT_SECRET_KEY ? 'ON' : 'OFF (localhost-only)'}, RateLimit=ON, CORS=restricted`);
     console.log(`🛡️  Path Guard=ON, CMD Blacklist=ON`);
+    console.log('🚀 V2 Endpoints: /api/v2/execute, /api/v2/fact-check, /api/v2/research, /api/v2/benchmark');
     console.log('===============================================================');
 });

@@ -1,0 +1,237 @@
+/**
+ * 💾 CONTEXT CACHE MANAGER
+ *
+ * Gemini Context Caching để giảm latency và cost:
+ * - Cache system prompts của các agents
+ * - Cache long-term memory
+ * - Automatic TTL management
+ * - Cost tracking
+ */
+
+const fetch = require('node:fetch');
+
+class ContextCacheManager {
+    constructor(geminiApiKey) {
+        this.apiKey = geminiApiKey;
+        this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+        this.caches = new Map();
+        this.stats = {
+            cacheHits: 0,
+            cacheMisses: 0,
+            totalSaved: 0 // tokens saved
+        };
+    }
+
+    /**
+     * Create or retrieve cached content
+     */
+    async getCachedContent(name, content, model, ttlSeconds = 3600) {
+        // Check if cache exists and is valid
+        const existing = this.caches.get(name);
+        if (existing && existing.expireTime > new Date()) {
+            this.stats.cacheHits++;
+            console.log(`💾 Cache HIT: ${name}`);
+            return existing.cacheName;
+        }
+
+        // Create new cached content
+        this.stats.cacheMisses++;
+        console.log(`🔄 Cache MISS: Creating cache for ${name}`);
+
+        try {
+            const response = await fetch(`${this.baseUrl}/cachedContents`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-goog-api-key': this.apiKey
+                },
+                body: JSON.stringify({
+                    model: `models/${model}`,
+                    contents: [{
+                        role: 'user',
+                        parts: [{ text: content }]
+                    }],
+                    ttl: `${ttlSeconds}s`,
+                    displayName: name
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(`Cache creation failed: ${error}`);
+            }
+
+            const data = await response.json();
+
+            // Store cache metadata
+            this.caches.set(name, {
+                cacheName: data.name,
+                expireTime: new Date(data.expireTime),
+                createTime: new Date(data.createTime),
+                model: model,
+                tokensCount: this.estimateTokens(content)
+            });
+
+            console.log(`✅ Cache created: ${data.name}`);
+            return data.name;
+
+        } catch (error) {
+            console.error(`❌ Cache creation error:`, error.message);
+            return null;
+        }
+    }
+
+    /**
+     * Cache all agent system prompts
+     */
+    async cacheAgentPrompts(agents) {
+        const cachePromises = Object.entries(agents).map(async ([role, agent]) => {
+            if (!agent.cacheSystemPrompt && role !== 'developer') {
+                return null; // Skip non-cached agents
+            }
+
+            const cacheName = await this.getCachedContent(
+                `agent_${role}_prompt`,
+                agent.systemPrompt,
+                agent.model,
+                3600 // 1 hour TTL
+            );
+
+            return { role, cacheName };
+        });
+
+        const results = await Promise.all(cachePromises);
+        const cached = results.filter(r => r !== null && r.cacheName);
+
+        console.log(`📦 Cached ${cached.length} agent prompts`);
+        return Object.fromEntries(cached.map(r => [r.role, r.cacheName]));
+    }
+
+    /**
+     * Cache long-term memory for context
+     */
+    async cacheMemory(experiences, model = 'gemini-1.5-pro') {
+        if (!Array.isArray(experiences) || experiences.length === 0) {
+            return null;
+        }
+
+        // Format experiences as context
+        const memoryText = this.formatExperiencesForCache(experiences);
+
+        const cacheName = await this.getCachedContent(
+            `memory_context_${Date.now()}`,
+            memoryText,
+            model,
+            1800 // 30 minutes TTL
+        );
+
+        return cacheName;
+    }
+
+    /**
+     * Format experiences for efficient caching
+     */
+    formatExperiencesForCache(experiences) {
+        return experiences.map((exp, idx) => {
+            return `[Experience ${idx + 1}]
+ID: ${exp.id}
+Task: ${exp.task}
+Solution: ${exp.solution}
+Takeaway: ${exp.takeaway}
+Quality: ${exp.qualityScore}% (${exp.grade})
+Tags: ${exp.tags?.join(', ') || 'N/A'}
+---`;
+        }).join('\n\n');
+    }
+
+    /**
+     * Generate content using cached context
+     */
+    async generateWithCache(cacheName, prompt, model) {
+        if (!cacheName) {
+            throw new Error('Cache name is required');
+        }
+
+        const response = await fetch(
+            `${this.baseUrl}/models/${model}:generateContent?key=${this.apiKey}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        role: 'user',
+                        parts: [{ text: prompt }]
+                    }],
+                    cachedContent: cacheName
+                })
+            }
+        );
+
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(`Generate with cache failed: ${error}`);
+        }
+
+        return await response.json();
+    }
+
+    /**
+     * Delete expired or unused caches
+     */
+    async cleanupCaches() {
+        const now = new Date();
+        const expired = [];
+
+        for (const [name, cache] of this.caches.entries()) {
+            if (cache.expireTime <= now) {
+                expired.push(name);
+            }
+        }
+
+        for (const name of expired) {
+            this.caches.delete(name);
+            console.log(`🗑️ Removed expired cache: ${name}`);
+        }
+
+        return {
+            removed: expired.length,
+            remaining: this.caches.size
+        };
+    }
+
+    /**
+     * Estimate token count (rough approximation)
+     */
+    estimateTokens(text) {
+        // Rough estimate: 1 token ≈ 4 characters for English
+        // For Vietnamese: 1 token ≈ 2.5 characters
+        return Math.ceil(text.length / 3);
+    }
+
+    /**
+     * Get cache statistics
+     */
+    getStats() {
+        return {
+            ...this.stats,
+            activeCaches: this.caches.size,
+            hitRate: this.stats.cacheHits / (this.stats.cacheHits + this.stats.cacheMisses),
+            caches: Array.from(this.caches.entries()).map(([name, cache]) => ({
+                name,
+                model: cache.model,
+                tokens: cache.tokensCount,
+                expiresIn: Math.round((cache.expireTime - new Date()) / 1000)
+            }))
+        };
+    }
+
+    /**
+     * Force refresh a specific cache
+     */
+    async refreshCache(name, content, model, ttlSeconds = 3600) {
+        this.caches.delete(name);
+        return await this.getCachedContent(name, content, model, ttlSeconds);
+    }
+}
+
+module.exports = { ContextCacheManager };

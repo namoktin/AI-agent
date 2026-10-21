@@ -8,9 +8,17 @@
     "dev": "node --watch server.js",
     "check": "node --check server.js",
     "test": "node comprehensive_test_suite.js",
-    "benchmark": "node scientific_benchmark_harness.js"
+    "benchmark": "node scientific_benchmark_harness.js",
+    "v2:benchmark": "node -e \"require('./test-v2-benchmark')\"",
+    "v2:test": "node -e \"require('./test-v2-system')\""
   },
-  "keywords": ["ai-agent", "multi-agent", "gemini", "autonomous", "research"],
+  "keywords": [
+    "ai-agent",
+    "multi-agent",
+    "gemini",
+    "autonomous",
+    "research"
+  ],
   "author": "namoktin",
   "license": "ISC",
   "dependencies": {
