@@ -16,7 +16,12 @@
     "qualityScore": 82,
     "grade": "🚀 Chuyên Sâu (Production)",
     "version": 1,
-    "evolutionHistory": []
+    "evolutionHistory": [],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792050713006",
@@ -35,7 +40,12 @@
     "qualityScore": 90,
     "grade": "⭐ Tinh Hoa (Mastery)",
     "version": 1,
-    "evolutionHistory": []
+    "evolutionHistory": [],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792060557024",
@@ -54,7 +64,12 @@
     "qualityScore": 92,
     "grade": "⭐ Tinh Hoa (Mastery)",
     "version": 1,
-    "evolutionHistory": []
+    "evolutionHistory": [],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792066645320",
@@ -89,7 +104,12 @@
         "version": "v3.0",
         "reason": "Bổ sung chiều sâu kỹ thuật, nguyên nhân cốt lõi và bài học thực chiến"
       }
-    ]
+    ],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792068473603",
@@ -124,7 +144,12 @@
         "version": "v3.0",
         "reason": "Bổ sung chiều sâu kỹ thuật, nguyên nhân cốt lõi và bài học thực chiến"
       }
-    ]
+    ],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792068480359",
@@ -154,7 +179,12 @@
         "reason": "Bổ sung phân tích nguyên nhân gốc rễ, rủi ro và các từ khóa kỹ thuật thực chiến cho chiến dịch săn job tốc độ cao."
       }
     ],
-    "lastUpdated": "22:34:08 15/10/2026"
+    "lastUpdated": "22:34:08 15/10/2026",
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792068549436",
@@ -182,7 +212,12 @@
         "version": "v2.0",
         "reason": "Bổ sung chuẩn ATS quốc tế, công thức Google XYZ và kịch bản Proposal cá nhân hóa 2 dòng đầu"
       }
-    ]
+    ],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792068634258",
@@ -210,7 +245,12 @@
         "version": "v2.0",
         "reason": "Bổ sung cấu trúc định giá 3 tầng, kỹ thuật neo giá Decoy và cơ chế bảo vệ dòng tiền Milestone 40-30-30"
       }
-    ]
+    ],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792068666510",
@@ -244,7 +284,12 @@
         "reason": "Bổ sung phân tích nguyên nhân gốc rễ, rủi ro bị từ chối và phương pháp kỹ thuật xây dựng kịch bản Proposal tỷ lệ chuyển đổi cao."
       }
     ],
-    "lastUpdated": "22:34:18 15/10/2026"
+    "lastUpdated": "22:34:18 15/10/2026",
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792068712699",
@@ -263,7 +308,12 @@
     "qualityScore": 90,
     "grade": "⭐ Tinh Hoa (Mastery)",
     "version": 1,
-    "evolutionHistory": []
+    "evolutionHistory": [],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792068782807",
@@ -282,7 +332,12 @@
     "qualityScore": 80,
     "grade": "🚀 Chuyên Sâu (Production)",
     "version": 1,
-    "evolutionHistory": []
+    "evolutionHistory": [],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792068821880",
@@ -301,7 +356,12 @@
     "qualityScore": 90,
     "grade": "⭐ Tinh Hoa (Mastery)",
     "version": 1,
-    "evolutionHistory": []
+    "evolutionHistory": [],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792068832537",
@@ -335,7 +395,12 @@
         "reason": "Nạp tri thức kỹ thuật từ Dev.to Engineering (CSP & Multi-Agent Architecture) và Wikipedia Standards"
       }
     ],
-    "lastUpdated": "23:00:10 15/10/2026"
+    "lastUpdated": "23:00:10 15/10/2026",
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792068880588",
@@ -391,7 +456,12 @@
         "reason": "Tích hợp mô hình Event-Driven & Circuit Breaker từ Dev.to Engineering"
       }
     ],
-    "lastUpdated": "23:00:45 15/10/2026"
+    "lastUpdated": "23:00:45 15/10/2026",
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792068952310",
@@ -419,7 +489,12 @@
         "version": "v2.0",
         "reason": "Tích hợp mô hình PAS, cơ chế Hook 3 giây và kỹ thuật Micro-CTA tăng tỷ lệ phản hồi > 35%"
       }
-    ]
+    ],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792069042351",
@@ -447,7 +522,12 @@
         "version": "v2.0",
         "reason": "Bổ sung kịch bản xử lý từ chối 3 bước, quy chuẩn ROI và kỹ thuật chốt sale tốc độ cao"
       }
-    ]
+    ],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792069060113",
@@ -467,7 +547,12 @@
     "qualityScore": 80,
     "grade": "🚀 Chuyên Sâu (Production)",
     "version": 1,
-    "evolutionHistory": []
+    "evolutionHistory": [],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792069072008",
@@ -511,7 +596,12 @@
         "reason": "Áp dụng Reactive State & Debounce Render chuẩn mực từ Dev.to"
       }
     ],
-    "lastUpdated": "23:00:45 15/10/2026"
+    "lastUpdated": "23:00:45 15/10/2026",
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792070129233",
@@ -546,7 +636,12 @@
         "version": "v3.0",
         "reason": "Bổ sung chiều sâu kỹ thuật, nguyên nhân cốt lõi và bài học thực chiến"
       }
-    ]
+    ],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792070344930",
@@ -577,7 +672,12 @@
         "reason": "Nâng cấp bài học chuyên sâu về E-commerce Job Hunting, bổ sung phân tích nguyên nhân gốc rễ, giải pháp kỹ thuật bài bản và từ khóa thực chiến."
       }
     ],
-    "lastUpdated": "22:33:40 15/10/2026"
+    "lastUpdated": "22:33:40 15/10/2026",
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792070458327",
@@ -611,7 +711,12 @@
         "reason": "Tích hợp chuẩn ATS Parsing và Puppeteer Print Specification từ tài liệu quốc tế"
       }
     ],
-    "lastUpdated": "23:00:46 15/10/2026"
+    "lastUpdated": "23:00:46 15/10/2026",
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792075309584",
@@ -650,7 +755,12 @@
         "reason": "Nâng cấp bài học v2.0 dựa trên chuẩn data pipeline quốc tế và tài liệu kỹ thuật web scraping chống bot detection năm 2026, bổ sung đầy đủ các từ khóa kỹ thuật chuyên sâu và cơ chế kiểm thực dữ liệu."
       }
     ],
-    "lastUpdated": "23:05:58 15/10/2026"
+    "lastUpdated": "23:05:58 15/10/2026",
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792075318820",
@@ -684,7 +794,12 @@
         "reason": "Nâng cấp bài học cũ thiếu chiều sâu kỹ thuật sang chuẩn Chuyên Sâu (Production v2.0) với các kỹ thuật cá nhân hóa và đo lường conversion rate."
       }
     ],
-    "lastUpdated": "22:47:07 15/10/2026"
+    "lastUpdated": "22:47:07 15/10/2026",
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792075580356",
@@ -712,7 +827,12 @@
         "version": "v2.0",
         "reason": "Bổ sung chiều sâu kỹ thuật, nguyên nhân cốt lõi và bài học thực chiến"
       }
-    ]
+    ],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792075602703",
@@ -740,7 +860,12 @@
         "version": "v2.0",
         "reason": "Bổ sung chiều sâu kỹ thuật, nguyên nhân cốt lõi và bài học thực chiến"
       }
-    ]
+    ],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792076735059",
@@ -773,7 +898,12 @@
         "reason": "Tích hợp kiến trúc Human-in-the-loop và Anti-bot Stealth từ Wikipedia & Dev.to"
       }
     ],
-    "lastUpdated": "23:00:46 15/10/2026"
+    "lastUpdated": "23:00:46 15/10/2026",
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792076861985",
@@ -808,7 +938,12 @@
         "version": "v3.0",
         "reason": "Bổ sung chiều sâu kỹ thuật, nguyên nhân cốt lõi và bài học thực chiến"
       }
-    ]
+    ],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792082028904",
@@ -839,7 +974,12 @@
         "reason": "Nâng cấp bài học từ kinh nghiệm xử lý anti-bot thực chiến và tiêu chuẩn trích xuất DOM bóc tách Job ID kết hợp tài liệu kỹ thuật engineering."
       }
     ],
-    "lastUpdated": "23:34:14 15/10/2026"
+    "lastUpdated": "23:34:14 15/10/2026",
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792091670861",
@@ -869,7 +1009,12 @@
         "reason": "Nâng cấp từ tài liệu kỹ thuật & tiêu chuẩn MCDM chuẩn quốc tế để chuẩn hóa quy trình khởi động tranh biện hội đồng."
       }
     ],
-    "lastUpdated": "00:52:24 19/10/2026"
+    "lastUpdated": "00:52:24 19/10/2026",
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792091709380",
@@ -900,7 +1045,12 @@
         "reason": "Nâng cấp dựa trên chuẩn mực Computational Intelligence và Fault Tolerance patterns trong kiến trúc hệ thống phân tán 2026."
       }
     ],
-    "lastUpdated": "00:52:35 19/10/2026"
+    "lastUpdated": "00:52:35 19/10/2026",
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792091764417",
@@ -931,7 +1081,12 @@
         "reason": "Nâng cấp dựa trên tiêu chuẩn kiến trúc hệ thống high-throughput AI workloads và best practices từ cộng đồng kỹ sư quốc tế."
       }
     ],
-    "lastUpdated": "00:52:31 19/10/2026"
+    "lastUpdated": "00:52:31 19/10/2026",
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792092242444",
@@ -947,7 +1102,12 @@
     "qualityScore": 58,
     "grade": "⚠️ Sơ Cấp (Preliminary)",
     "version": 1,
-    "evolutionHistory": []
+    "evolutionHistory": [],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792331646206",
@@ -972,7 +1132,12 @@
     "qualityScore": 100,
     "grade": "⭐ Tinh Hoa (Mastery)",
     "version": 1,
-    "evolutionHistory": []
+    "evolutionHistory": [],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792333836894",
@@ -993,7 +1158,12 @@
     "qualityScore": 80,
     "grade": "🚀 Chuyên Sâu (Production)",
     "version": 1,
-    "evolutionHistory": []
+    "evolutionHistory": [],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792343445322",
@@ -1013,7 +1183,12 @@
     "qualityScore": 82,
     "grade": "🚀 Chuyên Sâu (Production)",
     "version": 1,
-    "evolutionHistory": []
+    "evolutionHistory": [],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792343455253",
@@ -1052,7 +1227,12 @@
         "reason": "Nâng cấp giải pháp thực chiến sâu sắc hơn (83% ➔ 90%)"
       }
     ],
-    "lastUpdated": "00:33:56 19/10/2026"
+    "lastUpdated": "00:33:56 19/10/2026",
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792343843788",
@@ -1072,7 +1252,12 @@
     "qualityScore": 85,
     "grade": "🚀 Chuyên Sâu (Production)",
     "version": 1,
-    "evolutionHistory": []
+    "evolutionHistory": [],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792343859000",
@@ -1092,7 +1277,12 @@
     "qualityScore": 93,
     "grade": "⭐ Tinh Hoa (Mastery)",
     "version": 1,
-    "evolutionHistory": []
+    "evolutionHistory": [],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792507067768",
@@ -1108,7 +1298,12 @@
     "qualityScore": 67,
     "grade": "📌 Cơ Bản (Standard)",
     "version": 1,
-    "evolutionHistory": []
+    "evolutionHistory": [],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792507173561",
@@ -1124,7 +1319,12 @@
     "qualityScore": 43,
     "grade": "⚠️ Sơ Cấp (Preliminary)",
     "version": 1,
-    "evolutionHistory": []
+    "evolutionHistory": [],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   },
   {
     "id": "exp_1792507246775",
@@ -1140,6 +1340,11 @@
     "qualityScore": 43,
     "grade": "⚠️ Sơ Cấp (Preliminary)",
     "version": 1,
-    "evolutionHistory": []
+    "evolutionHistory": [],
+    "evidence_sources": [],
+    "verification_status": "UNVERIFIED",
+    "confidence": null,
+    "last_verified_at": null,
+    "limitations": ""
   }
 ]

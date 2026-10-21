@@ -3,6 +3,8 @@ const { exec, spawn } = require('child_process');
 const fs = require('fs');
 const fsPromises = require('fs').promises;
 const path = require('path');
+const dns = require('dns').promises;
+const net = require('net');
 const cors = require('cors');
 const vm = require('vm');
 const { createPathGuard } = require('./utils/pathSafety');
@@ -66,22 +68,23 @@ app.use('/api', (req, res, next) => {
 // Auth Middleware — Bearer Token (bật khi AGENT_SECRET_KEY được cấu hình)
 app.use('/api', createAuthMiddleware(process.env.AGENT_SECRET_KEY));
 
-app.use(express.static(__dirname));
+// SECURITY: Chỉ phục vụ file tĩnh từ thư mục public/ — không phục vụ toàn bộ thư mục dự án
+app.use(express.static(path.join(__dirname, 'public')));
 
 // API cung cấp cấu hình cho giao diện trình duyệt từ .env
+// SECURITY: Không bao giờ trả về giá trị API Key — chỉ trả trạng thái có/không
 app.get('/api/config', (req, res) => {
     res.json({
         success: true,
-        apiKey: process.env.GEMINI_API_KEY || '',
         hasGeminiKey: !!process.env.GEMINI_API_KEY,
         hasCustomAiKey: !!process.env.CUSTOM_AI_KEY,
         hasAgentSecret: !!process.env.AGENT_SECRET_KEY,
         port: process.env.PORT || 3000,
-        outputDir: process.env.OUTPUT_DIR || 'C:\\Users\\Nam\\Desktop\\gemini',
+        outputDir: process.env.OUTPUT_DIR || '',
         customAi: {
-            baseUrl: process.env.CUSTOM_AI_BASE_URL || '',
+            baseUrl: process.env.CUSTOM_AI_BASE_URL ? '***configured***' : '',
             model: process.env.CUSTOM_AI_MODEL || '',
-            apiKey: process.env.CUSTOM_AI_KEY || ''
+            hasApiKey: !!process.env.CUSTOM_AI_KEY
         }
     });
 });
@@ -141,6 +144,23 @@ if (!fs.existsSync(EXPERIENCES_FILE)) {
 }
 if (!fs.existsSync(EXPERIENCES_MD)) {
     fs.writeFileSync(EXPERIENCES_MD, '# 🧠 KHO TRI THỨC & BÀI HỌC KINH NGHIỆM CỦA CYBER AGENT\n\nDanh sách các bài học, giải pháp và kinh nghiệm tự học tích lũy qua thời gian:\n\n---\n', 'utf8');
+}
+
+function hasPathTraversal(targetPath) {
+    if (typeof targetPath !== 'string') return false;
+    const normalized = targetPath.trim().replace(/\\/g, '/');
+    return normalized.split('/').some(segment => segment === '..');
+}
+
+function rejectPathTraversal(targetPath, res) {
+    if (!hasPathTraversal(targetPath)) return false;
+    if (res) {
+        res.json({
+            success: false,
+            error: '🚫 Path bị từ chối: không cho phép thành phần .. trong đường dẫn.'
+        });
+    }
+    return true;
 }
 
 // Hàm chuẩn hóa đường dẫn thông minh:
@@ -203,6 +223,7 @@ function resolvePath(targetPath, isWriting = false) {
 // ==========================================
 
 const SNAPSHOTS_DIR = path.join(BASE_DIR, '.snapshots');
+const SNAPSHOT_NAME_PATTERN = /^\d+_[A-Za-z0-9._-]+$/;
 if (!fs.existsSync(SNAPSHOTS_DIR)) fs.mkdirSync(SNAPSHOTS_DIR, { recursive: true });
 
 // Tự động tạo bản sao lưu Snapshot trước khi sửa file
@@ -265,6 +286,7 @@ app.post('/api/save-file', (req, res) => {
     try {
         let { filePath, fileName, content } = req.body;
         const target = filePath || fileName || 'output.txt';
+        if (rejectPathTraversal(target, res)) return;
         const fullPath = resolvePath(target, true);
         if (!assertSafePath(fullPath, res)) return; // Chặn path traversal
 
@@ -315,6 +337,7 @@ app.post('/api/edit-file-chunk', (req, res) => {
         if (replacementContent === undefined || replacementContent === null) {
             replacementContent = '';
         }
+        if (rejectPathTraversal(filePath, res)) return;
 
         const fullPath = resolvePath(filePath);
         if (!assertSafePath(fullPath, res)) return; // Chặn path traversal
@@ -395,6 +418,7 @@ app.post('/api/rollback-code', (req, res) => {
         }
 
         let targetSnapshot = snapshotId;
+        if (filePath && rejectPathTraversal(filePath, res)) return;
         if (!targetSnapshot || targetSnapshot === 'latest') {
             const files = fs.readdirSync(SNAPSHOTS_DIR);
             if (filePath) {
@@ -410,8 +434,12 @@ app.post('/api/rollback-code', (req, res) => {
             }
         }
 
-        const snapshotPath = path.join(SNAPSHOTS_DIR, targetSnapshot);
-        if (!fs.existsSync(snapshotPath)) {
+        const snapshotNamePattern = SNAPSHOT_NAME_PATTERN;
+        if (!snapshotNamePattern.test(targetSnapshot) || path.basename(targetSnapshot) !== targetSnapshot) {
+            return res.json({ success: false, error: 'Snapshot ID không hợp lệ.' });
+        }
+        const snapshotPath = path.resolve(SNAPSHOTS_DIR, targetSnapshot);
+        if (!assertSafePath(snapshotPath, res) || !fs.existsSync(snapshotPath)) {
             return res.json({ success: false, error: `Snapshot không tồn tại: ${targetSnapshot}` });
         }
 
@@ -436,9 +464,11 @@ app.post('/api/rollback-code', (req, res) => {
 app.post('/api/codebase-map', (req, res) => {
     try {
         const { rootDir, depth = 3 } = req.body;
+        if (rootDir && rejectPathTraversal(rootDir, res)) return;
         const targetDir = rootDir ? resolvePath(rootDir) : BASE_DIR;
+        if (!assertSafePath(targetDir, res)) return;
 
-        if (!fs.existsSync(targetDir)) {
+        if (!fs.existsSync(targetDir) || !fs.statSync(targetDir).isDirectory()) {
             return res.json({ success: false, error: `Thư mục không tồn tại: ${targetDir}` });
         }
 
@@ -528,13 +558,28 @@ app.post('/api/manage-daemon', (req, res) => {
 
         if (action === 'start') {
             if (!command) return res.json({ success: false, error: 'Thiếu lệnh khởi chạy (command)' });
+            if (cwd && rejectPathTraversal(cwd, res)) return;
             const id = daemonId || `daemon_${Date.now()}`;
             if (activeDaemons.has(id) && activeDaemons.get(id).status === 'RUNNING') {
                 return res.json({ success: false, error: `Daemon ID '${id}' đang chạy rồi. Hãy dừng trước nếu muốn chạy lại.` });
             }
 
+            // SECURITY: Whitelist — Chỉ cho phép chạy node scripts và npm scripts
+            const DAEMON_ALLOWED = [
+                /^node\s+[\w\-\.\/\\]+\.js\b/i,
+                /^npm\s+(start|run)\b/i,
+                /^(python|python3|py)\s+[\w\-\.\/\\]+\.py\b/i,
+            ];
+            if (!DAEMON_ALLOWED.some(p => p.test(command.trim()))) {
+                return res.json({ success: false, error: '🚫 Daemon chỉ cho phép chạy: node <file.js>, npm start/run, python <file.py>.' });
+            }
+
             const workDir = cwd ? resolvePath(cwd) : BASE_DIR;
-            const child = exec(command, { cwd: workDir, maxBuffer: 10 * 1024 * 1024 });
+            if (cwd && rejectPathTraversal(cwd, res)) return;
+            if (!assertSafePath(workDir, res) || !fs.existsSync(workDir) || !fs.statSync(workDir).isDirectory()) return;
+            const parsed = parseSafeCommand(command);
+            if (!parsed) return res.json({ success: false, error: 'Daemon command không nằm trong schema an toàn.' });
+            const child = spawn(parsed.file, parsed.args, { cwd: workDir, shell: false, windowsHide: true });
 
             const daemonRecord = {
                 id,
@@ -589,7 +634,9 @@ app.post('/api/manage-daemon', (req, res) => {
 
             if (daemon.status === 'RUNNING' && daemon.process) {
                 try {
-                    exec(`taskkill /pid ${daemon.process.pid} /T /F`);
+                    spawn(process.platform === 'win32' ? 'taskkill.exe' : 'kill',
+                        process.platform === 'win32' ? ['/pid', String(daemon.process.pid), '/T', '/F'] : ['-KILL', String(daemon.process.pid)],
+                        { shell: false, windowsHide: true });
                 } catch (e) {
                     daemon.process.kill('SIGKILL');
                 }
@@ -641,6 +688,7 @@ app.post('/api/read-file', (req, res) => {
         let { filePath, fileName } = req.body;
         const target = filePath || fileName;
         if (!target) return res.json({ success: false, error: 'Thiếu đường dẫn file (filePath)' });
+        if (rejectPathTraversal(target, res)) return;
 
         const fullPath = resolvePath(target);
         if (!assertSafePath(fullPath, res)) return; // Chặn path traversal
@@ -673,7 +721,9 @@ app.get('/api/view-file', (req, res) => {
     try {
         const target = req.query.path || req.query.file;
         if (!target) return res.status(400).send('Thiếu đường dẫn file (path hoặc file)');
+        if (rejectPathTraversal(target)) return res.status(400).send('🚫 Path bị từ chối: không cho phép thành phần .. trong đường dẫn.');
         const fullPath = resolvePath(target);
+        if (!assertSafePath(fullPath, res)) return;
         if (!fs.existsSync(fullPath)) {
             return res.status(404).send(`<h3>Không tìm thấy file: ${target}</h3>`);
         }
@@ -890,9 +940,10 @@ function escapeHtmlServer(str) {
 app.post('/api/list-files', (req, res) => {
     try {
         let { dirPath, recursive } = req.body;
+        if (dirPath && rejectPathTraversal(dirPath, res)) return;
         const targetDir = resolvePath(dirPath || '.');
-
-        if (!fs.existsSync(targetDir)) {
+        if (!assertSafePath(targetDir, res)) return;
+        if (!fs.existsSync(targetDir) || !fs.statSync(targetDir).isDirectory()) {
             return res.json({ success: false, error: `Thư mục không tồn tại: ${targetDir}` });
         }
 
@@ -946,48 +997,98 @@ app.get('/api/workspace-info', (req, res) => {
 // 2. CMD EXECUTION (Thực thi lệnh hệ thống)
 // ==========================================
 
-// Blacklist các lệnh hệ thống nguy hiểm
-const FORBIDDEN_CMD_PATTERNS = [
-    /rm\s+-rf\s+[\/\\]/i,
-    /del\s+\/[fs]/i,
-    /format\s+[a-z]:/i,
-    /\bmkfs\b/i,
-    /\bdd\s+if=/i,
-    /shutdown\s+[\/\-]/i,
-    /\bregedit\b/i,
-    /reg\s+(delete|add)\s+HKL/i,
-    /net\s+(user|localgroup)\s+.*(\/add|\/delete)/i,
-    /\bbcdedit\b/i,
-    /cipher\s+\/w/i
-];
+// Parse thành executable + argv; không bao giờ chuyển chuỗi người dùng vào shell.
+function parseSafeCommand(command) {
+    if (typeof command !== 'string' || !command.trim() || command.length > 500) return null;
+    const value = command.trim();
+    // Shell metacharacters, command substitution and control operators are never accepted.
+    if (/[&|<>`$;\n\r]|\$\(|\b(?:cmd|powershell|pwsh|sh|bash)\b/i.test(value)) return null;
+
+    const parts = value.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g);
+    if (!parts || parts.length === 0) return null;
+    const args = parts.map(part => part.replace(/^(["'])|(["'])$/g, ''));
+    const executable = args.shift().toLowerCase();
+    const scriptArg = args[0] || '';
+    const safeRelative = input => typeof input === 'string' &&
+        input.length > 0 && input.length <= 240 &&
+        !path.isAbsolute(input) && !input.includes('..') &&
+        /^[\w./\\:-]+$/.test(input);
+
+    if (executable === 'node' && /^[-\w./\\]+\.js$/i.test(scriptArg)) {
+        const extraArgs = args.slice(1);
+        if (!extraArgs.every(arg => safeRelative(arg))) return null;
+        return { file: process.execPath, args, display: value };
+    }
+    if ((executable === 'python' || executable === 'python3' || executable === 'py') &&
+        /^[\w./\\-]+\.py$/i.test(scriptArg)) {
+        const extraArgs = args.slice(1);
+        if (!extraArgs.every(arg => safeRelative(arg))) return null;
+        return { file: executable === 'py' ? 'py' : executable, args, display: value };
+    }
+    if (executable === 'npm' && /^(start|test|ls|outdated|audit)$/.test(scriptArg)) {
+        return { file: process.platform === 'win32' ? 'npm.cmd' : 'npm', args, display: value };
+    }
+    if (executable === 'npm' && scriptArg === 'run' && /^[\w:-]+$/.test(args[1] || '')) {
+        return { file: process.platform === 'win32' ? 'npm.cmd' : 'npm', args, display: value };
+    }
+    if (executable === 'git' && /^(status|log|diff|branch|remote)$/.test(scriptArg) &&
+        args.slice(1).every(arg => /^[\w./\\:-]+$/.test(arg))) {
+        return { file: 'git', args, display: value };
+    }
+    if ((executable === 'dir' || executable === 'ls') && args.every(safeRelative)) {
+        return { file: executable, args, display: value };
+    }
+    if ((executable === 'type' || executable === 'cat') && args.length === 1 && safeRelative(args[0])) {
+        return { file: executable, args, display: value };
+    }
+    return null;
+}
+
+function runSafeCommand(command, cwd, callback) {
+    const parsed = parseSafeCommand(command);
+    if (!parsed) return callback(new Error('Command không nằm trong schema an toàn'), '', '');
+    const child = spawn(parsed.file, parsed.args, {
+        cwd,
+        shell: false,
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe']
+    });
+    let stdout = '', stderr = '';
+    const maxOutput = 2 * 1024 * 1024;
+    child.stdout.on('data', chunk => {
+        stdout += chunk.toString();
+        if (stdout.length > maxOutput) child.kill();
+    });
+    child.stderr.on('data', chunk => {
+        stderr += chunk.toString();
+        if (stderr.length > maxOutput) child.kill();
+    });
+    const timer = setTimeout(() => child.kill(), 60000);
+    child.once('error', err => { clearTimeout(timer); callback(err, stdout, stderr); });
+    child.once('close', code => {
+        clearTimeout(timer);
+        callback(code === 0 ? null : Object.assign(new Error(`Exit code ${code}`), { code }), stdout, stderr);
+    });
+}
 
 app.post('/api/run-cmd', (req, res) => {
     const { command, cwd } = req.body;
-    if (!command) return res.json({ success: false, error: 'Thiếu lệnh CMD' });
-
-    // Kiểm tra blacklist — từ chối các lệnh nguy hiểm
-    const isForbidden = FORBIDDEN_CMD_PATTERNS.some(pattern => pattern.test(command));
-    if (isForbidden) {
-        console.warn(`[CMD Blocked] Lệnh nguy hiểm bị từ chối: ${command.slice(0, 80)}`);
-        return res.json({
-            success: false,
-            output: '🚫 Lệnh bị từ chối: Phát hiện lệnh có thể gây nguy hiểm cho hệ thống.'
-        });
+    const parsed = parseSafeCommand(command);
+    if (!parsed) {
+        return res.json({ success: false, output: '🚫 Lệnh bị từ chối: chỉ hỗ trợ command schema an toàn, không qua shell.' });
     }
+    if (cwd && rejectPathTraversal(cwd, res)) return;
 
-    // Mặc định thực thi ngay trong thư mục ngày hôm nay của Gemini
     const workDir = cwd ? resolvePath(cwd) : getTodayOutputDir();
+    if (!assertSafePath(workDir, res) || !fs.existsSync(workDir) || !fs.statSync(workDir).isDirectory()) return;
 
-    exec(command, { cwd: workDir, maxBuffer: 10 * 1024 * 1024, timeout: 60000 }, (error, stdout, stderr) => {
+    runSafeCommand(command, workDir, (error, stdout, stderr) => {
         const output = (stdout || '') + (stderr ? (stdout ? '\n[STDERR]:\n' : '') + stderr : '');
-        if (error && !output) {
-            return res.json({ success: false, output: `Lỗi thực thi (${error.code || 'TIMEOUT'}): ${error.message}` });
-        }
         res.json({
             success: !error,
-            output: output || '[Lệnh đã hoàn thành, không có dữ liệu trả về]',
+            output: output || (error ? `Lỗi thực thi: ${error.message}` : '[Lệnh đã hoàn thành, không có dữ liệu trả về]'),
             exitCode: error ? (error.code || 1) : 0,
-            workDir: workDir
+            workDir
         });
     });
 });
@@ -1297,8 +1398,19 @@ function extractContentAndJobLinks(rawHtml, baseUrl) {
 
 // Đọc toàn bộ nội dung của 1 đường dẫn URL (Cơ chế Vượt Chặn Bot Đa Tầng 3 Lớp: Stealth Fetch -> Jina AI Reader -> Puppeteer Stealth)
 app.post('/api/fetch-webpage', async (req, res) => {
-    const { url } = req.body;
+    let { url } = req.body;
     if (!url) return res.json({ success: false, error: 'Thiếu đường dẫn URL' });
+
+    let parsedInputUrl;
+    try {
+        parsedInputUrl = new URL(url);
+        if (!['http:', 'https:'].includes(parsedInputUrl.protocol) || !isUrlSafe(url)) {
+            return res.json({ success: false, error: 'URL bị từ chối vì không hợp lệ hoặc trỏ tới mạng nội bộ.' });
+        }
+        url = parsedInputUrl.toString();
+    } catch (e) {
+        return res.json({ success: false, error: 'URL không hợp lệ.' });
+    }
 
     let rawHtml = '';
     let usedEngine = 'Direct Stealth HTTP/2 Fetch';
@@ -2628,6 +2740,11 @@ app.post('/api/browse-web', async (req, res) => {
 
     let browser = null;
     try {
+        const parsedUrl = new URL(url);
+        if (!['http:', 'https:'].includes(parsedUrl.protocol) || !isUrlSafe(url)) {
+            return res.json({ success: false, error: 'URL bị từ chối vì không hợp lệ hoặc trỏ tới mạng nội bộ.' });
+        }
+        url = parsedUrl.toString();
         const isHeadless = headless !== false && headless !== 'false'; // Mặc định chạy ngầm
 
         browser = await puppeteer.launch({
@@ -2804,17 +2921,30 @@ app.post('/api/open-browser-login', (req, res) => {
         return res.json({ success: false, error: 'Không tìm thấy Google Chrome hoặc Edge.' });
     }
 
-    const startUrl = targetUrl || 'https://facebook.com';
-    // Khởi chạy Chrome với UserDataDir của Agent để lưu phiên đăng nhập
-    const cmd = `"${chromePath}" --user-data-dir="${CHROME_PROFILE_DIR}" "${startUrl}"`;
-    exec(cmd, (err) => {
-        if (err) console.warn("Chrome login process closed/err:", err.message);
+    let startUrl = targetUrl || 'https://facebook.com';
+    try {
+        const parsed = new URL(startUrl);
+        if (!['http:', 'https:'].includes(parsed.protocol) || !isUrlSafe(startUrl)) {
+            return res.json({ success: false, error: 'URL đăng nhập không hợp lệ hoặc bị chặn vì lý do bảo mật.' });
+        }
+        startUrl = parsed.toString();
+    } catch (e) {
+        return res.json({ success: false, error: 'URL đăng nhập không hợp lệ.' });
+    }
+
+    // Không nối URL vào shell; mỗi tham số được truyền riêng qua spawn.
+    const child = spawn(chromePath, [`--user-data-dir=${CHROME_PROFILE_DIR}`, startUrl], {
+        shell: false,
+        windowsHide: false,
+        detached: true,
+        stdio: 'ignore'
     });
+    child.unref();
 
     res.json({
         success: true,
-        message: `Đã mở trình duyệt Chrome cho phiên đăng nhập: ${startUrl}. Hãy đăng nhập tài khoản của bạn, phiên đăng nhập sẽ được lưu tự động vĩnh viễn!`,
-        profileDir: CHROME_PROFILE_DIR
+        message: `Đã mở trình duyệt Chrome cho phiên đăng nhập: ${startUrl}.`,
+        profileDir: path.basename(CHROME_PROFILE_DIR)
     });
 });
 
@@ -2835,6 +2965,7 @@ app.post('/api/generate-image', async (req, res) => {
         const genH = Math.min(Math.max(Math.round(reqH / 64) * 64, 512), 768);
 
         let targetName = fileName || `image_${Date.now()}.png`;
+        if (rejectPathTraversal(targetName, res)) return;
         if (!path.extname(targetName)) targetName += '.png';
 
         const fullPath = resolvePath(targetName, true);
@@ -2936,6 +3067,7 @@ app.post('/api/export-design', async (req, res) => {
         let { filePath, fileName, format, outputFileName, width, height } = req.body;
         const target = filePath || fileName;
         if (!target) return res.json({ success: false, error: 'Thiếu đường dẫn file thiết kế (filePath)' });
+        if (rejectPathTraversal(target, res)) return;
 
         const fullSrcPath = resolvePath(target);
         if (!fs.existsSync(fullSrcPath)) {
@@ -2949,6 +3081,7 @@ app.post('/api/export-design', async (req, res) => {
             outName = `${baseWithoutExt}.${exportFormat}`;
         }
         if (!path.extname(outName)) outName += `.${exportFormat}`;
+        if (rejectPathTraversal(outName, res)) return;
 
         const fullOutPath = resolvePath(outName, true);
         const outDir = path.dirname(fullOutPath);
@@ -3026,11 +3159,40 @@ app.post('/api/export-design', async (req, res) => {
 // ==========================================
 // 6.5. UNIVERSAL CUSTOM AI PROVIDER GATEWAY
 // Hỗ trợ kết nối mọi AI bên ngoài (Claude 39k, OpenAI, DeepSeek, OpenRouter...)
+// SECURITY: Kiểm tra URL chống SSRF — chặn truy cập mạng nội bộ và metadata
+function isUrlSafe(urlString) {
+    try {
+        const parsed = new URL(urlString);
+        const hostname = parsed.hostname.toLowerCase();
+        const blocked = [
+            /^localhost$/i,
+            /^127\.\d+\.\d+\.\d+$/,
+            /^10\.\d+\.\d+\.\d+$/,
+            /^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/,
+            /^192\.168\.\d+\.\d+$/,
+            /^169\.254\.\d+\.\d+$/,
+            /^0\.0\.0\.0$/,
+            /^\[?::1\]?$/,
+            /^\[?fe80:/i,
+            /^\[?fc00:/i,
+            /^\[?fd/i,
+        ];
+        if (blocked.some(p => p.test(hostname))) return false;
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
+        return true;
+    } catch(e) { return false; }
+}
+
 function resolveApiEndpoint(rawUrl, model = '') {
     if (!rawUrl) return '';
     let clean = rawUrl.trim().replace(/\/+$/, '');
     if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
         clean = 'https://' + clean;
+    }
+    // SSRF Guard
+    if (!isUrlSafe(clean)) {
+        console.warn('[SSRF Blocked] URL bị chặn vì lý do bảo mật: ' + clean.slice(0, 100));
+        return '';
     }
     if (clean.endsWith('/chat/completions') || clean.endsWith('/messages')) {
         return clean;
@@ -3145,23 +3307,45 @@ app.post('/api/test-custom-ai', async (req, res) => {
 // API Lưu cấu hình Custom AI vào .env
 app.post('/api/save-custom-config', (req, res) => {
     const { baseUrl, model, apiKey } = req.body;
-    process.env.CUSTOM_AI_BASE_URL = baseUrl || '';
-    process.env.CUSTOM_AI_MODEL = model || '';
-    process.env.CUSTOM_AI_KEY = apiKey || '';
+
+    // SECURITY: Sanitize input — loại bỏ ký tự xuống dòng và null byte, chặn injection
+    const sanitizeEnvValue = (val) => {
+        if (typeof val !== 'string') return '';
+        return val.replace(/[\r\n\x00]/g, '').trim().slice(0, 500);
+    };
+
+    const cleanBaseUrl = sanitizeEnvValue(baseUrl);
+    const cleanModel = sanitizeEnvValue(model);
+    const cleanApiKey = sanitizeEnvValue(apiKey);
+
+    // Validate URL nếu có
+    if (cleanBaseUrl && !/^https?:\/\/.+/i.test(cleanBaseUrl)) {
+        return res.json({ success: false, error: 'Base URL không hợp lệ. Phải bắt đầu bằng http:// hoặc https://' });
+    }
+
+    // Validate model name (chỉ cho phép chữ, số, dấu gạch, dấu chấm)
+    if (cleanModel && !/^[\w\-\.\/\:]+$/.test(cleanModel)) {
+        return res.json({ success: false, error: 'Model name chứa ký tự không hợp lệ.' });
+    }
+
+    process.env.CUSTOM_AI_BASE_URL = cleanBaseUrl;
+    process.env.CUSTOM_AI_MODEL = cleanModel;
+    process.env.CUSTOM_AI_KEY = cleanApiKey;
 
     try {
         let envData = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
         const setEnvVar = (key, val) => {
+            const safeVal = String(val).replace(/[\r\n\x00]/g, '');
             const regex = new RegExp(`^${key}=.*$`, 'm');
             if (regex.test(envData)) {
-                envData = envData.replace(regex, `${key}=${val}`);
+                envData = envData.replace(regex, key + '=' + safeVal);
             } else {
-                envData += `\n${key}=${val}`;
+                envData += '\n' + key + '=' + safeVal;
             }
         };
-        if (baseUrl !== undefined) setEnvVar('CUSTOM_AI_BASE_URL', baseUrl);
-        if (model !== undefined) setEnvVar('CUSTOM_AI_MODEL', model);
-        if (apiKey !== undefined) setEnvVar('CUSTOM_AI_KEY', apiKey);
+        if (baseUrl !== undefined) setEnvVar('CUSTOM_AI_BASE_URL', cleanBaseUrl);
+        if (model !== undefined) setEnvVar('CUSTOM_AI_MODEL', cleanModel);
+        if (apiKey !== undefined) setEnvVar('CUSTOM_AI_KEY', cleanApiKey);
         fs.writeFileSync(envPath, envData.trim() + '\n', 'utf8');
         res.json({ success: true, message: 'Đã lưu cấu hình Custom AI thành công!' });
     } catch (e) {
@@ -4188,7 +4372,7 @@ function auditCitationEntailment(claimText, sourceData = {}) {
     const srcText = String(sourceData.sourceText || sourceData.abstract || '');
     const blockingIssues = [];
     const approvedCaveats = [];
-    let status = 'SUPPORTED';
+    let status = 'UNVERIFIED';
 
     // 1. Kiểm tra phóng đại từ mô hình động vật sang người
     const isAnimalStudy = Boolean(sourceData.species === 'animal' || sourceData.species === 'rodent' ||
@@ -4243,6 +4427,15 @@ function auditCitationEntailment(claimText, sourceData = {}) {
         blockingIssues.push('Tuyên bố sai lệch: Tốc độ dẫn truyền sợi có myelin do đường kính sợi giải phẫu quyết định (lên tới 100-120 m/s so với sợi không myelin); Deliberate Practice chỉ tinh chỉnh đồng bộ hóa thời gian (temporal synchrony), không làm tăng tốc độ lên 100 lần.');
     }
 
+    // Nâng từ UNVERIFIED lên SUPPORTED chỉ khi có nguồn DOI/PMID được xác minh
+    if (status === 'UNVERIFIED' && blockingIssues.length === 0) {
+        const hasVerifiedSource = !!(sourceData.doi || sourceData.pmid || sourceData.sourceUrl);
+        const hasSourceText = !!(srcText && srcText.length > 50);
+        if (hasVerifiedSource && hasSourceText) {
+            status = 'SUPPORTED';
+        }
+    }
+
     // Sinh approved wording
     let approvedWording = text;
     if (approvedCaveats.length > 0) {
@@ -4272,7 +4465,7 @@ function enforceQualityGate(reportContent, claims = []) {
     let r1Pass = true;
     let r1Detail = '';
     if (/Šrámek|Sramek/i.test(text)) {
-        const mentionsExactNumbers = /250%|530%/i.test(text);
+        const mentionsExactNumbers = /250%/i.test(text) && /530%/i.test(text);
         const mentionsUnderstatement = /dopamine tăng nhẹ/i.test(text);
         if (mentionsUnderstatement && !mentionsExactNumbers) {
             r1Pass = false;
@@ -4412,8 +4605,15 @@ function enforceQualityGate(reportContent, claims = []) {
     rubricResults.push({ id: 'R9_OBJECTIVE_ACADEMIC_TONE', name: 'Văn phong học thuật khách quan', passed: r9Pass, detail: r9Detail });
 
     const passed = issues.length === 0;
-    const baseScore = 9.5;
-    const score = Math.max(4.0, (baseScore - issues.length * 1.5)).toFixed(1);
+    // UPGRADED: Điểm dựa trên tỷ lệ tiêu chí đạt, KHÔNG dùng base 9.5 cố định
+    const totalCriteria = rubricResults.length || 1;
+    const skipPhrases = ['Không đề cập', 'Không áp dụng', 'Không có vi phạm', 'Đạt chuẩn'];
+    const isApplicable = (r) => !skipPhrases.some(sp => r.detail.includes(sp));
+    const applicableCriteria = rubricResults.filter(isApplicable).length;
+    const passedApplicable = rubricResults.filter(r => r.passed && isApplicable(r)).length;
+    const ratioScore = applicableCriteria > 0 ? (passedApplicable / applicableCriteria) * 10 : 5.0;
+    const penalty = issues.length * 1.0;
+    const score = Math.max(1.0, Math.min(10.0, ratioScore - penalty)).toFixed(1);
 
     return {
         passed,
@@ -4622,7 +4822,16 @@ app.get('/api/memory-stats', (req, res) => {
 app.get('/api/snapshots', (req, res) => {
     try {
         if (!fs.existsSync(SNAPSHOTS_DIR)) return res.json({ success: true, snapshots: [], total: 0 });
-        const files = fs.readdirSync(SNAPSHOTS_DIR).sort().reverse();
+        const files = fs.readdirSync(SNAPSHOTS_DIR)
+            .filter(f => SNAPSHOT_NAME_PATTERN.test(f))
+            .filter(f => {
+                try {
+                    return fs.lstatSync(path.join(SNAPSHOTS_DIR, f)).isFile();
+                } catch (e) {
+                    return false;
+                }
+            })
+            .sort().reverse();
         const snapshots = files.slice(0, 50).map(f => {
             const stat = fs.statSync(path.join(SNAPSHOTS_DIR, f));
             const parts = f.match(/^(\d+)_(.+)$/);
@@ -4647,6 +4856,7 @@ app.post('/api/diff-files', (req, res) => {
 
         const fullA = resolvePath(filePathA);
         const fullB = resolvePath(filePathB);
+        if (!assertSafePath(fullA, res) || !assertSafePath(fullB, res)) return;
         if (!fs.existsSync(fullA)) return res.json({ success: false, error: `File A không tồn tại: ${filePathA}` });
         if (!fs.existsSync(fullB)) return res.json({ success: false, error: `File B không tồn tại: ${filePathB}` });
 
@@ -4684,6 +4894,7 @@ app.post('/api/diff-files', (req, res) => {
 });
 
 // Code Execution Sandbox — Chạy JS an toàn trong VM với resource limits
+// SECURITY: Thực thi code trong tiến trình con cô lập (thay vì vm module không an toàn)
 app.post('/api/run-code', (req, res) => {
     try {
         const { code, language = 'javascript', timeout = 5000 } = req.body;
@@ -4692,35 +4903,50 @@ app.post('/api/run-code', (req, res) => {
             return res.json({ success: false, error: 'Hiện tại chỉ hỗ trợ JavaScript sandbox. Python cần daemon riêng.' });
         }
         const safeTimeout = Math.min(parseInt(timeout) || 5000, 10000);
-        const logs = [];
-        const sandbox = {
-            console: {
-                log: (...a) => logs.push(a.map(x => typeof x === 'object' ? JSON.stringify(x) : String(x)).join(' ')),
-                error: (...a) => logs.push('[ERR] ' + a.map(String).join(' ')),
-                warn: (...a) => logs.push('[WARN] ' + a.map(String).join(' ')),
-                info: (...a) => logs.push('[INFO] ' + a.map(String).join(' '))
-            },
-            Math, JSON, Array, Object, String, Number, Boolean, Date, RegExp, Error,
-            parseInt, parseFloat, isNaN, isFinite, encodeURIComponent, decodeURIComponent,
-            // Disabled: setTimeout, setInterval, require, process, global, fs
-        };
         const startMs = Date.now();
-        let result;
-        try {
-            result = new vm.Script(code, { filename: 'sandbox.js', timeout: safeTimeout })
-                .runInContext(vm.createContext(sandbox), { timeout: safeTimeout });
-        } catch (e) {
-            return res.json({ success: false, error: `${e.name}: ${e.message}`, logs, executionTimeMs: Date.now() - startMs });
-        }
-        res.json({
-            success: true,
-            result: result !== undefined ? (typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result)) : undefined,
-            logs,
-            executionTimeMs: Date.now() - startMs,
-            language
+        const workerPath = path.join(__dirname, 'workers', 'sandbox.js');
+
+        const child = spawn('node', [workerPath], {
+            cwd: __dirname,
+            timeout: safeTimeout,
+            stdio: ['pipe', 'pipe', 'pipe'],
+            env: { NODE_OPTIONS: '--max-old-space-size=64' }
+        });
+
+        let stdout = '', stderr = '';
+        child.stdout.on('data', d => { stdout += d.toString(); });
+        child.stderr.on('data', d => { stderr += d.toString(); });
+
+        child.stdin.write(JSON.stringify({ code, timeout: safeTimeout }));
+        child.stdin.end();
+
+        const killTimer = setTimeout(() => {
+            try { child.kill('SIGKILL'); } catch(e) {}
+        }, safeTimeout + 1000);
+
+        child.on('close', (exitCode) => {
+            clearTimeout(killTimer);
+            const executionTimeMs = Date.now() - startMs;
+            try {
+                const result = JSON.parse(stdout);
+                res.json({ ...result, executionTimeMs, language });
+            } catch (e) {
+                res.json({
+                    success: false,
+                    error: stderr || ('Worker exited with code ' + exitCode),
+                    logs: stdout ? [stdout] : [],
+                    executionTimeMs,
+                    language
+                });
+            }
+        });
+
+        child.on('error', (err) => {
+            clearTimeout(killTimer);
+            res.json({ success: false, error: 'Lỗi khởi tạo sandbox worker: ' + err.message });
         });
     } catch (err) {
-        res.json({ success: false, error: `Lỗi sandbox: ${err.message}` });
+        res.json({ success: false, error: 'Lỗi sandbox: ' + err.message });
     }
 });
 
@@ -4776,7 +5002,7 @@ app.post('/api/gemini-proxy', async (req, res) => {
 // 7. SERVER LAUNCH
 // ==========================================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, '127.0.0.1', () => {
     console.log('===============================================================');
     console.log('⚡ CYBER AGENT PRO v2.0 S+ // SELF-LEARNING & AUTONOMOUS ENGINE');
     console.log(`🌐 Máy chủ: http://localhost:${PORT}`);

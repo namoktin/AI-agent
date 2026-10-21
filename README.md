@@ -19,7 +19,7 @@
 - ⚖️ **Cơ chế phản biện & Đồng thuận (Consensus & Debate Protocol):** Các Agent nhân viên độc lập đánh giá, thảo luận và phản biện đa chiều; Phó giám đốc điều phối và đưa ra quyết định xử lý khi có bất đồng.
 - 🧠 **Trí nhớ dài hạn & Tự tiến hóa (Self-Learning Long-Term Memory):** Tự động đúc kết kinh nghiệm sau mỗi lần thực thi (`experiences.json` & `EXPERIENCES.md`), tránh lặp lại sai lầm trong quá khứ.
 - 🌐 **Thu thập dữ liệu web tự động (Stealth Automation):** Trình duyệt không đầu (Headless Browser) qua Puppeteer Stealth giúp tra cứu tài liệu thực tế theo thời gian thực mà không bị chặn bot.
-- 🛡️ **Cơ chế an toàn mã nguồn:** Hệ thống kiểm soát bảo mật đường dẫn (Path Traversal Protection) và tự động tạo snapshot dự phòng cục bộ khi chỉnh sửa tài nguyên.
+- 🛡️ **Bảo mật nâng cao:** Xác thực Bearer Token, whitelist lệnh, SSRF protection, sandbox cô lập, tách biệt file tĩnh.
 
 ---
 
@@ -51,10 +51,7 @@ flowchart TD
 ### Chi tiết các vai trò:
 1. **Giám đốc điều hành (CEO):** Nhận đề bài từ người dùng, thẩm định yêu cầu, xác định chiến lược tổng quát và giám sát chất lượng sản phẩm đầu ra.
 2. **Phó giám đốc (COO):** Cánh tay phải điều hành tác nghiệp, phân rã mục tiêu lớn thành các tác vụ con, phân bổ việc cho đúng nhân viên chuyên trách, điều phối tranh luận và đưa ra quyết định khi các nhân viên có góc nhìn trái ngược.
-3. **Các Agent chuyên môn:** 
-   - **Scientific Researcher:** Thu thập bằng chứng thực nghiệm, tài liệu học thuật (DOI, PMID).
-   - **Code Specialist:** Thiết kế giải pháp kỹ thuật, viết mã nguồn tối ưu.
-   - **Quality & Security Critic:** Rà soát lỗ hổng, kiểm chứng độ trung thực tri thức (loại bỏ ngụy khoa học).
+3. **Các Agent chuyên môn:** Scientific Researcher, Code Specialist, Quality & Security Critic.
 4. **Hệ thống Trí nhớ (Long-Term Memory):** Ghi nhớ các giải pháp đã thành công và các bài học thất bại để hệ thống ngày càng thông minh hơn qua từng phiên làm việc.
 
 ---
@@ -63,11 +60,14 @@ flowchart TD
 
 ```text
 AI agent/
-├── index.html                       # Giao diện Dashboard điều khiển hiện đại
+├── public/                          # 🌐 Thư mục file tĩnh (giao diện web)
+│   └── index.html                   # Dashboard điều khiển hiện đại
+│
 ├── server.js                        # Máy chủ điều phối trung tâm (Express 5.x)
 ├── start.bat                        # File khởi động nhanh một chạm trên Windows
 ├── package.json                     # Thông tin gói và thư viện phụ thuộc
 ├── .gitignore                       # Danh sách loại trừ tệp nhạy cảm & cache
+├── .env.example                     # File mẫu cấu hình biến môi trường
 │
 ├── memory/                          # 🧠 Bộ não trí nhớ dài hạn của AI
 │   ├── experiences.json             # Cơ sở dữ liệu tri thức tích lũy (JSON)
@@ -76,13 +76,17 @@ AI agent/
 │   └── research/                    # Tài liệu chuyên sâu do AI tự nghiên cứu
 │
 ├── middleware/                      # Các tầng lọc bảo mật trung gian
-│   └── pathSecurity.js              # Chặn Path Traversal, bảo vệ hệ thống tệp
+│   └── auth.js                      # Xác thực Bearer Token + Localhost Guard
 │
 ├── utils/                           # Các mô-đun tiện ích hỗ trợ
-│   ├── asyncMutex.js                # Khóa đồng bộ truy xuất bộ nhớ chống race-condition
-│   └── validation.js                # Kiểm thực dữ liệu đầu vào
+│   ├── mutex.js                     # Khóa đồng bộ truy xuất bộ nhớ chống race-condition
+│   ├── pathSafety.js                # Chống Path Traversal Attack
+│   └── rateLimiter.js               # Giới hạn tần suất request
 │
-├── comprehensive_test_suite.js     # Bộ kịch bản kiểm thử tích hợp toàn diện
+├── workers/                         # Tiến trình con cô lập
+│   └── sandbox.js                   # Sandbox chạy code JS trong tiến trình riêng biệt
+│
+├── comprehensive_test_suite.js      # Bộ kịch bản kiểm thử tích hợp toàn diện
 └── scientific_benchmark_harness.js  # Bộ kiểm thử chuẩn mực học thuật & phản biện
 ```
 
@@ -97,8 +101,8 @@ AI agent/
 
 ### Bước 1: Clone kho mã nguồn
 ```bash
-git clone https://github.com/namoktin/graduation_project.git
-cd "AI agent"
+git clone https://github.com/namoktin/AI-agent.git
+cd "AI-agent"
 ```
 
 ### Bước 2: Cài đặt các gói phụ thuộc
@@ -107,54 +111,64 @@ npm install
 ```
 
 ### Bước 3: Cấu hình biến môi trường
-Tạo một file có tên `.env` tại thư mục gốc với nội dung:
+Sao chép file mẫu `.env.example` thành `.env` và điền các khóa bí mật:
+```bash
+cp .env.example .env
+```
+Sau đó mở file `.env` và cập nhật:
 ```ini
-# Cấu hình cổng máy chủ
+# Cổng máy chủ (mặc định: 3000)
 PORT=3000
 
 # Khóa API Google Gemini (Bắt buộc)
 GEMINI_API_KEY=your_actual_gemini_api_key_here
 
+# Khóa bảo mật xác thực API (Khuyến nghị bật khi triển khai)
+AGENT_SECRET_KEY=your_secret_key_here
+
 # Thư mục xuất sản phẩm (tùy chọn)
 OUTPUT_DIR=C:\Users\YourUser\Desktop\gemini
 
-# Cấu hình AI tùy chỉnh (tùy chọn nếu dùng Local LLM/Claude)
-# CUSTOM_AI_BASE_URL=https://api.openai.com/v1
-# CUSTOM_AI_MODEL=gpt-4o
+# Cấu hình AI tùy chỉnh (tùy chọn)
+# CUSTOM_AI_BASE_URL=https://api.example.com/v1
+# CUSTOM_AI_MODEL=model-name
 # CUSTOM_AI_KEY=your_custom_key_here
 ```
 
 ### Bước 4: Khởi động hệ thống
-Bạn có thể khởi động theo 1 trong 2 cách:
-
-- **Cách 1 (Nhanh nhất trên Windows):** Click đúp chuột vào file `start.bat`. Hệ thống sẽ tự động bật server và mở trình duyệt tại `http://localhost:3000`.
-- **Cách 2 (Qua dòng lệnh Terminal/PowerShell):**
+- **Cách 1 (Windows):** Click đúp `start.bat` — tự động bật server và mở trình duyệt tại `http://localhost:3000`.
+- **Cách 2 (Terminal/PowerShell):**
   ```bash
   npm start
   ```
-  Sau đó mở trình duyệt truy cập: `http://localhost:3000`.
 
 ---
 
 ## 🧪 5. Kiểm thử hệ thống (Automated Testing)
 
-Dự án được trang bị sẵn các bộ kiểm thử chuyên sâu nhằm đảm bảo tính ổn định và chuẩn mực học thuật:
-
 ```bash
-# Chạy bộ kiểm thử tích hợp hồi quy toàn diện (Regression & Integration Test):
-node comprehensive_test_suite.js
+# Chạy bộ kiểm thử tích hợp hồi quy toàn diện:
+npm test
 
-# Chạy bộ đo lường chuẩn mực khoa học & phản biện (Scientific Benchmark):
-node scientific_benchmark_harness.js
+# Chạy bộ đo lường chuẩn mực khoa học & phản biện:
+npm run benchmark
 ```
 
 ---
 
 ## 🛡️ 6. An toàn & Bảo mật
 
-- **Không đưa file `.env` lên Git:** File `.env` chứa các API Key riêng tư. File này đã được thêm vào `.gitignore` để đảm bảo an toàn tuyệt đối.
-- **Cách ly dữ liệu người dùng:** Thư mục `chrome_profile/` và các tệp snapshot cục bộ `.snapshots/` được bảo vệ độc quyền trên môi trường local, không chia sẻ lên repo công khai.
-- **Phòng vệ Path Traversal:** Mọi thao tác đọc/ghi file từ Agent đều đi qua bộ lọc kiểm tra an toàn, ngăn chặn việc can thiệp ra ngoài phạm vi thư mục cho phép.
+| Cơ chế | Mô tả |
+|---|---|
+| **Bearer Token Auth** | Xác thực API bằng `AGENT_SECRET_KEY`. Khi chưa cấu hình, chỉ cho phép kết nối từ `127.0.0.1`. |
+| **Server Binding** | Server mặc định bind vào `127.0.0.1` (chỉ localhost), không mở toàn mạng. |
+| **API Key Protection** | File `.env` không bao giờ được đưa lên Git. Endpoint `/api/config` chỉ trả trạng thái có/không, KHÔNG trả giá trị key. |
+| **Command Whitelist** | Endpoint thực thi lệnh chỉ cho phép các lệnh an toàn (npm, node, git status, dir). Từ chối mọi lệnh khác. |
+| **Sandbox Isolation** | Code JS được thực thi trong tiến trình con cô lập (RAM giới hạn 64MB), không có quyền truy cập filesystem hay network. |
+| **SSRF Protection** | Gateway Custom AI chặn mọi URL trỏ tới localhost, private IP, link-local và cloud metadata. |
+| **Path Traversal Guard** | Mọi thao tác đọc/ghi file đều qua bộ lọc kiểm tra an toàn. |
+| **Static File Isolation** | Chỉ phục vụ file tĩnh từ thư mục `public/`, không phục vụ toàn bộ mã nguồn. |
+| **Config Injection Guard** | Giá trị cấu hình được sanitize (loại bỏ newline, null byte) trước khi ghi vào `.env`. |
 
 ---
 
@@ -162,4 +176,3 @@ node scientific_benchmark_harness.js
 
 Dự án được phân phối dưới giấy phép [ISC License](LICENSE).
 Mọi đóng góp, báo lỗi (Issues) hoặc yêu cầu tính năng (Pull Requests) đều được hoan nghênh!
-

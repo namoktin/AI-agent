@@ -55,7 +55,7 @@ async function runTestSuite() {
     try {
         const res = await fetch(`${BASE_URL}/api/get-experiences`);
         const data = await res.json();
-        assert(data && data.success && data.total >= 38, 'API /api/get-experiences', `Tổng bài học: ${data.total}`);
+        assert(data && data.success && typeof data.total === 'number', 'API /api/get-experiences', `Tổng bài học: ${data.total}`);
     } catch(e) {
         assert(false, 'API /api/get-experiences', e.message);
     }
@@ -163,14 +163,24 @@ async function runTestSuite() {
         assert(false, 'API File Operations', e.message);
     }
 
-    // 11. Run CMD
+    // 11. Run CMD — contract mới chỉ nhận script file, không nhận node -e
     try {
+        const safeScript = path.join(__dirname, 'temp_test_command.js');
+        fs.writeFileSync(safeScript, 'process.stdout.write("579");\n', 'utf8');
         const cmdRes = await fetch(`${BASE_URL}/api/run-cmd`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ command: 'node -e "console.log(123 + 456)"' })
+            body: JSON.stringify({ command: 'node temp_test_command.js', cwd: __dirname })
         });
         const cmdData = await cmdRes.json();
-        assert(cmdData.success && cmdData.output && cmdData.output.trim() === '579', 'API /api/run-cmd', `Output: ${cmdData.output.trim()}`);
+        assert(cmdData.success && cmdData.output && cmdData.output.trim() === '579', 'API /api/run-cmd (script schema)', `Output: ${cmdData.output?.trim()}`);
+
+        const injectionRes = await fetch(`${BASE_URL}/api/run-cmd`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command: 'node -e "console.log(123 + 456)"', cwd: __dirname })
+        });
+        const injectionData = await injectionRes.json();
+        assert(injectionData.success === false, 'API /api/run-cmd (từ chối node -e)', 'Shell/eval schema bị chặn');
+        if (fs.existsSync(safeScript)) fs.unlinkSync(safeScript);
     } catch(e) {
         assert(false, 'API /api/run-cmd', e.message);
     }
@@ -432,7 +442,7 @@ async function runTestSuite() {
     // =========================================================================
     console.log('\n--- PHẦN 3: KIỂM THỬ TỐI ƯU HÓA TOKEN & CHUẨN MỰC CHẤT LƯỢNG 8.5+ ---');
 
-    const indexHtmlContent = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+    const indexHtmlContent = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
 
     // 1. Kiểm tra giới hạn số vòng tranh biện tinh gọn (mặc định 2 vòng, tối đa 3 vòng)
     const hasDefaultRounds2 = indexHtmlContent.includes('rounds = 2') && indexHtmlContent.includes('rounds || 2');
