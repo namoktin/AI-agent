@@ -186,25 +186,41 @@ class AdaptivePlanner {
      * Dynamic replanning when a task fails, times out, or produces invalid output
      */
     replan(failedTask, failureReason, currentPlan, userRequest, directive = {}) {
-        console.warn(`🔄 [AdaptivePlanner] Replanning triggered due to task failure: [${failedTask?.id || 'unknown'}] - Reason: ${failureReason}`);
+        const taskId = failedTask?.id || failedTask?.taskId || 'unknown';
+        const taskDesc = failedTask?.description || userRequest;
+        const assigned = failedTask?.assignedTo || 'developer';
 
-        const remainingTasks = (currentPlan?.tasks || []).filter(t => t.id !== failedTask?.id);
+        console.warn(`🔄 [AdaptivePlanner] Replanning triggered due to task failure: [${taskId}] - Reason: ${failureReason}`);
+
+        const remainingTasks = (currentPlan?.tasks || []).filter(t => (t.id || t.taskId) !== taskId);
         const recoveryTaskId = `REC_${Date.now().toString().slice(-4)}`;
 
         const recoveryTask = {
             id: recoveryTaskId,
-            description: `[RECOVERY] Thực hiện giải pháp thay thế cho nhiệm vụ lỗi [${failedTask?.id || ''}]. Nguyên nhân lỗi: ${failureReason}. Mục tiêu gốc: ${failedTask?.description || userRequest}`,
-            assignedTo: failedTask?.assignedTo === 'developer' ? 'researcher' : 'developer',
+            description: `[RECOVERY] Thực hiện giải pháp thay thế cho nhiệm vụ lỗi [${taskId}]. Nguyên nhân lỗi: ${failureReason}. Mục tiêu gốc: ${taskDesc}`,
+            assignedTo: assigned === 'developer' ? 'researcher' : 'developer',
             priority: 1,
             isRecovery: true,
+            recoveredTaskId: taskId,
             fallbackStrategy: 'alternative_approach',
             parallelizable: false
         };
 
+        // Cập nhật các task phụ thuộc: chuyển từ phụ thuộc vào task lỗi sang phụ thuộc vào recovery task
+        const updatedRemainingTasks = remainingTasks.map(t => {
+            if (Array.isArray(t.dependencies) && t.dependencies.includes(taskId)) {
+                return {
+                    ...t,
+                    dependencies: t.dependencies.map(d => d === taskId ? recoveryTaskId : d)
+                };
+            }
+            return t;
+        });
+
         return {
             mode: currentPlan?.mode || 'adaptive_recovery',
-            description: `Adapted plan after recovering from [${failedTask?.id || 'task failure'}]`,
-            tasks: [recoveryTask, ...remainingTasks],
+            description: `Adapted plan after recovering from [${taskId}]`,
+            tasks: [recoveryTask, ...updatedRemainingTasks],
             replanCount: (currentPlan?.replanCount || 0) + 1,
             skipConsensus: false,
             skipCritic: false

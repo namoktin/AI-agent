@@ -476,12 +476,19 @@ class AgentOrchestrator {
                 };
                 specialistResults = await this.executeTasksParallel(taskPlan.tasks, enrichedContext);
 
-                // DYNAMIC REPLANNING: Nếu có task thất bại, kích hoạt Adaptive Replanning
+                // DYNAMIC REPLANNING: Nếu có task thất bại, tìm lại task gốc và kích hoạt Adaptive Replanning
                 for (let i = 0; i < specialistResults.length; i++) {
                     const res = specialistResults[i];
                     if (!res.success && (context.replanAttempts || 0) < 1) {
-                        this.log(`⚠️ Specialist task [${res.id || i}] failed: ${res.error || 'unspecified'}. Initiating Dynamic Replanning...`);
-                        const replanned = this.adaptivePlanner.replan(res, res.error || 'task failure', taskPlan, userRequest, directive);
+                        const failedTaskId = res.taskId || res.id;
+                        const originalTask = (taskPlan.tasks || []).find(t => t.id === failedTaskId) || {
+                            id: failedTaskId,
+                            description: res.description || userRequest,
+                            assignedTo: res.agent || 'developer'
+                        };
+
+                        this.log(`⚠️ Specialist task [${failedTaskId}] failed: ${res.error || 'unspecified'}. Initiating Dynamic Replanning...`);
+                        const replanned = this.adaptivePlanner.replan(originalTask, res.error || 'task failure', taskPlan, userRequest, directive);
                         const recoveryTasks = (replanned.tasks || []).filter(t => t.isRecovery);
                         if (recoveryTasks.length > 0) {
                             this.log(`🔄 Executing ${recoveryTasks.length} recovery task(s)...`);
@@ -567,8 +574,8 @@ class AgentOrchestrator {
                 this.checkpointManager.clearCheckpoint(taskId);
             }
 
-            // AUTO-PROMOTE SUCCESSFUL AUTONOMOUS WORKFLOWS TO PROCEDURAL SKILLS
-            if ((mode === 'autonomous' || mode === 'standard') && (audit.status === 'APPROVED' || audit.status === 'VERIFIED') && !context.matchedSkill) {
+            // AUTO-PROMOTE SUCCESSFUL AUTONOMOUS WORKFLOWS TO PROCEDURAL SKILLS (Strict 100% APPROVED only)
+            if ((mode === 'autonomous' || mode === 'standard') && audit.status === 'APPROVED' && audit.passRatio === 100 && !context.matchedSkill) {
                 try {
                     const toolActions = this.executionLog.filter(l => l.tool).map(l => ({
                         tool: l.tool,
@@ -641,16 +648,41 @@ class AgentOrchestrator {
         const sortedBatches = this.topologicalSort(tasks);
         const results = [];
         const completed = new Set();
+        const failedTaskIds = new Set();
 
         for (const batch of sortedBatches) {
-            const batchPromises = batch.map(async (task) => {
+            const runnableTasks = [];
+            for (const task of batch) {
+                const hasFailedDep = (task.dependencies || []).some(dep => failedTaskIds.has(dep));
+                if (hasFailedDep) {
+                    this.log(`⛔ Bỏ qua nhiệm vụ phụ thuộc [${task.id}] do nhiệm vụ tiền đề gặp lỗi.`);
+                    results.push({
+                        taskId: task.id,
+                        id: task.id,
+                        success: false,
+                        error: `Nhiệm vụ tiền đề trong dependencies đã thất bại`,
+                        skippedDueToDependency: true
+                    });
+                    failedTaskIds.add(task.id);
+                } else {
+                    runnableTasks.push(task);
+                }
+            }
+
+            const batchPromises = runnableTasks.map(async (task) => {
                 try {
                     const result = await this.executeTask(task, context);
-                    completed.add(task.id);
-                    return { taskId: task.id, ...result };
+                    if (result && result.success !== false) {
+                        completed.add(task.id);
+                    } else {
+                        failedTaskIds.add(task.id);
+                    }
+                    return { taskId: task.id, id: task.id, ...result };
                 } catch (error) {
+                    failedTaskIds.add(task.id);
                     return {
                         taskId: task.id,
+                        id: task.id,
                         success: false,
                         error: error.message
                     };

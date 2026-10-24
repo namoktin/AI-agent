@@ -7,14 +7,15 @@ class ModelRouter {
     constructor(customConfig = {}) {
         this.defaultModel = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
 
-        // Unified Model Registry with Tiers
+        // Unified Model Registry with Distinct Tiers (Fast, Standard, Reasoning Pro)
         this.registry = {
             FAST: process.env.GEMINI_MODEL_FAST || 'gemini-flash-lite-latest',
-            STANDARD: this.defaultModel,
-            REASONING: process.env.GEMINI_MODEL_HEAVY || this.defaultModel,
+            STANDARD: process.env.GEMINI_MODEL_STANDARD || this.defaultModel || 'gemini-3.1-flash-lite',
+            REASONING: process.env.GEMINI_MODEL_HEAVY || 'gemini-pro-latest',
             FALLBACK_POOL: [
                 'gemini-3.1-flash-lite',
                 'gemini-flash-lite-latest',
+                'gemini-flash-latest',
                 'gemini-3.1-flash-lite-preview'
             ],
             ...customConfig

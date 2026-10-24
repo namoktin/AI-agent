@@ -73,14 +73,44 @@ class SkillLibrary {
             triggerPatterns: skill.triggerPatterns || [],
             actionGraph: skill.actionGraph,
             verified: true,
+            acceptanceCriteria: skill.acceptanceCriteria || ['100% independent verification checks passed'],
             executionCount: (skill.executionCount || 0) + 1,
-            successRate: skill.successRate || 1.0,
+            successCount: (skill.successCount || 0) + (skill.verified ? 1 : 0),
+            failureCount: skill.failureCount || 0,
+            successRate: skill.successRate !== undefined ? skill.successRate : 1.0,
             updatedAt: new Date().toISOString()
         };
 
         fs.writeFileSync(filePath, JSON.stringify(skillData, null, 2), 'utf8');
         console.log(`💾 [SkillLibrary] Procedural skill saved: [${skillData.name}]`);
         return true;
+    }
+
+    /**
+     * Record execution outcome for an existing procedural skill
+     */
+    recordExecution(skillId, isSuccess = true) {
+        try {
+            const filePath = path.join(this.skillsDir, `${skillId}.json`);
+            if (!fs.existsSync(filePath)) return false;
+
+            const skillData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            skillData.executionCount = (skillData.executionCount || 0) + 1;
+            if (isSuccess) {
+                skillData.successCount = (skillData.successCount || 0) + 1;
+            } else {
+                skillData.failureCount = (skillData.failureCount || 0) + 1;
+            }
+            skillData.successRate = Math.round(((skillData.successCount || 0) / skillData.executionCount) * 100) / 100;
+            skillData.updatedAt = new Date().toISOString();
+
+            fs.writeFileSync(filePath, JSON.stringify(skillData, null, 2), 'utf8');
+            console.log(`📊 [SkillLibrary] Updated skill stats for [${skillData.name}]: Runs=${skillData.executionCount}, SuccessRate=${Math.round(skillData.successRate * 100)}%`);
+            return true;
+        } catch (e) {
+            console.error(`[SkillLibrary] Failed to record execution: ${e.message}`);
+            return false;
+        }
     }
 
     /**

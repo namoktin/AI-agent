@@ -1,5 +1,5 @@
 /**
- * IndependentVerifier.js - Independent Verification Engine (Zero Blind Trust)
+ * IndependentVerifier.js - Independent Verification Engine (Zero Blind Trust & Live Proof)
  * Cyber Agent Pro v3.5 Ultimate
  */
 
@@ -20,7 +20,7 @@ class IndependentVerifier {
         let totalChecks = 0;
         let passedChecks = 0;
 
-        // 1. VERIFY PHYSICAL FILE CLAIMS (Existence, Size, Syntax, Anti-stub)
+        // 1. VERIFY PHYSICAL FILE CLAIMS (Existence, Size, Syntax, Anti-stub, Live Test Run)
         const createdFiles = this.extractTargetFiles(specialistResults, executionLog);
         for (const filePath of createdFiles) {
             totalChecks++;
@@ -29,10 +29,10 @@ class IndependentVerifier {
             if (fileCheck.passed) passedChecks++;
         }
 
-        // 2. VERIFY RESEARCH CLAIMS (For Deep Research or Factual Inquiries)
+        // 2. VERIFY RESEARCH CLAIMS (For Deep Research or Factual Inquiries with Live URL Ping)
         if (mode === 'deep_research' || (typeof plan?.description === 'string' && plan.description.includes('research'))) {
             totalChecks++;
-            const claimCheck = this.verifyResearchClaims(specialistResults);
+            const claimCheck = await this.verifyResearchClaims(specialistResults);
             checks.push(claimCheck);
             if (claimCheck.passed) passedChecks++;
         }
@@ -155,9 +155,9 @@ class IndependentVerifier {
     }
 
     /**
-     * Verify academic and research citations in specialist outputs
+     * Verify academic and research citations in specialist outputs with live endpoint check
      */
-    verifyResearchClaims(specialistResults) {
+    async verifyResearchClaims(specialistResults) {
         let combinedText = '';
         for (const res of specialistResults) {
             if (res.response) {
@@ -172,29 +172,49 @@ class IndependentVerifier {
         // 3. Search for quantitative data / metrics (percentages, numbers with units)
         const metricMatches = combinedText.match(/\b\d+(?:\.\d+)?(?:%|mg|ml|km|kg|ms|s|°C|giây|phút|giờ|USD|VNĐ|triệu|tỷ)\b/gi) || [];
 
+        let liveUrlVerified = false;
+        if (urlMatches.length > 0) {
+            for (let i = 0; i < Math.min(2, urlMatches.length); i++) {
+                const targetUrl = urlMatches[i].replace(/[.,;:)]+$/, '');
+                try {
+                    const res = await fetch(targetUrl, {
+                        method: 'HEAD',
+                        signal: AbortSignal.timeout(3500),
+                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+                    });
+                    if (res.status >= 200 && res.status < 400) {
+                        liveUrlVerified = true;
+                        break;
+                    }
+                } catch (e) {
+                    // Ignore ping failure
+                }
+            }
+        }
+
         const hasSources = urlMatches.length > 0 || citationMatches.length > 0;
         const hasMetrics = metricMatches.length >= 2;
 
-        if (hasSources && hasMetrics) {
+        if ((liveUrlVerified || citationMatches.length > 0) && hasMetrics) {
             return {
-                type: 'research_verification',
+                type: 'research_live_verification',
                 target: 'claims_and_evidence',
                 passed: true,
-                details: `Verified: ${urlMatches.length} URLs, ${citationMatches.length} citations, ${metricMatches.length} quantitative metrics`
+                details: `Live verified: ${liveUrlVerified ? 'Active live URLs confirmed' : 'Academic DOI/PubMed indexed'}, ${metricMatches.length} metrics`
             };
         } else if (hasSources || hasMetrics) {
             return {
                 type: 'research_verification',
                 target: 'claims_and_evidence',
                 passed: true,
-                details: `Partially verified: ${urlMatches.length} URLs, ${metricMatches.length} metrics`
+                details: `Partially verified: ${urlMatches.length} URLs, ${citationMatches.length} citations, ${metricMatches.length} metrics`
             };
         } else {
             return {
                 type: 'research_verification',
                 target: 'claims_and_evidence',
                 passed: false,
-                details: 'Thiếu trích dẫn nguồn kiểm chứng (URL/DOI) hoặc dữ liệu định lượng'
+                details: 'Thiếu trích dẫn nguồn kiểm chứng (URL/DOI sống) hoặc dữ liệu định lượng'
             };
         }
     }
@@ -267,12 +287,21 @@ class IndependentVerifier {
                 };
             }
 
-            // Syntax verification for JS / JSON / Python
+            // Syntax and Live Execution verification for JS / JSON / Python
             const ext = path.extname(filePath).toLowerCase();
             if (ext === '.json') {
                 try {
                     const parsed = JSON.parse(content);
-                    if (typeof parsed !== 'object' || parsed === null) throw new Error('Root is not object');
+                    if (typeof parsed !== 'object' || parsed === null) throw new Error('Root is not object or array');
+                    const itemCount = Array.isArray(parsed) ? parsed.length : Object.keys(parsed).length;
+                    if (itemCount === 0) {
+                        return {
+                            type: 'data_integrity',
+                            target: filePath,
+                            passed: false,
+                            details: 'JSON file is empty container (0 elements)'
+                        };
+                    }
                 } catch (e) {
                     return {
                         type: 'syntax_validation',
@@ -302,6 +331,30 @@ class IndependentVerifier {
                         passed: false,
                         details: 'Python syntax validation failed (py_compile)'
                     };
+                }
+
+                // Live Unit Test Execution Check for Python test files
+                if (/unittest|def test_|if __name__\s*==\s*['"]__main__['"]/i.test(content)) {
+                    try {
+                        execSync(`python "${filePath}"`, {
+                            stdio: 'pipe',
+                            timeout: 8000,
+                            env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+                        });
+                        return {
+                            type: 'live_test_execution',
+                            target: filePath,
+                            passed: true,
+                            details: `Valid Python file (${Math.round(stat.size)} bytes), passed live unit tests successfully`
+                        };
+                    } catch (testErr) {
+                        return {
+                            type: 'live_test_execution',
+                            target: filePath,
+                            passed: false,
+                            details: `Python live test execution failed: ${testErr.message}`
+                        };
+                    }
                 }
             }
 
