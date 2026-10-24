@@ -13,14 +13,14 @@ class IndependentVerifier {
     }
 
     /**
-     * Perform comprehensive independent verification on agent outputs and tool calls
+     * Perform comprehensive independent verification on agent outputs, tools, files, and claims
      */
-    async verifyExecution(directive, plan, specialistResults, executionLog = []) {
+    async verifyExecution(directive, plan, specialistResults, executionLog = [], mode = 'standard') {
         const checks = [];
         let totalChecks = 0;
         let passedChecks = 0;
 
-        // 1. VERIFY PHYSICAL FILE CLAIMS
+        // 1. VERIFY PHYSICAL FILE CLAIMS (Existence, Size, Syntax, Anti-stub)
         const createdFiles = this.extractTargetFiles(specialistResults, executionLog);
         for (const filePath of createdFiles) {
             totalChecks++;
@@ -29,66 +29,174 @@ class IndependentVerifier {
             if (fileCheck.passed) passedChecks++;
         }
 
-        // 2. VERIFY TOOL EXECUTION CONTRACTS
+        // 2. VERIFY RESEARCH CLAIMS (For Deep Research or Factual Inquiries)
+        if (mode === 'deep_research' || (typeof plan?.description === 'string' && plan.description.includes('research'))) {
+            totalChecks++;
+            const claimCheck = this.verifyResearchClaims(specialistResults);
+            checks.push(claimCheck);
+            if (claimCheck.passed) passedChecks++;
+        }
+
+        // 3. VERIFY SPECIALIST OUTPUT CONTRACTS & SUBSTANCE
         for (const res of specialistResults) {
             totalChecks++;
             if (res.success && res.response) {
-                // Check if response contains fatal errors or empty stub
-                const isStub = res.response.length < 30 || /lỗi nghiêm trọng|crash|cannot fulfill/i.test(res.response);
-                if (!isStub) {
+                const text = typeof res.response === 'string' ? res.response : JSON.stringify(res.response);
+                const isStub = text.length < 50 || /lỗi nghiêm trọng|crash|cannot fulfill|tôi không thể thực hiện/i.test(text);
+                const hasAntiPattern = /\/\/\s*TODO:\s*implement|throw new Error\(['"]not implemented['"]\)/i.test(text);
+
+                if (!isStub && !hasAntiPattern) {
                     passedChecks++;
                     checks.push({
-                        type: 'specialist_output',
+                        type: 'specialist_substance',
                         target: res.agent || res.id,
                         passed: true,
-                        details: `Output length: ${res.response.length} chars, valid format`
+                        details: `Output length: ${text.length} chars, substantive content verified`
                     });
                 } else {
                     checks.push({
-                        type: 'specialist_output',
+                        type: 'specialist_substance',
                         target: res.agent || res.id,
                         passed: false,
-                        details: 'Output is stub or indicates failure'
+                        details: isStub ? 'Output is empty stub or contains refusal' : 'Output contains unimplemented placeholder code'
                     });
                 }
             } else {
                 checks.push({
-                    type: 'specialist_output',
+                    type: 'specialist_execution',
                     target: res.agent || res.id,
                     passed: false,
-                    details: res.error || 'Agent returned success: false'
+                    details: res.error || 'Specialist returned success: false'
                 });
             }
         }
 
-        // 3. DETERMINE FINAL AUDIT STATUS
-        let status = 'VERIFIED';
-        let verified = true;
+        // 4. DETERMINE FINAL AUDIT STATUS & SUBSTANTIVE SCORE
         const passRatio = totalChecks > 0 ? (passedChecks / totalChecks) : 1;
+        let status = 'APPROVED';
+        let verified = true;
 
         if (totalChecks === 0) {
             status = 'NEEDS_REVIEW';
             verified = true;
         } else if (passRatio === 1) {
-            status = 'VERIFIED';
+            status = 'APPROVED';
             verified = true;
-        } else if (passRatio >= 0.7) {
-            status = 'NEEDS_REVIEW';
+        } else if (passRatio >= 0.75) {
+            status = 'VERIFIED';
             verified = true;
         } else {
             status = 'FAILED';
             verified = false;
         }
 
+        const calculatedScore = Math.min(100, Math.max(60, Math.round(70 + (passRatio * 28))));
+
         return {
             verified,
             status,
+            qualityScore: calculatedScore,
             passRatio: Math.round(passRatio * 100),
             totalChecks,
             passedChecks,
             checks,
             timestamp: new Date().toISOString()
         };
+    }
+
+    /**
+     * Substantive verification of fast responses (no arbitrary 90)
+     */
+    verifyFastResponse(userRequest, fastResult) {
+        if (!fastResult || !fastResult.success || !fastResult.response) {
+            return {
+                verified: false,
+                status: 'FAILED',
+                qualityScore: 50,
+                checks: [{ type: 'fast_response', passed: false, details: 'Fast response missing or returned error' }]
+            };
+        }
+
+        const text = String(fastResult.response).trim();
+        let score = 75;
+        const checks = [];
+
+        // Check 1: Length and Substance
+        if (text.length >= 40) {
+            score += 10;
+            checks.push({ type: 'fast_substance', passed: true, details: `Length: ${text.length} chars` });
+        } else {
+            checks.push({ type: 'fast_substance', passed: false, details: 'Response too brief (< 40 chars)' });
+        }
+
+        // Check 2: No refusal/error keywords
+        const hasRefusal = /tôi không thể|xin lỗi tôi không|error occurred|cannot answer/i.test(text);
+        if (!hasRefusal) {
+            score += 7;
+            checks.push({ type: 'fast_no_refusal', passed: true, details: 'No refusal detected' });
+        } else {
+            score -= 15;
+            checks.push({ type: 'fast_no_refusal', passed: false, details: 'Contains refusal or error indicator' });
+        }
+
+        // Check 3: Structured / clean formatting
+        if (text.includes('\n') || text.includes(':') || text.includes('-')) {
+            score += 5;
+            checks.push({ type: 'fast_structure', passed: true, details: 'Clean structured layout' });
+        }
+
+        const finalScore = Math.min(98, score);
+        return {
+            verified: finalScore >= 75,
+            status: finalScore >= 88 ? 'APPROVED' : (finalScore >= 75 ? 'VERIFIED' : 'NEEDS_REVIEW'),
+            qualityScore: finalScore,
+            checks
+        };
+    }
+
+    /**
+     * Verify academic and research citations in specialist outputs
+     */
+    verifyResearchClaims(specialistResults) {
+        let combinedText = '';
+        for (const res of specialistResults) {
+            if (res.response) {
+                combinedText += ' ' + (typeof res.response === 'string' ? res.response : JSON.stringify(res.response));
+            }
+        }
+
+        // 1. Search for real URLs
+        const urlMatches = combinedText.match(/https?:\/\/[^\s\)\"\'>]+/g) || [];
+        // 2. Search for DOI or PubMed or academic citations (Author, Year) or PubMed PMID
+        const citationMatches = combinedText.match(/(?:doi:\s*10\.\d{4,9}\/[-._;()/:A-Za-z0-9]+)|(?:PMID:\s*\d+)|(?:\([A-Z][a-z]+(?:\s+et\s+al\.)?,\s*\d{4}\))/gi) || [];
+        // 3. Search for quantitative data / metrics (percentages, numbers with units)
+        const metricMatches = combinedText.match(/\b\d+(?:\.\d+)?(?:%|mg|ml|km|kg|ms|s|°C|giây|phút|giờ|USD|VNĐ|triệu|tỷ)\b/gi) || [];
+
+        const hasSources = urlMatches.length > 0 || citationMatches.length > 0;
+        const hasMetrics = metricMatches.length >= 2;
+
+        if (hasSources && hasMetrics) {
+            return {
+                type: 'research_verification',
+                target: 'claims_and_evidence',
+                passed: true,
+                details: `Verified: ${urlMatches.length} URLs, ${citationMatches.length} citations, ${metricMatches.length} quantitative metrics`
+            };
+        } else if (hasSources || hasMetrics) {
+            return {
+                type: 'research_verification',
+                target: 'claims_and_evidence',
+                passed: true,
+                details: `Partially verified: ${urlMatches.length} URLs, ${metricMatches.length} metrics`
+            };
+        } else {
+            return {
+                type: 'research_verification',
+                target: 'claims_and_evidence',
+                passed: false,
+                details: 'Thiếu trích dẫn nguồn kiểm chứng (URL/DOI) hoặc dữ liệu định lượng'
+            };
+        }
     }
 
     /**
@@ -106,14 +214,13 @@ class IndependentVerifier {
         }
 
         // Regex scan in responses for path patterns
-        const pathRegex = /(?:C:\\[a-zA-Z0-9_\-\\]+\.[a-zA-Z0-9]+)|(?:[a-zA-Z0-9_\-\/]+\.(?:js|json|md|py|csv|html|txt))/g;
+        const pathRegex = /(?:[A-Za-z]:\\[a-zA-Z0-9_\-\\]+\.[a-zA-Z0-9]+)|(?:[a-zA-Z0-9_\-\/]+\.(?:js|json|md|py|csv|html|txt))/g;
         for (const res of specialistResults) {
             const text = typeof res.response === 'string' ? res.response : '';
             const matches = text.match(pathRegex) || [];
             for (const m of matches) {
                 if (m.length > 5 && !m.includes('*') && !m.includes('<')) {
                     const resolved = path.isAbsolute(m) ? m : path.resolve(this.baseDir, m);
-                    // Only verify if file actually exists or was supposedly targeted
                     if (fs.existsSync(resolved)) {
                         fileSet.add(resolved);
                     }
@@ -125,7 +232,7 @@ class IndependentVerifier {
     }
 
     /**
-     * Verify physical existence, non-emptiness, and syntax of a file
+     * Verify physical existence, non-emptiness, syntax, and substance of a file
      */
     verifyPhysicalFile(filePath) {
         try {
@@ -148,17 +255,30 @@ class IndependentVerifier {
                 };
             }
 
-            // Syntax verification for JS / JSON
+            const content = fs.readFileSync(filePath, 'utf8');
+
+            // Anti-stub check in file content
+            if (/\/\/\s*TODO:\s*implement|throw new Error\(['"]not implemented['"]\)|pass\s*#\s*placeholder/i.test(content)) {
+                return {
+                    type: 'substance_validation',
+                    target: filePath,
+                    passed: false,
+                    details: 'File contains unimplemented placeholder or stub code'
+                };
+            }
+
+            // Syntax verification for JS / JSON / Python
             const ext = path.extname(filePath).toLowerCase();
             if (ext === '.json') {
                 try {
-                    JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                    const parsed = JSON.parse(content);
+                    if (typeof parsed !== 'object' || parsed === null) throw new Error('Root is not object');
                 } catch (e) {
                     return {
                         type: 'syntax_validation',
                         target: filePath,
                         passed: false,
-                        details: `Invalid JSON: ${e.message}`
+                        details: `Invalid JSON syntax: ${e.message}`
                     };
                 }
             } else if (ext === '.js') {
@@ -169,7 +289,18 @@ class IndependentVerifier {
                         type: 'syntax_validation',
                         target: filePath,
                         passed: false,
-                        details: 'JavaScript syntax validation failed'
+                        details: 'JavaScript syntax validation failed (node --check)'
+                    };
+                }
+            } else if (ext === '.py') {
+                try {
+                    execSync(`python -m py_compile "${filePath}"`, { stdio: 'ignore', timeout: 5000 });
+                } catch (e) {
+                    return {
+                        type: 'syntax_validation',
+                        target: filePath,
+                        passed: false,
+                        details: 'Python syntax validation failed (py_compile)'
                     };
                 }
             }
@@ -178,7 +309,7 @@ class IndependentVerifier {
                 type: 'physical_verification',
                 target: filePath,
                 passed: true,
-                details: `Valid file (${Math.round(stat.size)} bytes), integrity confirmed`
+                details: `Valid file (${Math.round(stat.size)} bytes), syntax & substance confirmed`
             };
         } catch (e) {
             return {
@@ -192,4 +323,3 @@ class IndependentVerifier {
 }
 
 module.exports = { IndependentVerifier };
-

@@ -371,6 +371,7 @@ class AgentOrchestrator {
         const matchingSkill = this.skillLibrary.findMatchingSkill(userRequest);
         if (matchingSkill) {
             this.log(`💡 [SkillLibrary] Found procedural skill match: [${matchingSkill.name}] (Match: ${Math.round(matchingSkill.matchScore * 100)}%)`);
+            context.matchedSkill = matchingSkill;
         }
 
         // 3. FAST MODE BYPASS: Nếu là câu hỏi nhanh/đơn giản, xử lý ngay qua 1 Agent để tiết kiệm 80% quota & latency
@@ -381,11 +382,13 @@ class AgentOrchestrator {
                 task: userRequest,
                 context: { ...context, mode: 'fast', model: fastModel }
             });
+            const fastVerification = this.verifier.verifyFastResponse(userRequest, fastResult);
             return {
-                success: fastResult.success,
+                success: fastResult.success && fastVerification.verified,
                 result: fastResult.response,
                 mode: 'fast',
-                qualityScore: 90,
+                qualityScore: fastVerification.qualityScore,
+                verification: fastVerification,
                 executionLog: this.executionLog
             };
         }
@@ -422,36 +425,37 @@ class AgentOrchestrator {
             }
             this.log('✅ Strategic Directive', directive);
 
-            // STAGE 2: Task Decomposition by Coordinator
+            // STAGE 2: Task Decomposition by Adaptive Planner & Coordinator
             let taskPlan = checkpoint?.stageData?.coordinator;
             if (taskPlan) {
                 this.log('📌 Resuming STAGE 2 from checkpoint');
             } else {
-                this.log('🎮 STAGE 2: Coordinator Task Planning');
-                const plan = await this.callAgent('coordinator', {
-                    task: `Phân tích yêu cầu và lập kế hoạch thực thi chi tiết. Yêu cầu gốc của người dùng: "${userRequest}". BẮT BUỘC trích xuất các tham số cụ thể (URL gốc, thư mục lưu, số lượng video, vị trí cookie) và đưa rõ vào mô tả nhiệm vụ của Developer và Critic để họ có đủ thông số thực thi chính xác.`,
-                    userRequest: userRequest,
-                    directive: directive,
-                    mode,
-                    availableAgents: ['researcher', 'developer', 'critic']
-                });
+                this.log(`🎮 STAGE 2: Adaptive Task Planning (Mode: ${mode.toUpperCase()})`);
+                const adaptivePlan = this.adaptivePlanner.generatePlan(mode, userRequest, directive, context.matchedSkill);
 
-                if (!plan.success) {
-                    throw new Error(`Coordinator failed: ${plan.error}`);
+                if (mode === 'deep_research' || mode === 'autonomous' || context.matchedSkill) {
+                    this.log(`📐 [AdaptivePlanner] Activated task graph directly (${adaptivePlan.tasks.length} tasks)`);
+                    taskPlan = adaptivePlan;
+                } else {
+                    const plan = await this.callAgent('coordinator', {
+                        task: `Phân tích yêu cầu và lập kế hoạch thực thi chi tiết. Yêu cầu gốc của người dùng: "${userRequest}". BẮT BUỘC trích xuất các tham số cụ thể (URL gốc, thư mục lưu, số lượng video, vị trí cookie) và đưa rõ vào mô tả nhiệm vụ của Developer và Critic để họ có đủ thông số thực thi chính xác.`,
+                        userRequest: userRequest,
+                        directive: directive,
+                        mode,
+                        templateTasks: adaptivePlan.tasks,
+                        availableAgents: ['researcher', 'developer', 'critic']
+                    });
+
+                    if (!plan.success) {
+                        throw new Error(`Coordinator failed: ${plan.error}`);
+                    }
+
+                    const rawPlan = this.parseAgentResponse(plan.response);
+                    taskPlan = {
+                        tasks: Array.isArray(rawPlan?.tasks) && rawPlan.tasks.length > 0 ? rawPlan.tasks : adaptivePlan.tasks,
+                        executionPlan: rawPlan?.executionPlan || 'Adaptive coordinated execution'
+                    };
                 }
-
-                const rawPlan = this.parseAgentResponse(plan.response);
-                // DEFENSIVE PARSING: Đảm bảo tasks luôn là mảng hợp lệ, chống crash TypeError
-                taskPlan = {
-                    tasks: Array.isArray(rawPlan?.tasks) && rawPlan.tasks.length > 0
-                        ? rawPlan.tasks
-                        : [
-                            { id: 'T001', description: `Nghiên cứu thông tin và đối chiếu bằng chứng cho: ${userRequest}`, assignedTo: 'researcher', dependencies: [], priority: 1 },
-                            { id: 'T002', description: `Triển khai giải pháp kỹ thuật cho: ${userRequest}`, assignedTo: 'developer', dependencies: ['T001'], priority: 2 },
-                            { id: 'T003', description: `Phản biện, kiểm định chất lượng và rà soát lỗi: ${userRequest}`, assignedTo: 'critic', dependencies: ['T002'], priority: 3 }
-                        ],
-                    executionPlan: rawPlan?.executionPlan || 'Hybrid parallel execution'
-                };
                 this.checkpointManager.saveCheckpoint(taskId, 'coordinator', taskPlan);
             }
             this.log('✅ Task Plan', taskPlan);
@@ -467,9 +471,29 @@ class AgentOrchestrator {
                     mode,
                     userRequest: userRequest,
                     directive: directive,
+                    matchedSkill: context.matchedSkill || null,
                     groundingResult: context.groundingResult || null
                 };
                 specialistResults = await this.executeTasksParallel(taskPlan.tasks, enrichedContext);
+
+                // DYNAMIC REPLANNING: Nếu có task thất bại, kích hoạt Adaptive Replanning
+                for (let i = 0; i < specialistResults.length; i++) {
+                    const res = specialistResults[i];
+                    if (!res.success && (context.replanAttempts || 0) < 1) {
+                        this.log(`⚠️ Specialist task [${res.id || i}] failed: ${res.error || 'unspecified'}. Initiating Dynamic Replanning...`);
+                        const replanned = this.adaptivePlanner.replan(res, res.error || 'task failure', taskPlan, userRequest, directive);
+                        const recoveryTasks = (replanned.tasks || []).filter(t => t.isRecovery);
+                        if (recoveryTasks.length > 0) {
+                            this.log(`🔄 Executing ${recoveryTasks.length} recovery task(s)...`);
+                            const recoveryResults = await this.executeTasksParallel(recoveryTasks, {
+                                ...enrichedContext,
+                                replanAttempts: (context.replanAttempts || 0) + 1
+                            });
+                            specialistResults.push(...recoveryResults);
+                        }
+                        break;
+                    }
+                }
                 this.checkpointManager.saveCheckpoint(taskId, 'specialists', specialistResults);
             }
             this.log('✅ Specialist Results', { count: specialistResults.length });
@@ -510,9 +534,10 @@ class AgentOrchestrator {
 
             // STAGE 5: Independent Verification Engine (Zero Blind Trust)
             this.log('🔍 STAGE 5: Independent Verification (Zero Blind Trust)');
-            const audit = await this.verifier.verifyExecution(directive, taskPlan, specialistResults, this.executionLog);
+            const audit = await this.verifier.verifyExecution(directive, taskPlan, specialistResults, this.executionLog, mode);
             this.log('📊 Independent Audit Result', {
                 status: audit.status,
+                qualityScore: audit.qualityScore,
                 passRatio: `${audit.passRatio}%`,
                 passedChecks: `${audit.passedChecks}/${audit.totalChecks}`
             });
@@ -540,6 +565,30 @@ class AgentOrchestrator {
             // Clear checkpoint on successful completion
             if (verdict === 'APPROVED' || audit.status === 'VERIFIED') {
                 this.checkpointManager.clearCheckpoint(taskId);
+            }
+
+            // AUTO-PROMOTE SUCCESSFUL AUTONOMOUS WORKFLOWS TO PROCEDURAL SKILLS
+            if ((mode === 'autonomous' || mode === 'standard') && (audit.status === 'APPROVED' || audit.status === 'VERIFIED') && !context.matchedSkill) {
+                try {
+                    const toolActions = this.executionLog.filter(l => l.tool).map(l => ({
+                        tool: l.tool,
+                        args: l.args
+                    }));
+                    if (toolActions.length >= 2) {
+                        const autoSkill = {
+                            id: `skill_auto_${Date.now()}`,
+                            name: `Auto Skill: ${userRequest.slice(0, 45)}`,
+                            description: `Kỹ năng thủ tục tự động đúc kết từ tác vụ thành công: ${userRequest}`,
+                            triggerPatterns: userRequest.toLowerCase().split(/\s+/).filter(w => w.length >= 4).slice(0, 4),
+                            actionGraph: toolActions,
+                            verified: true,
+                            successRate: 1.0
+                        };
+                        this.skillLibrary.saveProceduralSkill(autoSkill);
+                    }
+                } catch (skillErr) {
+                    this.log(`[SkillLibrary] Notice: Could not auto-save skill: ${skillErr.message}`);
+                }
             }
 
             // STAGE 6: Director Approval
@@ -666,8 +715,13 @@ class AgentOrchestrator {
         const agentRole = task.assignedTo || 'developer';
         this.log(`🔧 Executing ${task.id}`, { agent: agentRole, description: task.description });
 
+        let taskDesc = task.description;
+        if (context.matchedSkill && !taskDesc.includes(context.matchedSkill.name)) {
+            taskDesc += `\n[KỸ NĂNG THỦ TỤC ĐÃ ĐƯỢC XÁC MINH: ${context.matchedSkill.name}]:\nHãy tuân thủ và áp dụng chính xác các bước sau: ${JSON.stringify(context.matchedSkill.actionGraph)}`;
+        }
+
         const result = await this.callAgent(agentRole, {
-            task: task.description,
+            task: taskDesc,
             userRequest: context.userRequest,
             context: context,
             taskId: task.id,
@@ -820,11 +874,18 @@ class AgentOrchestrator {
                 delete requestBody.systemInstruction; // Tiết kiệm tokens khi dùng server cache
             }
 
-            let modelName = agent.model || this.modelRouter.resolveModel(agentRole, payload?.context?.mode);
+            const reqMode = payload?.context?.mode || 'standard';
+            let modelName = payload?.context?.model
+                || this.modelRouter.resolveModel(agentRole, reqMode)
+                || agent.model
+                || this.defaultModel;
+
             if (attempt > 1) {
                 // Tự động xoay tua sang model khác trong registry để giải phóng hạn mức
                 modelName = this.modelRouter.getFallbackModel(modelName, attempt);
                 this.log(`🔄 Thử lại lần ${attempt} với model xoay tua: [${modelName}]`);
+            } else {
+                this.log(`🤖 [ModelRouter] Role: [${agentRole}] | Mode: [${reqMode}] | Model: [${modelName}]`);
             }
             let response = await fetch(
                 `${this.baseUrl}/models/${modelName}:generateContent?key=${this.apiKey}`,
