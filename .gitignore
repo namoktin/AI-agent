@@ -8,3 +8,4 @@ chrome_profile/
 memory/cookies/
 memory/cookie_vault.json
 screenshots/
+memory/checkpoints/*.json

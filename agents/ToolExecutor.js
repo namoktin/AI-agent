@@ -59,31 +59,35 @@ class ToolExecutor {
         this.executionCache = new Map();
         this.rateLimiter = new Map();
 
-        // Tool safety classification
+        // Tool safety classification - strictly mutually exclusive
         this.toolCategories = {
             // Read-only tools - safe for parallel execution
             readonly: [
                 'READ_FILE',
                 'LIST_FILES',
                 'WEB_SEARCH',
+                'SEARCH',
                 'ACADEMIC_SEARCH',
                 'SEARCH_EXPERIENCE',
+                'SEARCH_EXPERIENCES',
                 'READ_URL',
-                'FETCH_WEBPAGE'
+                'FETCH_WEBPAGE',
+                'VERIFY_SOURCE',
+                'CHECK_COOKIE_STATUS'
             ],
-            // Write tools - must be sequential
+            // Write tools - must be sequential to avoid conflicts
             write: [
                 'WRITE_FILE',
+                'SAVE_FILE',
                 'SAVE_EXPERIENCE',
                 'UPDATE_EXPERIENCE',
                 'DELETE_FILE',
                 'RUN_CODE',
-                'RUN_CMD'
+                'RUN_CMD',
+                'SAVE_COOKIE'
             ],
-            // Heavy tools - rate limited
+            // Heavy tools - rate limited (Puppeteer browser, image generation)
             heavy: [
-                'WEB_SEARCH',
-                'ACADEMIC_SEARCH',
                 'BROWSE_WEB',
                 'BROWSER_ACTION',
                 'GENERATE_IMAGE'
@@ -92,25 +96,39 @@ class ToolExecutor {
     }
 
     /**
-     * Execute multiple tool calls with intelligent parallelization
+     * Execute multiple tool calls with intelligent parallelization and strict deduplication
      */
     async executeTools(toolCalls, context = {}) {
         if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
             return [];
         }
 
-        // Classify tools
-        const readonly = toolCalls.filter(t => this.isReadOnly(t.name));
-        const writes = toolCalls.filter(t => this.isWrite(t.name));
-        const heavy = toolCalls.filter(t => this.isHeavy(t.name));
+        // Classify each tool call into strictly ONE category (no duplicate execution)
+        const readonly = [];
+        const heavy = [];
+        const writes = [];
+        const others = [];
+
+        for (const tool of toolCalls) {
+            if (this.isWrite(tool.name)) {
+                writes.push(tool);
+            } else if (this.isHeavy(tool.name)) {
+                heavy.push(tool);
+            } else if (this.isReadOnly(tool.name)) {
+                readonly.push(tool);
+            } else {
+                others.push(tool);
+            }
+        }
 
         const results = [];
 
-        // PHASE 1: Execute all read-only tools in parallel
-        if (readonly.length > 0) {
-            console.log(`⚡ Executing ${readonly.length} read-only tools in parallel`);
+        // PHASE 1: Execute all read-only tools and other queries in parallel
+        const fastParallel = [...readonly, ...others];
+        if (fastParallel.length > 0) {
+            console.log(`⚡ Executing ${fastParallel.length} fast tools in parallel (read-only/query)`);
             const readResults = await Promise.allSettled(
-                readonly.map(tool => this.executeSingleTool(tool, context))
+                fastParallel.map(tool => this.executeSingleTool(tool, context))
             );
             results.push(...this.unwrapSettled(readResults));
         }

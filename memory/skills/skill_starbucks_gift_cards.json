@@ -1,0 +1,38 @@
+{
+  "id": "skill_starbucks_gift_cards",
+  "name": "Starbucks Gift Card Text Extraction",
+  "description": "Tự động truy cập website Starbucks, điều hướng tới mục GIFT CARDS, bấm link mở tab mới 'More ways to gift' và trích xuất ngữ cảnh văn bản sau chữ 'Amazon'.",
+  "triggerPatterns": [
+    "starbucks",
+    "gift cards",
+    "more ways to gift",
+    "amazon"
+  ],
+  "actionGraph": [
+    {
+      "tool": "BROWSER_ACTION",
+      "action": "click",
+      "target": "GIFT CARDS"
+    },
+    {
+      "tool": "BROWSER_ACTION",
+      "action": "scroll",
+      "distance": 800
+    },
+    {
+      "tool": "BROWSER_ACTION",
+      "action": "click",
+      "target": "More ways to gift",
+      "waitMs": 2500
+    },
+    {
+      "tool": "BROWSER_ACTION",
+      "action": "extract",
+      "findAfter": "amazon"
+    }
+  ],
+  "verified": true,
+  "executionCount": 2,
+  "successRate": 1.0,
+  "updatedAt": "2026-10-24T15:35:00.000Z"
+}

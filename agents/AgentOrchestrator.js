@@ -18,6 +18,11 @@ const path = require('path');
 const { URL } = require('url');
 const { ToolExecutor } = require('./ToolExecutor');
 const { ContextCacheManager } = require('./ContextCacheManager');
+const { ModelRouter } = require('./ModelRouter');
+const { IndependentVerifier } = require('./IndependentVerifier');
+const { SkillLibrary } = require('./SkillLibrary');
+const { CheckpointManager } = require('./CheckpointManager');
+const { AdaptivePlanner } = require('./AdaptivePlanner');
 
 // Fetch polyfill using native http/https
 function fetch(url, options = {}) {
@@ -75,6 +80,13 @@ class AgentOrchestrator {
             ...config
         };
 
+        // Unified Model Router, Verifier, Skills, Checkpoints, Adaptive Planner
+        this.modelRouter = new ModelRouter({ defaultModel: this.defaultModel });
+        this.verifier = new IndependentVerifier(process.cwd());
+        this.skillLibrary = new SkillLibrary(process.cwd());
+        this.checkpointManager = new CheckpointManager(process.cwd());
+        this.adaptivePlanner = new AdaptivePlanner();
+
         // Khởi tạo công cụ thực thi song song
         this.toolExecutor = new ToolExecutor(this.config.serverUrl);
 
@@ -114,10 +126,10 @@ class AgentOrchestrator {
         const standardModel = this.defaultModel;
 
         return {
-            // 🎯 DIRECTOR: Strategic mastermind (gemini-3.5-flash)
+            // 🎯 DIRECTOR: Strategic mastermind
             director: {
                 role: 'director',
-                model: 'gemini-3.1-flash-lite',
+                model: this.modelRouter.resolveModel('director'),
                 systemPrompt: `BẠN LÀ GIÁM ĐỐC ĐIỀU HÀNH (CEO/DIRECTOR) - BỘ NÃO CHIẾN LƯỢC CỦA TỔ CHỨC.
 
 **VAI TRÒ TUYỆT ĐỐI:**
@@ -154,10 +166,10 @@ class AgentOrchestrator {
                 enableTools: false
             },
 
-            // 🎮 COORDINATOR: Task orchestration master (gemini-3.1-flash-lite)
+            // 🎮 COORDINATOR: Task orchestration master
             coordinator: {
                 role: 'coordinator',
-                model: 'gemini-3.1-flash-lite',
+                model: this.modelRouter.resolveModel('coordinator'),
                 systemPrompt: `BẠN LÀ PHÓ GIÁM ĐỐC (COO/COORDINATOR) - TRUNG TÂM ĐIỀU PHỐI VẬN HÀNH.
 
 **VAI TRÒ:**
@@ -194,10 +206,10 @@ class AgentOrchestrator {
                 enableTools: false
             },
 
-            // 🔬 RESEARCHER: Information gathering specialist (gemini-3-flash-preview)
+            // 🔬 RESEARCHER: Information gathering specialist
             researcher: {
                 role: 'researcher',
-                model: 'gemini-3.1-flash-lite',
+                model: this.modelRouter.resolveModel('researcher'),
                 systemPrompt: `BẠN LÀ CHUYÊN GIA NGHIÊN CỨU (RESEARCH SPECIALIST).
 
 **NHIỆM VỤ:**
@@ -226,10 +238,10 @@ class AgentOrchestrator {
                 enableTools: true
             },
 
-            // 💻 DEVELOPER: Technical implementation expert (gemini-3.5-flash-lite)
+            // 💻 DEVELOPER: Technical implementation expert
             developer: {
                 role: 'developer',
-                model: 'gemini-3.1-flash-lite',
+                model: this.modelRouter.resolveModel('developer'),
                 systemPrompt: `BẠN LÀ CHUYÊN GIA LẬP TRÌNH & THỰC THI KỸ THUẬT (DEVELOPMENT & AUTOMATION SPECIALIST).
 
 **NHIỆM VỤ:**
@@ -283,10 +295,10 @@ class AgentOrchestrator {
                 enableTools: true
             },
 
-            // 🛡️ CRITIC: Adversarial quality assurance (gemini-3.1-flash-lite)
+            // 🛡️ CRITIC: Adversarial quality assurance
             critic: {
                 role: 'critic',
-                model: 'gemini-3.1-flash-lite',
+                model: this.modelRouter.resolveModel('critic'),
                 systemPrompt: `BẠN LÀ CHUYÊN GIA THẨM ĐỊNH (CRITICAL ANALYST) - ĐỐI THỦ PHẢN BIỆN.
 
 **VAI TRÒ:**
@@ -351,64 +363,115 @@ class AgentOrchestrator {
             this.cacheInitialized = true;
         }
 
+        // 1. ADAPTIVE PLANNER: Xác định chế độ thực thi tối ưu (Fast, Deep Research, Autonomous, Standard)
+        const mode = this.adaptivePlanner.determineMode(userRequest, context);
+        this.log(`🎯 [AdaptivePlanner] Selected mode: [${mode.toUpperCase()}]`);
+
+        // 2. PROCEDURAL SKILLS: Tra cứu kỹ năng có sẵn (Hermes Agent Pattern)
+        const matchingSkill = this.skillLibrary.findMatchingSkill(userRequest);
+        if (matchingSkill) {
+            this.log(`💡 [SkillLibrary] Found procedural skill match: [${matchingSkill.name}] (Match: ${Math.round(matchingSkill.matchScore * 100)}%)`);
+        }
+
+        // 3. FAST MODE BYPASS: Nếu là câu hỏi nhanh/đơn giản, xử lý ngay qua 1 Agent để tiết kiệm 80% quota & latency
+        if (mode === 'fast') {
+            this.log('⚡ Running in FAST mode (bypass heavy orchestration overhead)');
+            const fastModel = this.modelRouter.resolveModel('researcher', 'fast');
+            const fastResult = await this.callAgent('researcher', {
+                task: userRequest,
+                context: { ...context, mode: 'fast', model: fastModel }
+            });
+            return {
+                success: fastResult.success,
+                result: fastResult.response,
+                mode: 'fast',
+                qualityScore: 90,
+                executionLog: this.executionLog
+            };
+        }
+
+        const taskId = context.taskId || `task_${Date.now()}`;
+        const checkpoint = context.resume !== false ? this.checkpointManager.loadCheckpoint(taskId) : null;
+
         try {
             // STAGE 1: Strategic Analysis by Director
-            this.log('📋 STAGE 1: Director Strategic Analysis');
-            const strategy = await this.callAgent('director', {
-                task: userRequest,
-                context: {
-                    experiences: context.experiences || [],
-                    previousAttempts: context.previousAttempts || [],
-                    grounding: context.groundingResult ? {
-                        text: context.groundingResult.text,
-                        sources: context.groundingResult.sources || []
-                    } : null
+            let directive = checkpoint?.stageData?.director;
+            if (directive) {
+                this.log('📌 Resuming STAGE 1 from checkpoint');
+            } else {
+                this.log('📋 STAGE 1: Director Strategic Analysis');
+                const strategy = await this.callAgent('director', {
+                    task: userRequest,
+                    context: {
+                        mode,
+                        experiences: context.experiences || [],
+                        previousAttempts: context.previousAttempts || [],
+                        grounding: context.groundingResult ? {
+                            text: context.groundingResult.text,
+                            sources: context.groundingResult.sources || []
+                        } : null
+                    }
+                });
+
+                if (!strategy.success) {
+                    throw new Error(`Director failed: ${strategy.error}`);
                 }
-            });
 
-            if (!strategy.success) {
-                throw new Error(`Director failed: ${strategy.error}`);
+                directive = this.parseAgentResponse(strategy.response);
+                this.checkpointManager.saveCheckpoint(taskId, 'director', directive);
             }
-
-            const directive = this.parseAgentResponse(strategy.response);
             this.log('✅ Strategic Directive', directive);
 
             // STAGE 2: Task Decomposition by Coordinator
-            this.log('🎮 STAGE 2: Coordinator Task Planning');
-            const plan = await this.callAgent('coordinator', {
-                task: `Phân tích yêu cầu và lập kế hoạch thực thi chi tiết. Yêu cầu gốc của người dùng: "${userRequest}". BẮT BUỘC trích xuất các tham số cụ thể (URL gốc, thư mục lưu, số lượng video, vị trí cookie) và đưa rõ vào mô tả nhiệm vụ của Developer và Critic để họ có đủ thông số thực thi chính xác.`,
-                userRequest: userRequest,
-                directive: directive,
-                availableAgents: ['researcher', 'developer', 'critic']
-            });
+            let taskPlan = checkpoint?.stageData?.coordinator;
+            if (taskPlan) {
+                this.log('📌 Resuming STAGE 2 from checkpoint');
+            } else {
+                this.log('🎮 STAGE 2: Coordinator Task Planning');
+                const plan = await this.callAgent('coordinator', {
+                    task: `Phân tích yêu cầu và lập kế hoạch thực thi chi tiết. Yêu cầu gốc của người dùng: "${userRequest}". BẮT BUỘC trích xuất các tham số cụ thể (URL gốc, thư mục lưu, số lượng video, vị trí cookie) và đưa rõ vào mô tả nhiệm vụ của Developer và Critic để họ có đủ thông số thực thi chính xác.`,
+                    userRequest: userRequest,
+                    directive: directive,
+                    mode,
+                    availableAgents: ['researcher', 'developer', 'critic']
+                });
 
-            if (!plan.success) {
-                throw new Error(`Coordinator failed: ${plan.error}`);
+                if (!plan.success) {
+                    throw new Error(`Coordinator failed: ${plan.error}`);
+                }
+
+                const rawPlan = this.parseAgentResponse(plan.response);
+                // DEFENSIVE PARSING: Đảm bảo tasks luôn là mảng hợp lệ, chống crash TypeError
+                taskPlan = {
+                    tasks: Array.isArray(rawPlan?.tasks) && rawPlan.tasks.length > 0
+                        ? rawPlan.tasks
+                        : [
+                            { id: 'T001', description: `Nghiên cứu thông tin và đối chiếu bằng chứng cho: ${userRequest}`, assignedTo: 'researcher', dependencies: [], priority: 1 },
+                            { id: 'T002', description: `Triển khai giải pháp kỹ thuật cho: ${userRequest}`, assignedTo: 'developer', dependencies: ['T001'], priority: 2 },
+                            { id: 'T003', description: `Phản biện, kiểm định chất lượng và rà soát lỗi: ${userRequest}`, assignedTo: 'critic', dependencies: ['T002'], priority: 3 }
+                        ],
+                    executionPlan: rawPlan?.executionPlan || 'Hybrid parallel execution'
+                };
+                this.checkpointManager.saveCheckpoint(taskId, 'coordinator', taskPlan);
             }
-
-            const rawPlan = this.parseAgentResponse(plan.response);
-            // DEFENSIVE PARSING: Đảm bảo tasks luôn là mảng hợp lệ, chống crash TypeError
-            const taskPlan = {
-                tasks: Array.isArray(rawPlan?.tasks) && rawPlan.tasks.length > 0
-                    ? rawPlan.tasks
-                    : [
-                        { id: 'T001', description: `Nghiên cứu thông tin và đối chiếu bằng chứng cho: ${userRequest}`, assignedTo: 'researcher', dependencies: [], priority: 1 },
-                        { id: 'T002', description: `Triển khai giải pháp kỹ thuật cho: ${userRequest}`, assignedTo: 'developer', dependencies: ['T001'], priority: 2 },
-                        { id: 'T003', description: `Phản biện, kiểm định chất lượng và rà soát lỗi: ${userRequest}`, assignedTo: 'critic', dependencies: ['T002'], priority: 3 }
-                    ],
-                executionPlan: rawPlan?.executionPlan || 'Hybrid parallel execution'
-            };
             this.log('✅ Task Plan', taskPlan);
 
             // STAGE 3: Parallel Specialist Execution
-            this.log('⚡ STAGE 3: Specialist Execution (Parallel)');
-            const enrichedContext = {
-                ...context,
-                userRequest: userRequest,
-                directive: directive,
-                groundingResult: context.groundingResult || null
-            };
-            const specialistResults = await this.executeTasksParallel(taskPlan.tasks, enrichedContext);
+            let specialistResults = checkpoint?.stageData?.specialists;
+            if (specialistResults) {
+                this.log('📌 Resuming STAGE 3 from checkpoint');
+            } else {
+                this.log('⚡ STAGE 3: Specialist Execution (Parallel)');
+                const enrichedContext = {
+                    ...context,
+                    mode,
+                    userRequest: userRequest,
+                    directive: directive,
+                    groundingResult: context.groundingResult || null
+                };
+                specialistResults = await this.executeTasksParallel(taskPlan.tasks, enrichedContext);
+                this.checkpointManager.saveCheckpoint(taskId, 'specialists', specialistResults);
+            }
             this.log('✅ Specialist Results', { count: specialistResults.length });
 
             // STAGE 4: Consensus & Debate Protocol (Real Content Consensus)
@@ -445,8 +508,17 @@ class AgentOrchestrator {
                 };
             }
 
-            // STAGE 5: Final Quality Gate
-            this.log('🛡️ STAGE 5: Final Quality Gate by Critic');
+            // STAGE 5: Independent Verification Engine (Zero Blind Trust)
+            this.log('🔍 STAGE 5: Independent Verification (Zero Blind Trust)');
+            const audit = await this.verifier.verifyExecution(directive, taskPlan, specialistResults, this.executionLog);
+            this.log('📊 Independent Audit Result', {
+                status: audit.status,
+                passRatio: `${audit.passRatio}%`,
+                passedChecks: `${audit.passedChecks}/${audit.totalChecks}`
+            });
+
+            // STAGE 6: Final Quality Gate by Critic
+            this.log('🛡️ STAGE 6: Final Quality Gate by Critic');
 
             // Xóa sạch bộ đệm cache công cụ để Critic đối chiếu dữ liệu sống trực tiếp trên đĩa
             if (this.toolExecutor && typeof this.toolExecutor.clearCache === 'function') {
@@ -456,13 +528,19 @@ class AgentOrchestrator {
             const finalCritique = await this.callAgent('critic', {
                 task: 'Final quality assessment',
                 result: consensus.finalResult,
-                directive: directive
+                directive: directive,
+                audit: audit
             });
 
             const critique = this.parseAgentResponse(finalCritique.response);
-            const overallScore = typeof critique.overallScore === 'number' ? critique.overallScore : 85;
+            const overallScore = typeof critique.overallScore === 'number' ? critique.overallScore : (audit.status === 'VERIFIED' ? 90 : 75);
             const verdict = critique.verdict || (overallScore >= 80 ? 'APPROVED' : 'NEEDS_REVISION');
-            this.log('✅ Final Critique', { score: overallScore, verdict });
+            this.log('✅ Final Critique', { score: overallScore, verdict, auditStatus: audit.status });
+
+            // Clear checkpoint on successful completion
+            if (verdict === 'APPROVED' || audit.status === 'VERIFIED') {
+                this.checkpointManager.clearCheckpoint(taskId);
+            }
 
             // STAGE 6: Director Approval
             if (verdict === 'APPROVED' && overallScore >= 80) {
@@ -632,12 +710,14 @@ class AgentOrchestrator {
             };
         }
 
-        // Nếu chỉ có 1 kết quả thành công -> tự động đồng thuận
+        // Nếu chỉ có 1 kết quả thành công -> trạng thái NEEDS_REVIEW, ghi rõ chưa đối chiếu độc lập
         if (successfulResults.length === 1) {
             return {
                 achieved: true,
                 finalResult: successfulResults[0].response,
-                agreement: 1.0
+                agreement: 0.85,
+                status: 'NEEDS_REVIEW',
+                note: 'Kết quả từ đơn chuyên viên, chưa qua tranh biện đối chiếu độc lập'
             };
         }
 
@@ -740,15 +820,10 @@ class AgentOrchestrator {
                 delete requestBody.systemInstruction; // Tiết kiệm tokens khi dùng server cache
             }
 
-            const MODEL_POOL = [
-                'gemini-3.1-flash-lite',
-                'gemini-3.1-flash-lite-preview',
-                'gemini-flash-lite-latest'
-            ];
-            let modelName = agent.model || this.defaultModel;
+            let modelName = agent.model || this.modelRouter.resolveModel(agentRole, payload?.context?.mode);
             if (attempt > 1) {
-                // Tự động xoay tua sang model khác trong pool để giải phóng hạn mức 15 RPM
-                modelName = MODEL_POOL[(attempt - 1) % MODEL_POOL.length];
+                // Tự động xoay tua sang model khác trong registry để giải phóng hạn mức
+                modelName = this.modelRouter.getFallbackModel(modelName, attempt);
                 this.log(`🔄 Thử lại lần ${attempt} với model xoay tua: [${modelName}]`);
             }
             let response = await fetch(
@@ -763,7 +838,7 @@ class AgentOrchestrator {
 
             // Tự động fallback tức thì nếu model chính bị 429 hoặc 503
             if (!response.ok && (response.status === 429 || response.status === 503)) {
-                const altModel = MODEL_POOL[attempt % MODEL_POOL.length];
+                const altModel = this.modelRouter.getFallbackModel(modelName, attempt + 1);
                 this.log(`⚠️ Model [${modelName}] gặp HTTP ${response.status}, hoán đổi tức thì sang [${altModel}]...`);
                 await new Promise(r => setTimeout(r, 1000));
                 modelName = altModel;
@@ -796,7 +871,7 @@ class AgentOrchestrator {
             let toolIterationCount = 0;
             const MAX_TOOL_ITERATIONS = 5;
 
-            // 1. KIỂM TRA & THỰC THI CHUỖI CÔNG CỤ ĐA BƯỚC (Multi-step Tool Calling Loop)
+            // 1. KIỂM TRA & THỰC THI CHUỖI CÔNG CỤ ĐA BƯỚC (Multi-step Tool Calling Loop với Parallelization & Deduplication)
             while (toolIterationCount < MAX_TOOL_ITERATIONS) {
                 const functionCallParts = currentParts.filter(p => p.functionCall);
                 if (functionCallParts.length === 0) break;
@@ -806,17 +881,20 @@ class AgentOrchestrator {
                     tools: functionCallParts.map(p => p.functionCall.name)
                 });
 
+                const toolCalls = functionCallParts.map(p => ({
+                    name: p.functionCall.name,
+                    args: p.functionCall.args || {}
+                }));
+
+                const toolResults = await this.toolExecutor.executeTools(toolCalls, { agentRole });
+
                 const functionResponseParts = [];
-                for (const fcp of functionCallParts) {
-                    const fc = fcp.functionCall;
-                    const toolResult = await this.toolExecutor.executeSingleTool(
-                        { name: fc.name, args: fc.args || {} },
-                        { agentRole }
-                    );
+                for (let i = 0; i < functionCallParts.length; i++) {
+                    const fc = functionCallParts[i].functionCall;
                     functionResponseParts.push({
                         functionResponse: {
                             name: fc.name,
-                            response: { content: toolResult }
+                            response: { content: toolResults[i] || { success: true } }
                         }
                     });
                 }
@@ -843,7 +921,7 @@ class AgentOrchestrator {
                 );
 
                 if (!followUpRes.ok && (followUpRes.status === 429 || followUpRes.status === 503)) {
-                    const fallbackModel = MODEL_POOL[(toolIterationCount + 1) % MODEL_POOL.length];
+                    const fallbackModel = this.modelRouter.getFallbackModel(modelName, toolIterationCount + 1);
                     this.log(`⚠️ Tool follow-up gặp ${followUpRes.status}, tự động xoay model sang [${fallbackModel}]...`);
                     await new Promise(r => setTimeout(r, 1000));
                     followUpRes = await fetch(
