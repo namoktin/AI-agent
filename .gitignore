@@ -5,4 +5,6 @@ node_modules/
 chrome_profile/
 .snapshots/
 *.bak
-
+memory/cookies/
+memory/cookie_vault.json
+screenshots/

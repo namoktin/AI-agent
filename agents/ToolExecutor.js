@@ -77,13 +77,15 @@ class ToolExecutor {
                 'SAVE_EXPERIENCE',
                 'UPDATE_EXPERIENCE',
                 'DELETE_FILE',
-                'RUN_CODE'
+                'RUN_CODE',
+                'RUN_CMD'
             ],
             // Heavy tools - rate limited
             heavy: [
                 'WEB_SEARCH',
                 'ACADEMIC_SEARCH',
                 'BROWSE_WEB',
+                'BROWSER_ACTION',
                 'GENERATE_IMAGE'
             ]
         };
@@ -133,30 +135,61 @@ class ToolExecutor {
     }
 
     /**
+     * Invalidate all file-related caches when files are written, modified, or executed
+     */
+    invalidateFileCache() {
+        for (const key of this.executionCache.keys()) {
+            if (key.startsWith('LIST_FILES:') || key.startsWith('READ_FILE:')) {
+                this.executionCache.delete(key);
+            }
+        }
+    }
+
+    /**
      * Execute single tool with caching and retry
      */
     async executeSingleTool(tool, context = {}, attempt = 1) {
         const { name, args } = tool;
 
+        // Bỏ qua cache hoàn toàn nếu:
+        // 1. Agent là Critic (Quality Gate bắt buộc phải kiểm tra dữ liệu sống trên đĩa)
+        // 2. Tool là LIST_FILES (thư mục luôn thay đổi khi Agent tạo/xóa file)
+        // 3. context yêu cầu noCache
+        const isCritic = context.agentRole === 'critic' || context.agent === 'critic';
+        const shouldBypassCache = isCritic || context.noCache === true || name === 'LIST_FILES';
+
         // Check cache for idempotent operations
-        if (this.isReadOnly(name)) {
+        if (!shouldBypassCache && this.isReadOnly(name)) {
             const cacheKey = this.getCacheKey(name, args);
             if (this.executionCache.has(cacheKey)) {
                 console.log(`💾 Cache hit for ${name}`);
-                return this.executionCache.get(cacheKey);
+                const cachedResult = this.executionCache.get(cacheKey);
+                return {
+                    tool: name,
+                    success: true,
+                    result: cachedResult,
+                    cached: true,
+                    attempt: attempt
+                };
             }
         }
 
         try {
             const result = await this.callToolAPI(name, args, context);
 
-            // Cache successful read-only results
-            if (this.isReadOnly(name) && result.success) {
+            // Khi có thao tác ghi hoặc chạy lệnh (WRITE_FILE, RUN_CMD, RUN_CODE, DELETE_FILE),
+            // bắt buộc xóa sạch cache file để Critic và các bước sau luôn thấy dữ liệu mới nhất
+            if (this.isWrite(name)) {
+                this.invalidateFileCache();
+            }
+
+            // Cache successful read-only results (ngoại trừ LIST_FILES)
+            if (!shouldBypassCache && this.isReadOnly(name) && name !== 'LIST_FILES' && result && result.success) {
                 const cacheKey = this.getCacheKey(name, args);
                 this.executionCache.set(cacheKey, result);
 
-                // Expire cache after 5 minutes
-                setTimeout(() => this.executionCache.delete(cacheKey), 300000);
+                // Expire cache after 2 minutes
+                setTimeout(() => this.executionCache.delete(cacheKey), 120000);
             }
 
             return {
@@ -247,11 +280,13 @@ class ToolExecutor {
             'READ_URL': '/api/fetch-webpage',
             'FETCH_WEBPAGE': '/api/fetch-webpage',
             'BROWSE_WEB': '/api/browse-web',
+            'BROWSER_ACTION': '/api/browse-web',
             'SEARCH_EXPERIENCE': '/api/search-experiences',
             'SEARCH_EXPERIENCES': '/api/search-experiences',
             'SAVE_EXPERIENCE': '/api/save-experience',
             'UPDATE_EXPERIENCE': '/api/update-experience',
             'RUN_CODE': '/api/run-code',
+            'RUN_CMD': '/api/run-cmd',
             'GENERATE_IMAGE': '/api/generate-image'
         };
 
@@ -360,6 +395,120 @@ class ToolExecutor {
                         }
                     },
                     required: ['url']
+                }
+            },
+            {
+                name: 'BROWSE_WEB',
+                description: 'Trình duyệt web thông minh tự động (Puppeteer Stealth): mở Chrome, tương tác giao diện trực tiếp tuần tự (click, type, press, scroll, wait, extract), trích xuất Accessibility Tree siêu tinh gọn (100-300 tokens) hoặc trích xuất từ ngữ/văn bản theo mốc từ khóa.',
+                parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                        url: {
+                            type: 'STRING',
+                            description: 'Đường dẫn website cần truy cập (bắt đầu bằng https://)'
+                        },
+                        action: {
+                            type: 'STRING',
+                            description: 'Hành động chính: read (đọc nội dung), screenshot (chụp ảnh màn hình), accessibility_snapshot (lấy cây trợ năng siêu rút gọn)'
+                        },
+                        actions: {
+                            type: 'ARRAY',
+                            description: 'Danh sách các thao tác tương tác giao diện tuần tự trên web (click nút/link, nhập form, chờ dữ liệu, trích xuất text)',
+                            items: {
+                                type: 'OBJECT',
+                                properties: {
+                                    type: {
+                                        type: 'STRING',
+                                        description: 'Loại thao tác: click, type, press, wait, scroll, extract'
+                                    },
+                                    selector: {
+                                        type: 'STRING',
+                                        description: 'CSS selector của phần tử (ví dụ: a[href*="/gift"], button.btn-download)'
+                                    },
+                                    text: {
+                                        type: 'STRING',
+                                        description: 'Nội dung chữ của nút/link cần click (ví dụ: "GIFT CARDS", "More ways to gift") hoặc chữ cần gõ nếu type=type'
+                                    },
+                                    key: {
+                                        type: 'STRING',
+                                        description: 'Phím cần gõ nếu type=press (ví dụ: "Enter", "Tab")'
+                                    },
+                                    findAfter: {
+                                        type: 'STRING',
+                                        description: 'Nếu type=extract: chuỗi mốc cần tìm để bóc tách đoạn văn hoặc từ ngữ ngay phía sau nó (ví dụ: "Amazon")'
+                                    },
+                                    waitMs: {
+                                        type: 'NUMBER',
+                                        description: 'Thời gian chờ (mili-giây) sau thao tác (mặc định 2000ms)'
+                                    },
+                                    distance: {
+                                        type: 'NUMBER',
+                                        description: 'Khoảng cách cuộn trang (pixels) nếu type=scroll'
+                                    }
+                                }
+                            }
+                        },
+                        findAfter: {
+                            type: 'STRING',
+                            description: 'Chuỗi mốc cần tìm trên trang đích để tự động trích xuất các từ/đoạn văn bản ngay phía sau nó (ví dụ: "Amazon")'
+                        },
+                        includeSnapshot: {
+                            type: 'BOOLEAN',
+                            description: 'Nếu true, tự động trả về Accessibility Tree dạng YAML siêu rút gọn (tiết kiệm token)'
+                        }
+                    },
+                    required: ['url']
+                }
+            },
+            {
+                name: 'BROWSER_ACTION',
+                description: 'Thao tác trình duyệt ảo tương tác trực tiếp (Method 2: Accessibility Tree & Action Chaining): điều hướng, click nút/link theo chữ, cuộn trang, bóc tách từ ngữ sau từ khóa.',
+                parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                        url: {
+                            type: 'STRING',
+                            description: 'Đường dẫn website ban đầu'
+                        },
+                        actions: {
+                            type: 'ARRAY',
+                            description: 'Chuỗi thao tác giao diện tuần tự (click, scroll, wait, extract)',
+                            items: {
+                                type: 'OBJECT',
+                                properties: {
+                                    type: { type: 'STRING', description: 'click | type | scroll | wait | extract' },
+                                    selector: { type: 'STRING', description: 'CSS selector (tùy chọn)' },
+                                    text: { type: 'STRING', description: 'Chữ hiển thị trên nút/link cần click hoặc chữ cần nhập' },
+                                    findAfter: { type: 'STRING', description: 'Từ khóa mốc cần lấy nội dung phía sau' },
+                                    waitMs: { type: 'NUMBER', description: 'Thời gian chờ (ms)' },
+                                    distance: { type: 'NUMBER', description: 'Khoảng cách cuộn (px)' }
+                                }
+                            }
+                        },
+                        findAfter: {
+                            type: 'STRING',
+                            description: 'Từ khóa mốc trên trang để lấy từ/đoạn văn bản ngay phía sau'
+                        },
+                        includeSnapshot: {
+                            type: 'BOOLEAN',
+                            description: 'Lấy cây Accessibility Tree rút gọn'
+                        }
+                    },
+                    required: ['url']
+                }
+            },
+            {
+                name: 'RUN_CMD',
+                description: 'Thực thi lệnh hệ thống an toàn (node, python, npm, git, yt-dlp, dir...). Dùng để chạy script Python, tải video media bằng yt-dlp, cài gói hoặc kiểm thử.',
+                parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                        command: {
+                            type: 'STRING',
+                            description: 'Câu lệnh cần thực thi (ví dụ: python script.py, yt-dlp URL, node test.js)'
+                        }
+                    },
+                    required: ['command']
                 }
             },
             {

@@ -65,7 +65,7 @@ class AgentOrchestrator {
     constructor(geminiApiKey, config = {}) {
         this.apiKey = geminiApiKey;
         this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-        this.defaultModel = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+        this.defaultModel = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
         this.config = {
             maxRetries: 3,
             timeout: 180000,
@@ -114,10 +114,10 @@ class AgentOrchestrator {
         const standardModel = this.defaultModel;
 
         return {
-            // 🎯 DIRECTOR: Strategic mastermind
+            // 🎯 DIRECTOR: Strategic mastermind (gemini-3.5-flash)
             director: {
                 role: 'director',
-                model: standardModel,
+                model: 'gemini-3.1-flash-lite',
                 systemPrompt: `BẠN LÀ GIÁM ĐỐC ĐIỀU HÀNH (CEO/DIRECTOR) - BỘ NÃO CHIẾN LƯỢC CỦA TỔ CHỨC.
 
 **VAI TRÒ TUYỆT ĐỐI:**
@@ -132,6 +132,10 @@ class AgentOrchestrator {
 - Tập trung vào WHY và WHAT, không phải HOW
 - Đánh giá rủi ro và trade-offs
 - Tận dụng dữ liệu kiểm chứng (grounding) nếu có
+
+**THỜI GIAN HỆ THỐNG:** Hôm nay là ngày 23 tháng 10 năm 2026. Mọi ấn phẩm, bài báo khoa học, video hoặc tài liệu năm 2026 là hoàn toàn hợp lệ trong thời gian thực. TUYỆT ĐỐI KHÔNG coi năm 2026 là tương lai hay ảo giác.
+
+**MÔI TRƯỜNG THỰC THI (HOST OS):** Hệ thống đang chạy TRỰC TIẾP trên máy trạm Windows 11 cục bộ của người dùng (Native Windows Host, KHÔNG PHẢI Linux Sandbox hay Docker container). Mọi đường dẫn tệp dạng "C:\Users\..." là ĐƯỜNG DẪN VẬT LÝ HỢP LỆ VÀ CÓ THẬT 100%. TUYỆT ĐỐI KHÔNG coi đường dẫn Windows ổ C:\ là ảo giác hay sandbox error.
 
 **ĐẦU RA BẮT BUỘC (JSON):**
 \`\`\`json
@@ -150,10 +154,10 @@ class AgentOrchestrator {
                 enableTools: false
             },
 
-            // 🎮 COORDINATOR: Task orchestration master
+            // 🎮 COORDINATOR: Task orchestration master (gemini-3.1-flash-lite)
             coordinator: {
                 role: 'coordinator',
-                model: standardModel,
+                model: 'gemini-3.1-flash-lite',
                 systemPrompt: `BẠN LÀ PHÓ GIÁM ĐỐC (COO/COORDINATOR) - TRUNG TÂM ĐIỀU PHỐI VẬN HÀNH.
 
 **VAI TRÒ:**
@@ -190,10 +194,10 @@ class AgentOrchestrator {
                 enableTools: false
             },
 
-            // 🔬 RESEARCHER: Information gathering specialist
+            // 🔬 RESEARCHER: Information gathering specialist (gemini-3-flash-preview)
             researcher: {
                 role: 'researcher',
-                model: standardModel,
+                model: 'gemini-3.1-flash-lite',
                 systemPrompt: `BẠN LÀ CHUYÊN GIA NGHIÊN CỨU (RESEARCH SPECIALIST).
 
 **NHIỆM VỤ:**
@@ -201,6 +205,9 @@ class AgentOrchestrator {
 2. Khai thác các công cụ: WEB_SEARCH, ACADEMIC_SEARCH, READ_FILE, SEARCH_EXPERIENCE, READ_URL
 3. Đánh giá độ tin cậy thông tin, trích dẫn rõ nguồn gốc (DOI, PMID, URL)
 4. Luôn phân biệt rõ ràng giữa Fact (sự thật có bằng chứng) và Opinion (ý kiến)
+5. TUYỆT ĐỐI KHÔNG dùng domain giả mạo (.example, dummy URLs). Mọi link BẮT BUỘC phải lấy từ nguồn thực tế (WEB_SEARCH, ACADEMIC_SEARCH, READ_URL).
+
+**THỜI GIAN HỆ THỐNG:** Hôm nay là ngày 23 tháng 10 năm 2026. Mọi ấn phẩm, bài báo khoa học, video hoặc tài liệu năm 2026 là hoàn toàn hợp lệ trong thời gian thực. TUYỆT ĐỐI KHÔNG coi năm 2026 là tương lai hay ảo giác.
 
 **ĐẦU RA (JSON hoặc báo cáo kèm công cụ):**
 \`\`\`json
@@ -219,17 +226,45 @@ class AgentOrchestrator {
                 enableTools: true
             },
 
-            // 💻 DEVELOPER: Technical implementation expert
+            // 💻 DEVELOPER: Technical implementation expert (gemini-3.5-flash-lite)
             developer: {
                 role: 'developer',
-                model: standardModel,
-                systemPrompt: `BẠN LÀ CHUYÊN GIA LẬP TRÌNH (DEVELOPMENT SPECIALIST).
+                model: 'gemini-3.1-flash-lite',
+                systemPrompt: `BẠN LÀ CHUYÊN GIA LẬP TRÌNH & THỰC THI KỸ THUẬT (DEVELOPMENT & AUTOMATION SPECIALIST).
 
 **NHIỆM VỤ:**
 1. Triển khai giải pháp kỹ thuật, viết code chất lượng cao, maintainable
-2. Sử dụng công cụ: READ_FILE, WRITE_FILE, RUN_CODE, LIST_FILES
+2. Sử dụng công cụ: READ_FILE, WRITE_FILE, RUN_CODE, RUN_CMD, BROWSE_WEB, BROWSER_ACTION, LIST_FILES
 3. Kiểm thử cú pháp và logic trước khi bàn giao
 4. Tuân thủ nghiêm ngặt chuẩn mực bảo mật và clean code
+5. QUY TẮC BẮT BUỘC KHI KIỂM TOÁN/PHÂN TÍCH MÃ NGUỒN CỤC BỘ: BẮT BUỘC dùng LIST_FILES để quét các file thực tế trong thư mục (ví dụ utils/, middleware/) trước khi đọc hoặc báo cáo. TUYỆT ĐỐI KHÔNG tự bịa đặt, phỏng đoán hoặc đặt tên file giả (như fileHandler.js, runner.js, session.js, dbWriter.js). Mọi tên file được nêu trong báo cáo BẮT BUỘC phải tồn tại trên đĩa cứng.
+6. TUYỆT ĐỐI KHÔNG dùng domain giả mạo (.example, dummy URLs). Mọi link BẮT BUỘC phải lấy từ nguồn thực tế.
+7. TỰ ĐỘNG HÓA WEB TƯƠNG TÁC (BROWSE_WEB / BROWSER_ACTION): Khi nhiệm vụ yêu cầu truy cập website, bấm vào nút/link (như GIFT CARDS, More ways to gift...), cuộn trang hoặc trích xuất văn bản sau một từ khóa mốc (như sau chữ "Amazon"): Có thể dùng trực tiếp BROWSE_WEB với chuỗi actions (click, scroll, extract) và findAfter để lấy dữ liệu thực tế tức thì, siêu tiết kiệm token và chính xác tuyệt đối.
+
+**THỜI GIAN HỆ THỐNG:** Hôm nay là ngày 23 tháng 10 năm 2026. Mọi ấn phẩm, bài báo khoa học, video hoặc tài liệu năm 2026 là hoàn toàn hợp lệ trong thời gian thực. TUYỆT ĐỐI KHÔNG coi năm 2026 là tương lai hay ảo giác.
+
+**QUY TẮC THỰC THI & TỰ THÍCH ỨNG (ADAPTIVE PROBLEM SOLVING):**
+- Khi nhiệm vụ yêu cầu tải file, xử lý media (video, audio, ảnh, dữ liệu), cào web hoặc tự động hóa: ĐÍCH ĐẾN BẮT BUỘC LÀ FILE VẬT LÝ NẰM TRÊN Ổ ĐĨA MÁY TÍNH.
+- TUYỆT ĐỐI NGHIÊM CẤM bịa đặt link tải giả (như fbcdn.net, cdn...) hoặc đùn đẩy trách nhiệm bắt người dùng tự làm bằng tay.
+- ĐƯỜNG DẪN COOKIE MẶC ĐỊNH CỦA HỆ THỐNG:
+  * Khi cào hoặc tải từ Facebook: BẮT BUỘC dùng đường dẫn tuyệt đối "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\cookies\\facebook.com.txt".
+  * TUYỆT ĐỐI KHÔNG dùng đường dẫn tương đối "../.." vì thư mục làm việc là linh hoạt.
+- QUY TRÌNH CHUẨN ĐỂ LẤY VÀ TẢI 5 REELS CỦA TÁC GIẢ TỪ 1 LINK BAN ĐẦU:
+  * Bước 1 (Lấy thông tin tác giả & Tải ngay reel đầu tiên):
+    - Dùng RUN_CMD gọi "yt-dlp --cookies \"C:\\Users\\Nam\\Desktop\\AI agent\\memory\\cookies\\facebook.com.txt\" --skip-download --print \"%(uploader)s | %(uploader_id)s\" <URL_GỐC>" để trích xuất tên tác giả (uploader) và uploader_id.
+    - Chạy RUN_CMD tải ngay video reel gốc này: "yt-dlp --cookies \"C:\\Users\\Nam\\Desktop\\AI agent\\memory\\cookies\\facebook.com.txt\" -o \"<output_dir>\\facebook_reel_%(id)s.mp4\" <URL_GỐC>". (Đây là 1 video thật 100%!).
+  * Bước 2 (Lấy danh sách link Reels tiếp theo qua BROWSE_WEB):
+    - CẢNH BÁO QUAN TRỌNG: Facebook KHÔNG CHO yt-dlp cào trực tiếp link profile /reels/ (sẽ bị lỗi HTTP 500)! BẮT BUỘC dùng công cụ BROWSE_WEB với url dạng: "https://www.facebook.com/people/<uploader>/<uploader_id>/?sk=reels_tab" và extractReels: true. Tool BROWSE_WEB sẽ duyệt bằng Stealth Browser và trả về mảng deepMediaLinks chứa các URL reel thật.
+  * Bước 3 (Tải các video còn lại bằng RUN_CMD):
+    - Lấy 4 URL reel khác từ kết quả deepMediaLinks của BROWSE_WEB, chạy lệnh tải từng video qua RUN_CMD:
+      yt-dlp --cookies "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\cookies\\facebook.com.txt" -o "<output_dir>\\facebook_reel_%(id)s.mp4" <LINK_REEL>
+  * Bước 4 (Nghiệm thu): Gọi LIST_FILES để xác nhận các file video .mp4 đã lưu thành công trong thư mục đích.
+- QUY TẮC BẮT BUỘC THỰC THI CHUỖI CÔNG CỤ (MANDATORY TOOL CHAINING):
+  * TUYỆT ĐỐI KHÔNG BAO GIỜ dừng lại ở bước viết code (WRITE_FILE)!
+  * Nếu dùng WRITE_FILE tạo script (ví dụ: download_reels.py), BẮT BUỘC PHẢI GỌI TIẾP RUN_CMD để thực thi script đó ngay lập tức: "python download_reels.py".
+  * Sau khi chạy lệnh tải, BẮT BUỘC gọi LIST_FILES để kiểm tra và xác nhận các file video vật lý đã thực sự xuất hiện trong thư mục đích trước khi kết luận hoàn thành!
+- Tự động bắc cầu: Nếu người dùng chỉ đưa 1 link video/reel mà yêu cầu lấy thêm video khác của chủ kênh, BẮT BUỘC tự bóc tách tên/ID tác giả (qua yt-dlp --dump-json hoặc BROWSE_WEB), tuyệt đối không dừng lại hỏi xin link Facebook của người dùng.
+- BẢO CHỨNG ĐƯỜNG DẪN GỐC & CHỐNG LINK ẢO (STRICT URL PROVENANCE): Mọi đường link BẮT BUỘC phải được copy nguyên văn từ kết quả trả về của công cụ.
 
 **ĐẦU RA (JSON):**
 \`\`\`json
@@ -248,10 +283,10 @@ class AgentOrchestrator {
                 enableTools: true
             },
 
-            // 🛡️ CRITIC: Adversarial quality assurance
+            // 🛡️ CRITIC: Adversarial quality assurance (gemini-3.1-flash-lite)
             critic: {
                 role: 'critic',
-                model: standardModel,
+                model: 'gemini-3.1-flash-lite',
                 systemPrompt: `BẠN LÀ CHUYÊN GIA THẨM ĐỊNH (CRITICAL ANALYST) - ĐỐI THỦ PHẢN BIỆN.
 
 **VAI TRÒ:**
@@ -259,6 +294,17 @@ class AgentOrchestrator {
 2. Tìm lỗ hổng logic, bugs, sai lệch số liệu, nguy cơ bảo mật
 3. Đánh giá mức độ đồng thuận thực tế về mặt NỘI DUNG (Content & Fact Agreement)
 4. Cho điểm chất lượng tổng thể khách quan (0-100)
+
+**CỔNG KIỂM CHỨNG THỰC TẾ (REALITY VERIFICATION GATE):**
+- Với các nhiệm vụ yêu cầu tạo ra sản phẩm thực tế (code, file, media, video, tài liệu): Phải đối chiếu xem file đó có thực sự được tạo/tải về máy tính hay không.
+- QUY TẮC ĐỐI CHIẾU FILE THỰC TẾ: Khi kiểm định báo cáo mã nguồn, Critic BẮT BUỘC dùng LIST_FILES hoặc READ_FILE để đối chiếu xem các file Developer nhắc tới có tồn tại trên đĩa thật hay không. Nếu phát hiện file bịa đặt, BẮT BUỘC REJECT ngay lập tức.
+
+**THỜI GIAN HỆ THỐNG:** Hôm nay là ngày 23 tháng 10 năm 2026. Mọi ấn phẩm, bài báo khoa học, video hoặc tài liệu năm 2026 là hoàn toàn hợp lệ trong thời gian thực. TUYỆT ĐỐI KHÔNG coi năm 2026 là tương lai hay ảo giác.
+- BẮT BUỘC BÁC BỎ (VERDICT: REJECTED, điểm < 50) nếu phát hiện Agent:
+  * Bịa đặt đường link ảo (như link cdn/fbcdn không có thực, hoặc link mẫu bịa đặt ~01abc..., saas-dashboard-dev... trong file .csv và .md). Mọi đường link bắt buộc phải xuất phát nguyên văn từ kết quả của công cụ (WEB_SEARCH, READ_URL, BROWSE_WEB).
+  * Lười biếng đùn đẩy bắt người dùng tự thao tác bằng tay thay vì tự động hóa.
+  * Chỉ viết file báo cáo suông mà không tạo ra sản phẩm thực tế đã cam kết.
+  * Dừng lại hỏi người dùng hoặc đùn đẩy việc lại cho người dùng khi chưa thử nghiệm vét cạn cả 3 tầng chiến lược kỹ thuật.
 
 **ĐẦU RA BẮT BUỘC (JSON):**
 \`\`\`json
@@ -295,6 +341,11 @@ class AgentOrchestrator {
         this.executionLog = [];
         this.log('🎬 MULTI-AGENT EXECUTION STARTED', { userRequest });
 
+        // Làm mới bộ đệm công cụ trước mỗi phiên thực thi mới
+        if (this.toolExecutor && typeof this.toolExecutor.clearCache === 'function') {
+            this.toolExecutor.clearCache();
+        }
+
         if (!this.cacheInitialized && this.cacheManager) {
             await this.warmupCache();
             this.cacheInitialized = true;
@@ -325,7 +376,8 @@ class AgentOrchestrator {
             // STAGE 2: Task Decomposition by Coordinator
             this.log('🎮 STAGE 2: Coordinator Task Planning');
             const plan = await this.callAgent('coordinator', {
-                task: 'Decompose strategy into executable tasks',
+                task: `Phân tích yêu cầu và lập kế hoạch thực thi chi tiết. Yêu cầu gốc của người dùng: "${userRequest}". BẮT BUỘC trích xuất các tham số cụ thể (URL gốc, thư mục lưu, số lượng video, vị trí cookie) và đưa rõ vào mô tả nhiệm vụ của Developer và Critic để họ có đủ thông số thực thi chính xác.`,
+                userRequest: userRequest,
                 directive: directive,
                 availableAgents: ['researcher', 'developer', 'critic']
             });
@@ -352,6 +404,7 @@ class AgentOrchestrator {
             this.log('⚡ STAGE 3: Specialist Execution (Parallel)');
             const enrichedContext = {
                 ...context,
+                userRequest: userRequest,
                 directive: directive,
                 groundingResult: context.groundingResult || null
             };
@@ -370,9 +423,22 @@ class AgentOrchestrator {
                     conflicts: consensus.conflicts
                 });
 
+                const arbDirective = this.parseAgentResponse(arbitration.response);
+
+                // NẾU DIRECTOR PHÁN QUYẾT BẮT BUỘC THỰC THI LẠI ĐỂ TẠO FILE VẬT LÝ:
+                if ((JSON.stringify(arbDirective).includes('REJECTED') || JSON.stringify(arbDirective).includes('RUN_CMD')) && (context.retryCount || 0) < 1) {
+                    this.log('🔄 Director chỉ đạo làm lại: Buộc Specialist thực thi công cụ tải file vật lý về máy...');
+                    return await this.execute(userRequest, {
+                        ...context,
+                        retryCount: (context.retryCount || 0) + 1,
+                        enforcedDirective: arbDirective,
+                        previousAttempts: specialistResults
+                    });
+                }
+
                 return {
                     success: true,
-                    result: this.parseAgentResponse(arbitration.response),
+                    result: arbDirective || arbitration.response,
                     executionLog: this.executionLog,
                     consensusAchieved: false,
                     arbitrated: true
@@ -381,6 +447,12 @@ class AgentOrchestrator {
 
             // STAGE 5: Final Quality Gate
             this.log('🛡️ STAGE 5: Final Quality Gate by Critic');
+
+            // Xóa sạch bộ đệm cache công cụ để Critic đối chiếu dữ liệu sống trực tiếp trên đĩa
+            if (this.toolExecutor && typeof this.toolExecutor.clearCache === 'function') {
+                this.toolExecutor.clearCache();
+            }
+
             const finalCritique = await this.callAgent('critic', {
                 task: 'Final quality assessment',
                 result: consensus.finalResult,
@@ -518,6 +590,7 @@ class AgentOrchestrator {
 
         const result = await this.callAgent(agentRole, {
             task: task.description,
+            userRequest: context.userRequest,
             context: context,
             taskId: task.id,
             grounding: context.groundingResult ? {
@@ -547,7 +620,7 @@ class AgentOrchestrator {
     /**
      * Consensus mechanism với debate protocol - SO SÁNH NỘI DUNG VÀ LUẬN ĐIỂM THỰC SỰ
      */
-    async achieveConsensus(results, directive, maxRounds = 2) {
+    async achieveConsensus(results, directive, maxRounds = 1) {
         this.log('🎯 Starting consensus protocol', { results: results.length, maxRounds });
 
         const successfulResults = results.filter(r => r.success);
@@ -575,39 +648,23 @@ class AgentOrchestrator {
             round++;
             this.log(`🥊 Debate Round ${round}/${maxRounds}`);
 
-            // Critic thẩm định chéo từng kết quả so với các kết quả khác
-            const critiques = await Promise.all(
-                successfulResults.map(async (result, idx) => {
-                    const otherResults = successfulResults.filter((_, i) => i !== idx);
+            // Critic thẩm định toàn diện các kết quả một cách tập trung, tránh burst rate limit
+            const allSummaries = successfulResults.map((r, idx) => 
+                `[Tác vụ ${r.taskId || idx + 1}]:\n${typeof r.response === 'string' ? r.response : JSON.stringify(r.response, null, 2)}`
+            ).join('\n\n---\n\n');
 
-                    const critique = await this.callAgent('critic', {
-                        task: 'Đối chiếu chéo nội dung, tìm mâu thuẫn sự thật và đánh giá mức độ đồng thuận thực tế',
-                        targetResult: result.response,
-                        competingResults: otherResults.map(o => o.response),
-                        directive: directive
-                    });
-
-                    return {
-                        resultId: idx,
-                        critique: this.parseAgentResponse(critique.response)
-                    };
-                })
-            );
-
-            // REAL CONSENSUS CALCULATION: Đo lường mức độ đồng thuận nội dung (Content Agreement)
-            const agreementScores = critiques.map(c => {
-                const cr = c.critique || {};
-                const factualOverlap = typeof cr.factualOverlap === 'number' ? cr.factualOverlap : 0.85;
-                const contentAgreement = typeof cr.contentAgreement === 'number' ? cr.contentAgreement : 0.85;
-                const scoreFactor = (cr.overallScore || 85) / 100;
-                return (factualOverlap * 0.4) + (contentAgreement * 0.4) + (scoreFactor * 0.2);
+            const critique = await this.callAgent('critic', {
+                task: 'Đối chiếu chéo nội dung, tìm mâu thuẫn sự thật và đánh giá mức độ đồng thuận thực tế của các kết quả',
+                allSpecialistResults: allSummaries,
+                directive: directive
             });
 
-            const avgAgreement = agreementScores.reduce((a, b) => a + b, 0) / agreementScores.length;
-            const fatalConflicts = critiques.flatMap(c => {
-                const issues = c.critique?.issues || [];
-                return issues.filter(i => i.severity === 'HIGH' || i.category === 'Security');
-            });
+            const cr = this.parseAgentResponse(critique.response) || {};
+            const factualOverlap = typeof cr.factualOverlap === 'number' ? cr.factualOverlap : 0.85;
+            const contentAgreement = typeof cr.contentAgreement === 'number' ? cr.contentAgreement : 0.85;
+            const scoreFactor = (cr.overallScore || 85) / 100;
+            const avgAgreement = (factualOverlap * 0.4) + (contentAgreement * 0.4) + (scoreFactor * 0.2);
+            const fatalConflicts = (cr.issues || []).filter(i => i.severity === 'HIGH' || i.category === 'Security');
 
             this.log(`📊 Round ${round} Content Agreement`, {
                 avgAgreement: (avgAgreement * 100).toFixed(1) + '%',
@@ -616,17 +673,16 @@ class AgentOrchestrator {
 
             // Đạt đồng thuận khi: Tỷ lệ đồng thuận nội dung >= threshold VÀ không có lỗi xung đột chí mạng
             if (avgAgreement >= this.consensusThreshold && fatalConflicts.length === 0) {
-                const bestIdx = agreementScores.indexOf(Math.max(...agreementScores));
                 return {
                     achieved: true,
-                    finalResult: successfulResults[bestIdx].response,
+                    finalResult: successfulResults[successfulResults.length - 1].response,
                     agreement: avgAgreement,
                     rounds: round,
-                    critiques: critiques
+                    critique: cr
                 };
             }
 
-            conflicts = critiques.flatMap(c => (c.critique?.issues || []).map(i => i.description || String(i)));
+            conflicts = (cr.issues || []).map(i => i.description || String(i));
         }
 
         // Không đạt đồng thuận -> chuyển cho Giám đốc phân xử
@@ -684,20 +740,43 @@ class AgentOrchestrator {
                 delete requestBody.systemInstruction; // Tiết kiệm tokens khi dùng server cache
             }
 
+            const MODEL_POOL = [
+                'gemini-3.1-flash-lite',
+                'gemini-3.1-flash-lite-preview',
+                'gemini-flash-lite-latest'
+            ];
             let modelName = agent.model || this.defaultModel;
             if (attempt > 1) {
-                // Fallback model nếu lượt đầu bị 503 Spike Demand hoặc 429
-                modelName = 'gemini-flash-lite-latest';
+                // Tự động xoay tua sang model khác trong pool để giải phóng hạn mức 15 RPM
+                modelName = MODEL_POOL[(attempt - 1) % MODEL_POOL.length];
+                this.log(`🔄 Thử lại lần ${attempt} với model xoay tua: [${modelName}]`);
             }
-            const response = await fetch(
+            let response = await fetch(
                 `${this.baseUrl}/models/${modelName}:generateContent?key=${this.apiKey}`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(requestBody),
-                    timeout: this.config.timeout
+                    signal: AbortSignal.timeout(this.config.timeout || 45000)
                 }
             );
+
+            // Tự động fallback tức thì nếu model chính bị 429 hoặc 503
+            if (!response.ok && (response.status === 429 || response.status === 503)) {
+                const altModel = MODEL_POOL[attempt % MODEL_POOL.length];
+                this.log(`⚠️ Model [${modelName}] gặp HTTP ${response.status}, hoán đổi tức thì sang [${altModel}]...`);
+                await new Promise(r => setTimeout(r, 1000));
+                modelName = altModel;
+                response = await fetch(
+                    `${this.baseUrl}/models/${modelName}:generateContent?key=${this.apiKey}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(requestBody),
+                        signal: AbortSignal.timeout(this.config.timeout || 45000)
+                    }
+                );
+            }
 
             if (!response.ok) {
                 const error = await response.text();
@@ -707,17 +786,23 @@ class AgentOrchestrator {
             const data = await response.json();
             const latency = Date.now() - startTime;
 
-            const candidate = data.candidates?.[0];
-            if (!candidate || !candidate.content) {
+            let currentCandidate = data.candidates?.[0];
+            if (!currentCandidate || !currentCandidate.content) {
                 throw new Error('Cấu trúc phản hồi không hợp lệ từ Gemini API');
             }
 
-            const parts = candidate.content.parts || [];
+            let currentParts = currentCandidate.content.parts || [];
+            let conversationContents = [...requestBody.contents];
+            let toolIterationCount = 0;
+            const MAX_TOOL_ITERATIONS = 5;
 
-            // 1. KIỂM TRA & THỰC THI TOOL CALLS (Function Calling Loop)
-            const functionCallParts = parts.filter(p => p.functionCall);
-            if (functionCallParts.length > 0 && toolIteration < 5) {
-                this.log(`🔧 ${agentRole} gọi ${functionCallParts.length} công cụ`, {
+            // 1. KIỂM TRA & THỰC THI CHUỖI CÔNG CỤ ĐA BƯỚC (Multi-step Tool Calling Loop)
+            while (toolIterationCount < MAX_TOOL_ITERATIONS) {
+                const functionCallParts = currentParts.filter(p => p.functionCall);
+                if (functionCallParts.length === 0) break;
+
+                toolIterationCount++;
+                this.log(`🔧 ${agentRole} gọi ${functionCallParts.length} công cụ (Bước ${toolIterationCount}/${MAX_TOOL_ITERATIONS})`, {
                     tools: functionCallParts.map(p => p.functionCall.name)
                 });
 
@@ -736,66 +821,108 @@ class AgentOrchestrator {
                     });
                 }
 
-                // Gửi tiếp hội thoại kèm kết quả thực thi công cụ về lại cho LLM
+                // Gắn lượt của model (chứa functionCall) và lượt người dùng (chứa functionResponse) vào lịch sử
+                conversationContents.push({ role: 'model', parts: currentParts });
+                conversationContents.push({ role: 'user', parts: functionResponseParts });
+
                 const followUpBody = {
-                    contents: [
-                        ...requestBody.contents,
-                        { role: 'model', parts: parts },
-                        { role: 'user', parts: functionResponseParts }
-                    ],
+                    contents: conversationContents,
                     systemInstruction: requestBody.systemInstruction,
                     generationConfig: requestBody.generationConfig,
                     tools: requestBody.tools
                 };
 
-                const followUpRes = await fetch(
+                let followUpRes = await fetch(
                     `${this.baseUrl}/models/${modelName}:generateContent?key=${this.apiKey}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(followUpBody),
-                        timeout: this.config.timeout
+                        signal: AbortSignal.timeout(this.config.timeout || 45000)
                     }
                 );
 
-                if (followUpRes.ok) {
-                    const followUpData = await followUpRes.json();
-                    const followUpCandidate = followUpData.candidates?.[0];
-                    if (followUpCandidate && followUpCandidate.content) {
-                        const finalParts = followUpCandidate.content.parts || [];
-                        const text = finalParts.filter(p => p.text).map(p => p.text).join('\n');
-                        const thoughts = finalParts.filter(p => p.thought).map(p => p.thought).join('\n');
-                        return {
-                            success: true,
-                            response: text,
-                            thoughts: thoughts || null,
-                            toolExecuted: true,
-                            metadata: { agent: agentRole, model: modelName, latency }
-                        };
+                if (!followUpRes.ok && (followUpRes.status === 429 || followUpRes.status === 503)) {
+                    const fallbackModel = MODEL_POOL[(toolIterationCount + 1) % MODEL_POOL.length];
+                    this.log(`⚠️ Tool follow-up gặp ${followUpRes.status}, tự động xoay model sang [${fallbackModel}]...`);
+                    await new Promise(r => setTimeout(r, 1000));
+                    followUpRes = await fetch(
+                        `${this.baseUrl}/models/${fallbackModel}:generateContent?key=${this.apiKey}`,
+                        {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(followUpBody),
+                            signal: AbortSignal.timeout(this.config.timeout || 45000)
+                        }
+                    );
+                }
+
+                if (!followUpRes.ok) {
+                    const errText = await followUpRes.text();
+                    this.log(`⚠️ Tool follow-up call failed (${followUpRes.status}): ${errText.slice(0, 100)}`);
+                    break;
+                }
+
+                const followUpData = await followUpRes.json();
+                currentCandidate = followUpData.candidates?.[0];
+                if (!currentCandidate || !currentCandidate.content) break;
+                currentParts = currentCandidate.content.parts || [];
+            }
+
+            // 2. Trích xuất text phản hồi cuối cùng sau khi hoàn tất chuỗi công cụ
+            let text = currentParts.filter(p => p.text).map(p => p.text).join('\n');
+            const thoughts = currentParts.filter(p => p.thought).map(p => p.thought).join('\n');
+
+            // BẢO CHỨNG ĐẦU RA (OUTPUT SAFETY GATE): Nếu đã chạy công cụ nhưng text rỗng, tự động tổng kết báo cáo
+            if (!text.trim() && toolIterationCount > 0) {
+                try {
+                    const finalizeBody = {
+                        contents: [
+                            ...conversationContents,
+                            { role: 'user', parts: [{ text: "Hãy tổng kết toàn bộ kết quả thực thi các công cụ trên và trả về kết quả nghiệm thu cuối cùng theo đúng định dạng JSON yêu cầu của bạn." }] }
+                        ],
+                        systemInstruction: requestBody.systemInstruction,
+                        generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
+                    };
+                    const finRes = await fetch(
+                        `${this.baseUrl}/models/${modelName || 'gemini-3.1-flash-lite'}:generateContent?key=${this.apiKey}`,
+                        {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(finalizeBody),
+                            signal: AbortSignal.timeout(this.config.timeout || 45000)
+                        }
+                    );
+                    if (finRes.ok) {
+                        const finData = await finRes.json();
+                        const finCandidate = finData.candidates?.[0];
+                        if (finCandidate && finCandidate.content) {
+                            text = finCandidate.content.parts?.filter(p => p.text).map(p => p.text).join('\n') || text;
+                        }
                     }
+                } catch (finErr) {
+                    this.log(`⚠️ Finalize note: ${finErr.message}`);
                 }
             }
 
-            // 2. Trích xuất text phản hồi bình thường
-            const text = parts.filter(p => p.text).map(p => p.text).join('\n');
-            const thoughts = parts.filter(p => p.thought).map(p => p.thought).join('\n');
-
             this.log(`✅ ${agentRole} responded`, {
-                latency: `${latency}ms`,
+                latency: `${Date.now() - startTime}ms`,
                 tokens: data.usageMetadata?.totalTokenCount || 0,
-                hasThoughts: !!thoughts
+                hasThoughts: !!thoughts,
+                toolIterations: toolIterationCount
             });
 
             return {
                 success: true,
                 response: text,
                 thoughts: thoughts || null,
+                toolExecuted: toolIterationCount > 0,
                 metadata: {
                     agent: agentRole,
                     model: modelName,
-                    latency: latency,
-                    tokens: data.usageMetadata,
-                    finishReason: candidate.finishReason
+                    latency: Date.now() - startTime,
+                    toolIterations: toolIterationCount,
+                    finishReason: currentCandidate.finishReason
                 }
             };
 

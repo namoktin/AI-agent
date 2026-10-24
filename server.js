@@ -11,6 +11,7 @@ const { createPathGuard } = require('./utils/pathSafety');
 const { AsyncMutex } = require('./utils/mutex');
 const { RateLimiter } = require('./utils/rateLimiter');
 const { createAuthMiddleware } = require('./middleware/auth');
+const { compactAccessibilityTree, executeBrowserActions, extractContextualText } = require('./utils/browserActions');
 
 // Mutex toàn cục cho file experiences.json (tránh concurrent write corruption)
 const experiencesMutex = new AsyncMutex();
@@ -96,6 +97,10 @@ const MEMORY_DIR = path.join(BASE_DIR, 'memory');
 const RESEARCH_DIR = path.join(MEMORY_DIR, 'research');
 const EXPERIENCES_FILE = path.join(MEMORY_DIR, 'experiences.json');
 const EXPERIENCES_MD = path.join(MEMORY_DIR, 'EXPERIENCES.md');
+
+// Khởi tạo Persistent Cookie Vault (Lưu trữ và tái sử dụng cookie vĩnh viễn)
+const { CookieVault } = require('./agents/CookieVault');
+const cookieVault = new CookieVault(BASE_DIR);
 
 // Thư mục gốc trên Desktop chuyên chứa toàn bộ sản phẩm do AI Agent tạo ra
 const GEMINI_OUTPUT_DIR = path.resolve(process.env.OUTPUT_DIR || 'C:\\Users\\Nam\\Desktop\\gemini');
@@ -1009,21 +1014,35 @@ function parseSafeCommand(command) {
     const args = parts.map(part => part.replace(/^(["'])|(["'])$/g, ''));
     const executable = args.shift().toLowerCase();
     const scriptArg = args[0] || '';
-    const safeRelative = input => typeof input === 'string' &&
-        input.length > 0 && input.length <= 240 &&
-        !path.isAbsolute(input) && !input.includes('..') &&
-        /^[\w./\\:-]+$/.test(input);
+    const safePathOrRelative = input => {
+        if (typeof input !== 'string' || !input || input.length > 300) return false;
+        if (input.includes('..') || /[;&|`$<>]/.test(input)) return false;
+        if (path.isAbsolute(input)) {
+            const normalized = path.normalize(input).toLowerCase();
+            return normalized.startsWith('c:\\users\\nam\\desktop\\ai agent') ||
+                   normalized.startsWith('c:\\users\\nam\\desktop\\gemini');
+        }
+        return /^[\w./\\:-]+$/.test(input);
+    };
 
-    if (executable === 'node' && /^[-\w./\\]+\.js$/i.test(scriptArg)) {
+    if (executable === 'node' && /^[-\w./\\:]+\.js$/i.test(scriptArg)) {
+        if (!safePathOrRelative(scriptArg)) return null;
         const extraArgs = args.slice(1);
-        if (!extraArgs.every(arg => safeRelative(arg))) return null;
+        if (!extraArgs.every(arg => safePathOrRelative(arg))) return null;
         return { file: process.execPath, args, display: value };
     }
     if ((executable === 'python' || executable === 'python3' || executable === 'py') &&
-        /^[\w./\\-]+\.py$/i.test(scriptArg)) {
+        /^[-\w./\\:]+\.py$/i.test(scriptArg)) {
+        if (!safePathOrRelative(scriptArg)) return null;
         const extraArgs = args.slice(1);
-        if (!extraArgs.every(arg => safeRelative(arg))) return null;
+        if (!extraArgs.every(arg => safePathOrRelative(arg))) return null;
         return { file: executable === 'py' ? 'py' : executable, args, display: value };
+    }
+    if (executable === 'yt-dlp' || executable === 'yt-dlp.exe') {
+        const safeYtArg = a => typeof a === 'string' && a.length <= 500 && !/[;&|`$<>]/.test(a);
+        if (args.every(safeYtArg)) {
+            return { file: 'yt-dlp', args, display: value };
+        }
     }
     if (executable === 'npm' && /^(start|test|ls|outdated|audit)$/.test(scriptArg)) {
         return { file: process.platform === 'win32' ? 'npm.cmd' : 'npm', args, display: value };
@@ -1035,11 +1054,12 @@ function parseSafeCommand(command) {
         args.slice(1).every(arg => /^[\w./\\:-]+$/.test(arg))) {
         return { file: 'git', args, display: value };
     }
+    const safeRelative = (input) => safePathOrRelative(input);
     if ((executable === 'dir' || executable === 'ls') && args.every(safeRelative)) {
-        return { file: executable, args, display: value };
+        return { file: process.platform === 'win32' ? 'cmd.exe' : 'ls', args: process.platform === 'win32' ? ['/c', 'dir', ...args] : args, display: value };
     }
     if ((executable === 'type' || executable === 'cat') && args.length === 1 && safeRelative(args[0])) {
-        return { file: executable, args, display: value };
+        return { file: process.platform === 'win32' ? 'cmd.exe' : 'cat', args: process.platform === 'win32' ? ['/c', 'type', ...args] : args, display: value };
     }
     return null;
 }
@@ -1051,7 +1071,12 @@ function runSafeCommand(command, cwd, callback) {
         cwd,
         shell: false,
         windowsHide: true,
-        stdio: ['ignore', 'pipe', 'pipe']
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: {
+            ...process.env,
+            PYTHONUTF8: '1',
+            PYTHONIOENCODING: 'utf-8'
+        }
     });
     let stdout = '', stderr = '';
     const maxOutput = 2 * 1024 * 1024;
@@ -1255,6 +1280,75 @@ function getScreenshotsDir() {
 
 if (!fs.existsSync(CHROME_PROFILE_DIR)) fs.mkdirSync(CHROME_PROFILE_DIR, { recursive: true });
 
+// Phân giải Cookie từ chuỗi văn bản (chuẩn Netscape .txt hoặc mảng JSON)
+function parseNetscapeOrJsonCookies(rawText, targetUrl) {
+    return cookieVault.parseCookies(rawText, cookieVault.getRootDomain(targetUrl));
+}
+
+// Hàm tiêm Cookie tự động vào Page trước khi truy cập
+async function autoInjectCookies(page, targetUrl, explicitCookieFile = null, explicitCookies = null) {
+    try {
+        const rootDomain = cookieVault.getRootDomain(targetUrl);
+
+        // 1. Nếu có explicitCookies truyền trực tiếp qua tham số API
+        if (explicitCookies && typeof explicitCookies === 'string') {
+            const parsed = cookieVault.parseCookies(explicitCookies, rootDomain);
+            if (parsed.length > 0) {
+                await page.setCookie(...parsed);
+                cookieVault.storeCookies(targetUrl, parsed, 'valid');
+                console.log(`🍪 [Stealth Browser] Đã nạp và lưu ${parsed.length} cookie từ chuỗi tham số cho ${targetUrl}`);
+                return { loaded: true, count: parsed.length, source: 'explicit_param' };
+            }
+        }
+
+        // 2. Nếu có explicitCookieFile được truyền qua tham số API
+        if (explicitCookieFile) {
+            const resolvedPath = resolvePath(explicitCookieFile, false);
+            if (fs.existsSync(resolvedPath)) {
+                const raw = fs.readFileSync(resolvedPath, 'utf8');
+                const parsed = cookieVault.parseCookies(raw, rootDomain);
+                if (parsed.length > 0) {
+                    await page.setCookie(...parsed);
+                    cookieVault.storeCookies(targetUrl, parsed, 'valid');
+                    console.log(`🍪 [Stealth Browser] Đã nạp và lưu ${parsed.length} cookie từ file ${path.basename(resolvedPath)} cho ${targetUrl}`);
+                    return { loaded: true, count: parsed.length, source: 'explicit_file' };
+                }
+            }
+        }
+
+        // 3. Tự động kiểm tra CookieVault dài hạn (Persistent Cookie Vault)
+        const vaultEntry = cookieVault.getCookiesForUrl(targetUrl);
+        if (vaultEntry && vaultEntry.cookies && vaultEntry.cookies.length > 0) {
+            await page.setCookie(...vaultEntry.cookies);
+            console.log(`🍪 [Stealth Browser] Đã nạp ${vaultEntry.cookies.length} cookie từ Kho CookieVault vĩnh viễn cho [${vaultEntry.domain}] (Status: ${vaultEntry.status})`);
+            return { loaded: true, count: vaultEntry.cookies.length, source: 'cookie_vault', status: vaultEntry.status };
+        }
+
+        // 4. Fallback tìm file cookies.txt trong thư mục làm việc ngày hôm nay hoặc thư mục dự án
+        const candidatePaths = [
+            path.join(getTodayOutputDir(), 'cookies.txt'),
+            path.join(getTodayOutputDir(), 'facebook_cookies.txt'),
+            path.join(BASE_DIR, 'cookies.txt')
+        ];
+
+        for (const cPath of candidatePaths) {
+            if (fs.existsSync(cPath)) {
+                const raw = fs.readFileSync(cPath, 'utf8');
+                const parsed = cookieVault.parseCookies(raw, rootDomain);
+                if (parsed.length > 0) {
+                    await page.setCookie(...parsed);
+                    cookieVault.storeCookies(targetUrl, parsed, 'valid');
+                    console.log(`🍪 [Stealth Browser] Đã tự động nạp & đồng bộ ${parsed.length} cookie từ ${path.basename(cPath)} vào Vault cho ${targetUrl}`);
+                    return { loaded: true, count: parsed.length, source: path.basename(cPath) };
+                }
+            }
+        }
+    } catch(err) {
+        console.warn('🍪 [Stealth Browser] Lỗi nạp cookie tự động:', err.message);
+    }
+    return { loaded: false, count: 0 };
+}
+
 // Tự động tìm đường dẫn Google Chrome hoặc Edge trên máy tính
 function getInstalledBrowserPath() {
     const candidatePaths = [
@@ -1277,55 +1371,6 @@ async function setupStealthPage(page) {
 
     // 2. Thiết lập User-Agent của Chrome thật trên Windows
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36');
-
-    // 3. Đặt header nhận diện như người thật duyệt web thông thường
-    await page.setExtraHTTPHeaders({
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-        'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
-        'sec-ch-ua': '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-platform': '"Windows"',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
-        'Sec-Fetch-User': '?1',
-        'Upgrade-Insecure-Requests': '1'
-    });
-
-    // 4. Tiêm mã ngụy trang sâu & xóa sạch dấu vết CDP / DevTools
-    await page.evaluateOnNewDocument(() => {
-        // Xóa cờ navigator.webdriver
-        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-
-        // Xóa các biến nhận diện DevTools (cdc_)
-        try {
-            for (const key of Object.keys(window)) {
-                if (/^cdc_/.test(key)) delete window[key];
-            }
-        } catch (e) {}
-
-        // Giả lập danh sách plugin trình duyệt thật
-        Object.defineProperty(navigator, 'plugins', {
-            get: () => [
-                { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer' },
-                { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai' },
-                { name: 'Native Client', filename: 'internal-nacl-plugin' }
-            ]
-        });
-
-        // Giả lập ngôn ngữ tiếng Việt & tiếng Anh
-        Object.defineProperty(navigator, 'languages', {
-            get: () => ['vi-VN', 'vi', 'en-US', 'en']
-        });
-
-        // Giả lập đối tượng window.chrome của Google Chrome
-        window.chrome = {
-            runtime: {},
-            loadTimes: function() {},
-            csi: function() {},
-            app: {}
-        };
-    });
 }
 
 // Hàm chuẩn hóa HTML & trích xuất liên kết việc làm / tài liệu chuyên sâu
@@ -1553,6 +1598,7 @@ app.post('/api/fetch-webpage', async (req, res) => {
                 });
                 const page = await stealthBrowser.newPage();
                 await setupStealthPage(page);
+                await autoInjectCookies(page, url);
                 await page.goto(url, { waitUntil: 'networkidle2', timeout: 35000 });
                 title = await page.title();
                 rawHtml = await page.content();
@@ -2730,7 +2776,7 @@ app.post('/api/prune-experiences', async (req, res) => {
 
 // API: Trình duyệt Stealth lướt web và cào dữ liệu
 app.post('/api/browse-web', async (req, res) => {
-    let { url, action, headless, waitSelector, humanScroll } = req.body;
+    let { url, action, headless, waitSelector, humanScroll, actions, downloadPath, cookieFile, cookies, extractReels, findText, findAfter, includeSnapshot } = req.body;
     if (!url) return res.json({ success: false, error: 'Thiếu đường dẫn URL' });
 
     const chromePath = getInstalledBrowserPath();
@@ -2745,31 +2791,45 @@ app.post('/api/browse-web', async (req, res) => {
             return res.json({ success: false, error: 'URL bị từ chối vì không hợp lệ hoặc trỏ tới mạng nội bộ.' });
         }
         url = parsedUrl.toString();
-        const isHeadless = headless !== false && headless !== 'false'; // Mặc định chạy ngầm
+        const isHeadless = headless !== false && headless !== 'false';
+
+        // Tự động tối ưu điều hướng nếu là Facebook Page / Profile cần trích xuất Reels
+        const isFacebook = url.includes('facebook.com');
+        const wantReels = isFacebook && (extractReels === true || action === 'extract_reels' || url.includes('/reels') || url.includes('sk=reels_tab'));
+        if (wantReels) {
+            if (url.includes('profile.php?id=') && !url.includes('sk=')) {
+                url = url + (url.includes('?') ? '&' : '?') + 'sk=reels_tab';
+            } else if (!url.includes('/reels') && !url.includes('/videos') && !url.includes('sk=') && !url.includes('/reel/')) {
+                url = url.replace(/\/$/, '') + '/reels';
+            }
+        }
 
         browser = await puppeteer.launch({
             executablePath: chromePath,
             headless: isHeadless,
-            userDataDir: CHROME_PROFILE_DIR, // Giữ lại Cookie và phiên đăng nhập FB, X, Taobao
+            userDataDir: CHROME_PROFILE_DIR,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
-                '--disable-blink-features=AutomationControlled',
-                '--disable-features=IsolateOrigins,site-per-process',
                 '--window-size=1920,1080',
                 '--disable-infobars',
-                '--lang=vi-VN,vi',
-                '--no-first-run',
-                '--no-default-browser-check'
-            ],
-            ignoreDefaultArgs: ['--enable-automation']
+                '--lang=vi-VN,vi'
+            ]
         });
 
         const page = await browser.newPage();
         await setupStealthPage(page);
+        await autoInjectCookies(page, url, cookieFile, cookies);
 
         // Mở trang web (chờ mạng ổn định)
         await page.goto(url, { waitUntil: 'networkidle2', timeout: 45000 });
+        if (isFacebook) {
+            try {
+                await page.waitForSelector('div[role="main"], a[href*="/reel/"], div[data-pagelet]', { timeout: 12000 });
+            } catch (e) {
+                await new Promise(r => setTimeout(r, 3500));
+            }
+        }
 
         // Tự động kiểm tra và chờ Cloudflare Turnstile / Challenge giải mã nếu có
         const checkChallenged = async () => {
@@ -2813,29 +2873,54 @@ app.post('/api/browse-web', async (req, res) => {
             }
         }
 
-        // Mô phỏng hành vi cuộn trang mượt mà của người thật (Human Scroll)
-        if (humanScroll !== false) {
-            await page.evaluate(async () => {
-                await new Promise((resolve) => {
-                    let totalHeight = 0;
-                    const distance = 250;
-                    let count = 0;
-                    const timer = setInterval(() => {
-                        window.scrollBy({ top: distance, behavior: 'smooth' });
-                        totalHeight += distance;
-                        count++;
-                        if (count >= 4 || totalHeight >= document.body.scrollHeight) {
-                            clearInterval(timer);
-                            resolve();
-                        }
-                    }, 250 + Math.random() * 200);
-                });
-            });
-            // Tạm dừng ngẫu nhiên 1 - 2 giây như người đang đọc
-            await new Promise(r => setTimeout(r, 1200 + Math.random() * 1000));
+        let activePage = page;
+        let actionLogs = [];
+        let actionExtracted = null;
+
+        // THỰC THI CHUỖI THAO TÁC GIAO DIỆN NÂNG CAO (METHOD 2: ACTION CHAINING & AUTO-WAIT)
+        if (Array.isArray(actions) && actions.length > 0) {
+            console.log(`🤖 [Browser Actions] Bắt đầu thực thi ${actions.length} thao tác giao diện tuần tự...`);
+            const actionExecResult = await executeBrowserActions(page, browser, actions, getScreenshotsDir());
+            activePage = actionExecResult.activePage;
+            actionLogs = actionExecResult.actionLogs;
+            actionExtracted = actionExecResult.lastExtracted;
+            console.log(`✅ [Browser Actions] Hoàn thành chuỗi thao tác, trang hiện hành: ${activePage.url()}`);
+        } else if (humanScroll !== false) {
+            // Mô phỏng hành vi cuộn trang mượt mà của người thật (Human Scroll) nếu không chạy action riêng
+            const scrollCount = wantReels ? 5 : 3;
+            const scrollDist = isFacebook ? 850 : 350;
+            for (let s = 0; s < scrollCount; s++) {
+                await activePage.evaluate((dist) => window.scrollBy(0, dist), scrollDist);
+                await new Promise(r => setTimeout(r, isFacebook ? 1200 : 400));
+            }
         }
 
-        const title = await page.title();
+        // BÓC TÁCH ACCESSIBILITY TREE SIÊU TINH GỌN (TOKEN-OPTIMIZED ACCESSIBILITY TREE)
+        let accessibilitySnapshot = null;
+        if (includeSnapshot || action === 'accessibility_snapshot' || action === 'snapshot') {
+            try {
+                const rawSnapshot = await activePage.accessibility.snapshot({ interestingOnly: true });
+                accessibilitySnapshot = compactAccessibilityTree(rawSnapshot);
+            } catch (snapErr) {
+                accessibilitySnapshot = `[Không thể lấy snapshot: ${snapErr.message}]`;
+            }
+        }
+
+        // TỰ ĐỘNG BÓC TÁCH THEO TỪ KHÓA (CONTEXTUAL TEXT EXTRACTION)
+        let contextualMatch = null;
+        const targetSearch = findAfter || findText;
+        if (targetSearch) {
+            contextualMatch = await extractContextualText(activePage, { findAfter: targetSearch });
+        }
+
+        let firstWordAfterTarget = contextualMatch ? contextualMatch.firstWord : null;
+        if (!firstWordAfterTarget && actionExtracted) {
+            const m = String(actionExtracted).trim().match(/^([^\\s.,;!?\\n]+)/);
+            if (m) firstWordAfterTarget = m[1];
+        }
+
+        const title = await activePage.title();
+        const currentUrl = activePage.url();
         let screenshotPath = null;
         let screenshotBase64 = null;
 
@@ -2843,43 +2928,84 @@ app.post('/api/browse-web', async (req, res) => {
         if (action === 'screenshot') {
             const filename = `screen_${Date.now()}.jpg`;
             const fullPath = path.join(getScreenshotsDir(), filename);
-            const buffer = await page.screenshot({ type: 'jpeg', quality: 80 });
+            const buffer = await activePage.screenshot({ type: 'jpeg', quality: 80 });
             fs.writeFileSync(fullPath, buffer);
             screenshotPath = fullPath;
             screenshotBase64 = buffer.toString('base64');
         }
 
-        // Trích xuất văn bản nội dung sạch từ trang và bảo toàn link bài tuyển dụng
-        const extraction = await page.evaluate((currentUrl) => {
-            const elementsToRemove = document.querySelectorAll('script, style, noscript, svg, iframe, nav, footer');
-            elementsToRemove.forEach(el => el.remove());
+        // Kiểm tra xem trang có bị đẩy về login hay cookie hết hạn không
+        const authCheck = await activePage.evaluate(() => {
+            const cur = window.location.href;
+            const txt = document.body ? document.body.innerText : '';
+            const isLogin = cur.includes('/login') ||
+                            cur.includes('login.php') ||
+                            txt.includes('Bạn phải đăng nhập để tiếp tục') ||
+                            txt.includes('Phiên đăng nhập đã hết hạn') ||
+                            txt.includes('Đăng nhập Facebook');
+            return { isLogin, currentHref: cur };
+        });
 
+        let cookieExpired = false;
+        if (isFacebook && authCheck.isLogin) {
+            cookieExpired = true;
+            cookieVault.markStatus('facebook.com', 'expired');
+            console.warn('⚠️ [Stealth Browser] Facebook đã đẩy về Login. Cookie đã hết hạn, cập nhật CookieVault status: expired');
+        }
+
+        // Trích xuất văn bản nội dung sạch từ trang, bảo toàn link bài tuyển dụng và Reel / Video Facebook
+        const extraction = await activePage.evaluate((currUrl) => {
             const extractedLinks = [];
-            const seen = new Set();
+            const extractedMedia = [];
+            const seenJobs = new Set();
+            const seenMedia = new Set();
+
             document.querySelectorAll('a[href]').forEach(a => {
                 try {
-                    const rawHref = a.getAttribute('href');
+                    const rawHref = a.getAttribute('href') || '';
                     if (!rawHref || rawHref.startsWith('#') || rawHref.startsWith('javascript:')) return;
-                    const full = new URL(rawHref, currentUrl).href;
-                    const text = (a.innerText || a.getAttribute('title') || '').trim().replace(/\s+/g, ' ');
-                    if (text.length > 5 && full.startsWith('http') && !seen.has(full)) {
-                        seen.add(full);
+                    const full = a.href || new URL(rawHref, currUrl).href;
+                    const text = (a.innerText || a.getAttribute('title') || a.getAttribute('aria-label') || '').trim().replace(/\s+/g, ' ');
+
+                    // 1. Trích xuất Reel / Video Facebook (hỗ trợ cả URL đầy đủ và raw relative href)
+                    const reelMatch = full.match(/\/reel\/(\d+)/i) || full.match(/\/videos\/(\d+)/i) || full.match(/[?&]v=(\d+)/i)
+                                   || rawHref.match(/\/reel\/(\d+)/i) || rawHref.match(/\/videos\/(\d+)/i) || rawHref.match(/[?&]v=(\d+)/i);
+                    if (reelMatch && reelMatch[1]) {
+                        const mediaId = reelMatch[1];
+                        if (!seenMedia.has(mediaId)) {
+                            seenMedia.add(mediaId);
+                            const canonicalUrl = `https://www.facebook.com/reel/${mediaId}/`;
+                            extractedMedia.push({
+                                id: mediaId,
+                                title: text || `Facebook Reel ${mediaId}`,
+                                url: canonicalUrl,
+                                type: 'reel'
+                            });
+                        }
+                    }
+
+                    // 2. Trích xuất Job Freelance / Việc làm
+                    if (text.length > 5 && full.startsWith('http') && !seenJobs.has(full)) {
+                        seenJobs.add(full);
                         const isJob = full.match(/\/jobs?\/~|\/job\/|\/projects?\/|\/freelance-jobs\/[a-zA-Z0-9_-]+\/|linkedin\.com\/jobs\/view|topcv\.vn|vietnamworks\.com/i)
                             || text.match(/developer|engineer|lập trình|frontend|backend|fullstack|designer|tuyển|hiring|remote|translator/i);
                         if (isJob) {
                             extractedLinks.push({ title: text, url: full });
                         }
-                        const linkText = document.createTextNode(` [${text}](${full}) `);
-                        a.parentNode.replaceChild(linkText, a);
                     }
                 } catch(e) {}
             });
 
+            // Sau khi đã trích xuất xong link an toàn, mới lọc bỏ các thẻ không cần thiết để lấy văn bản sạch
+            const elementsToRemove = document.querySelectorAll('script, style, noscript, svg, iframe, nav, footer');
+            elementsToRemove.forEach(el => el.remove());
+
             return {
-                bodyText: document.body.innerText || '',
-                links: extractedLinks
+                bodyText: document.body ? document.body.innerText : '',
+                links: extractedLinks,
+                media: extractedMedia
             };
-        }, url);
+        }, currentUrl);
 
         await browser.close();
         browser = null;
@@ -2895,12 +3021,25 @@ app.post('/api/browse-web', async (req, res) => {
                 extraction.links.slice(0, 10).map((j, i) => `${i + 1}. **[${j.title}](${j.url})**\n   - Link trực tiếp: \`${j.url}\``).join('\n');
         }
 
+        let deepMediaAppendix = "";
+        if (extraction.media && extraction.media.length > 0) {
+            deepMediaAppendix = `\n\n### 🎬 DANH SÁCH CÁC REEL / VIDEO THẬT TRÍCH XUẤT ĐƯỢC TỪ TRANG NÀY (ĐÃ KIỂM CHỨNG TỪ DOM):\n` +
+                extraction.media.slice(0, 30).map((m, i) => `${i + 1}. **[${m.title}](${m.url})**\n   - Link trực tiếp: \`${m.url}\``).join('\n');
+        }
+
         res.json({
             success: true,
             title: title,
-            url: url,
-            content: cleanText + (truncated ? '\n\n... [Nội dung đã được cắt ngắn] ...' : '') + deepLinkAppendix,
+            url: currentUrl,
+            content: cleanText + (truncated ? '\n\n... [Nội dung đã được cắt ngắn] ...' : '') + deepLinkAppendix + deepMediaAppendix,
+            accessibilitySnapshot: accessibilitySnapshot,
+            actionsExecuted: actionLogs,
+            lastExtracted: actionExtracted || (contextualMatch ? contextualMatch.followingText : null),
+            contextualMatch: contextualMatch,
+            firstWordAfterTarget: firstWordAfterTarget,
             deepJobLinks: extraction.links ? extraction.links.slice(0, 15) : [],
+            deepMediaLinks: extraction.media ? extraction.media.slice(0, 30) : [],
+            cookieExpired: cookieExpired,
             screenshotPath: screenshotPath,
             screenshotBase64: screenshotBase64 ? `data:image/jpeg;base64,${screenshotBase64}` : null
         });
@@ -2913,7 +3052,49 @@ app.post('/api/browse-web', async (req, res) => {
     }
 });
 
-// API: Mở Chrome có giao diện thật để người dùng đăng nhập FB, X, Taobao lưu Cookie
+// =========================================================================
+// API: PERSISTENT COOKIE VAULT ENDPOINTS
+// =========================================================================
+app.get('/api/cookie-vault', (req, res) => {
+    try {
+        const vault = cookieVault.getVault();
+        const summary = Object.keys(vault).map(d => ({
+            domain: d,
+            status: vault[d].status || 'valid',
+            count: vault[d].count || (vault[d].cookies ? vault[d].cookies.length : 0),
+            updatedAt: vault[d].updatedAt,
+            sampleKeys: vault[d].sampleKeys || []
+        }));
+        res.json({ success: true, vault: summary, totalDomains: summary.length });
+    } catch(e) {
+        res.json({ success: false, error: e.message });
+    }
+});
+
+app.post('/api/save-cookie', (req, res) => {
+    const { domainOrUrl, cookies, status } = req.body;
+    if (!domainOrUrl || !cookies) {
+        return res.json({ success: false, error: 'Thiếu domainOrUrl hoặc cookies' });
+    }
+    const result = cookieVault.storeCookies(domainOrUrl, cookies, status || 'valid');
+    res.json(result);
+});
+
+app.post('/api/check-cookie-status', (req, res) => {
+    const { urlOrDomain } = req.body;
+    if (!urlOrDomain) return res.json({ success: false, error: 'Thiếu urlOrDomain' });
+    const entry = cookieVault.getCookiesForUrl(urlOrDomain);
+    const domain = cookieVault.getRootDomain(urlOrDomain);
+    res.json({
+        success: true,
+        domain: domain,
+        hasCookie: !!entry,
+        status: entry ? entry.status : 'missing',
+        count: entry ? entry.count : 0,
+        updatedAt: entry ? entry.updatedAt : null
+    });
+});
+
 app.post('/api/open-browser-login', (req, res) => {
     const { targetUrl } = req.body;
     const chromePath = getInstalledBrowserPath();

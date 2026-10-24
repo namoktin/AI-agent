@@ -3427,7 +3427,22 @@
                     properties: {
                         url: { type: "STRING", description: "Đường dẫn URL cần duyệt" },
                         actionType: { type: "STRING", description: "Hành động: 'read' (đọc chữ) hoặc 'screenshot' (chụp ảnh màn hình)" },
-                        humanScroll: { type: "BOOLEAN", description: "Mô phỏng cuộn trang như người thật để tải nội dung lazy-load" }
+                        humanScroll: { type: "BOOLEAN", description: "Mô phỏng cuộn trang như người thật để tải nội dung lazy-load" },
+                        extractReels: { type: "BOOLEAN", description: "Tự động điều hướng sang tab Reels của trang/profile FB và bóc tách 100% link reel thật từ DOM" },
+                        headless: { type: "BOOLEAN", description: "Mặc định true (chạy ngầm). Đặt false nếu muốn mở cửa sổ Chrome có giao diện thật trên màn hình để người dùng nhìn thấy AI thao tác trực tiếp." },
+                        actions: {
+                            type: "ARRAY",
+                            items: {
+                                type: "OBJECT",
+                                properties: {
+                                    type: { type: "STRING", description: "Hành động: 'click', 'type', 'wait', 'waitForSelector', 'select', 'press'" },
+                                    selector: { type: "STRING", description: "CSS Selector của nút, ô nhập hoặc phần tử cần click/gõ" },
+                                    text: { type: "STRING", description: "Văn bản cần gõ nếu type='type'" },
+                                    ms: { type: "NUMBER", description: "Thời gian chờ mili-giây nếu type='wait'" }
+                                }
+                            },
+                            description: "Chuỗi hành động tương tác giao diện tuần tự (ví dụ: gõ link vào ô input, click nút download, chờ tải file)"
+                        }
                     },
                     required: ["url"]
                 }
@@ -3686,14 +3701,18 @@ Hệ thống Live Preview đã hỗ trợ hiển thị trực quan cả file .cs
 3. DASHBOARD / ỨNG DỤNG (.html): CHỈ DÙNG khi CEO yêu cầu Dashboard trực quan, Slide thuyết trình động, hoặc ứng dụng web tương tác.
 ⚠️ TUYỆT ĐỐI KHÔNG TỰ TIỆN TẠO FILE .html KHI NHIỆM VỤ LÀ TÌM KIẾM DỮ LIỆU HOẶC SĂN JOB!
 
-[QUY TẮC BẮT BUỘC VỀ LINK BÀI TUYỂN DỤNG CỤ THỂ (DEEP LINK PROTOCOL)]:
-Khi tìm kiếm việc làm, săn job freelance hoặc tìm kiếm thông tin khách hàng:
-1. TUYỆT ĐỐI NGHIÊM CẤM đưa các đường link danh mục chung chung, rỗng hoặc link tổng quan (Ví dụ cấm: 'https://www.upwork.com/freelance-jobs/vietnamese/', 'https://www.upwork.com/nx/search/jobs/', 'https://www.freelancer.com/jobs/vietnamese/'). CEO không thể biết khách hàng nào tuyển dụng nếu bạn chỉ đưa link danh mục!
-2. QUY TRÌNH BẮT BUỘC ĐỂ TRÍCH XUẤT ĐƯỜNG DẪN TRỰC TIẾP ĐẾN TỪNG BÀI ĐĂNG CỦA KHÁCH:
-   • Bước 1: Sau khi tìm kiếm hoặc có URL trang danh mục, nhân viên (Web Hunter) BẮT BUỘC gọi tool 'READ_URL' hoặc 'BROWSE_WEB' để cào đọc chi tiết trang đó.
-   • Bước 2: Hệ thống máy chủ tự động phân tích và trích xuất sẵn bảng: "🎯 DANH SÁCH CÁC LINK BÀI TUYỂN DỤNG CỤ THỂ TRÍCH XUẤT ĐƯỢC TỪ TRANG NÀY" chứa các link trực tiếp của từng khách hàng (dạng 'https://www.upwork.com/jobs/~01abc123...', 'https://www.freelancer.com/projects/...').
-   • Bước 3: Nhân viên BẮT BUỘC lấy chính xác các link chi tiết này để điền vào cột 'Job Link' trong file '.csv' và trong báo cáo Markdown!
-   • Bước 4: Từng dòng việc làm trong bảng tính CSV phải có link trực tiếp để CEO bấm vào là đến ngay trang tuyển dụng của khách hàng.
+[QUY TẮC BẢO CHỨNG ĐƯỜNG DẪN GỐC & CHỐNG LINK ẢO (STRICT URL PROVENANCE & ZERO HALLUCINATED LINKS)]:
+Khi tìm kiếm việc làm, săn job freelance hoặc trích xuất dữ liệu web:
+1. TUYỆT ĐỐI NGHIÊM CẤM BỊA ĐẶT / TỰ NGHĨ RA LINK MẪU (STRICT ZERO HALLUCINATED URLS):
+   • MỌI đường link trong file '.csv' và '.md' BẮT BUỘC phải là link THẬT 100%, được COPY NGUYÊN VĂN từ mảng kết quả của công cụ 'WEB_SEARCH', 'READ_URL' hoặc 'BROWSE_WEB' vừa gọi!
+   • TUYỆT ĐỐI CẤM tự ghép chuỗi, tự bịa ID hay dùng link giả lập (như ~01abc..., saas-dashboard-dev...). Mọi deliverable có link giả sẽ bị Thẩm định viên VETO ngay lập tức!
+2. NGUYÊN TẮC KHÔNG CÓ THÌ DÙNG NGUỒN CÓ THẬT (NO INVENTED PLATFORM LINKS):
+   • Công cụ 'WEB_SEARCH' đã kết nối trực tiếp với API Freelancer.com Live Projects và Remotive Tech Jobs.
+   • Khi tìm kiếm việc làm trên Freelancer hoặc Upwork, BẮT BUỘC lấy danh sách dự án THỰC TẾ từ kết quả 'WEB_SEARCH' (gồm link bài đăng thật dạng https://www.freelancer.com/projects/..., ngân sách thật, kỹ năng yêu cầu thật và mô tả thật của khách hàng) để đưa vào file '.csv' và soạn Proposal sâu vào file '.md'!
+   • Nếu một sàn nào đó (như Upwork) chặn bot không trả link bài trực tiếp, TUYỆT ĐỐI KHÔNG tự sáng tác link Upwork giả; hãy sử dụng 100% dự án CÓ THẬT từ sàn Freelancer.com hoặc các nguồn do công cụ trả về!
+3. TRÍCH XUẤT ĐƯỜNG DẪN CHI TIẾT (DEEP LINK PROTOCOL):
+   • Khi cào trang web bằng 'READ_URL' hoặc 'BROWSE_WEB', lấy chính xác các link từ phần "DANH SÁCH CÁC LINK BÀI TUYỂN DỤNG CỤ THỂ TRÍCH XUẤT ĐƯỢC TỪ TRANG NÀY" để điền vào cột 'Job Link'.
+   • Từng dòng việc làm trong file CSV và từng mục Proposal trong file Markdown phải có link thật để CEO bấm vào là mở ngay trang dự án của khách hàng.
 
 [QUY TẮC CHIẾN DỊCH SĂN JOB & TIẾP CẬN KHÁCH HÀNG (JOB HUNTING & CLIENT OUTREACH PROTOCOL)]:
 ⚠️ ĐIỀU KIỆN ÁP DỤNG: CHỈ KÍCH HOẠT KHI VÀ CHỈ KHI CEO YÊU CẦU TRỰC TIẾP VỀ TÌM VIỆC LÀM, SĂN JOB FREELANCE, TÌM KHÁCH HÀNG MỚI.
@@ -3703,10 +3722,10 @@ Nếu CEO yêu cầu kiểm tra/thẩm định kinh nghiệm, nghiên cứu họ
    • Web Hunter / Scout (🌐 Điệp viên cào mạng): Cấp quyền WEB_SEARCH, READ_URL, BROWSE_WEB để quét Google, Upwork, Freelancer, LinkedIn, Facebook Groups tìm các bài đăng tuyển dụng thực tế.
    • Lead Qualifier & Analyst (📊 Sàng lọc dữ liệu): Phân loại yêu cầu, tính khả thi, xuất danh sách ra file '.csv' (Excel).
    • Outreach Specialist (💬 Chuyên viên Tiếp cận): Soạn kịch bản tin nhắn IB/Cold DM/Proposal cá nhân hóa "gãi đúng chỗ ngứa" của khách, lưu vào file '.md'.
-3. XIN Ý KIẾN & DUYỆT TÀI NGUYÊN TỪ CEO ('REQUEST_CEO_RESOURCE'):
-   • Nếu cần tài khoản đăng nhập (Upwork/LinkedIn/Facebook) hoặc cookie/mật khẩu để ib khách.
-   • Hoặc khi đã soạn xong kịch bản tin nhắn và muốn CEO duyệt trước khi bấm gửi thật.
-   ➡️ BẮT BUỘC gọi tool 'REQUEST_CEO_RESOURCE' để trình thẻ phê duyệt lên cho CEO duyệt và cấp tài nguyên!
+3. NGUYÊN TẮC TỰ LỰC CÁNH SINH - XIN TÀI NGUYÊN TỪ CEO LÀ BƯỚC ĐƯỜNG CÙNG ('REQUEST_CEO_RESOURCE' - LAST RESORT):
+   • TỰ THÂN VẬN ĐỘNG TRƯỚC: Bắt buộc tự thử mọi công cụ (RUN_CMD, BROWSE_WEB, WEB_SEARCH, Viết script tự động) để hoàn thành nhiệm vụ. Tuyệt đối không được ỷ lại hoặc hỏi xin link/tài khoản/cookie khi chưa thử các cách bóc tách tự động.
+   • CHỈ GỌI 'REQUEST_CEO_RESOURCE' khi: Đã vét cạn mọi giải pháp kỹ thuật khả thi mà gặp rào cản vật lý bất khả kháng (cần duyệt kịch bản tin nhắn thật gửi khách hàng, cần ngân sách tiền thật, hoặc mã OTP 2FA cá nhân).
+   ➡️ BẮT BUỘC báo cáo rõ các phương án tự động đã thử và lý do bất khả kháng khi gọi tool này!
    ⚠️ QUY TẮC CỐT TỬ SAU KHI CEO DUYỆT / CẤP TÀI NGUYÊN:
    - Ngay khi nhận được phản hồi 'APPROVED' hoặc chỉ đạo/tài nguyên do CEO cung cấp:
    - Bạn BẮT BUỘC PHẢI DÙNG TÀI NGUYÊN ĐÓ VÀ PHÁT LỆNH GỌI TOOL HÀNH ĐỘNG TIẾP THEO NGAY LẬP TỨC (gọi DELEGATE_TASK, WEB_SEARCH, READ_URL, BROWSE_WEB, SAVE_FILE...).
@@ -3727,6 +3746,38 @@ Khi CEO yêu cầu: "lên internet tự tìm kiếm và check lại những kinh
 4. BƯỚC 3 - XUẤT BÁO CÁO ĐỐI CHIẾU THỰC TẾ RA FILE '.md':
    - Tổng hợp bảng so sánh chi tiết: [Kinh nghiệm AI tự viết & Điểm số] vs [Thực tế chuẩn ngành tra cứu trên Internet].
    - Chỉ ra trung thực: Điểm nào AI đúc kết đúng với chuẩn quốc tế, điểm nào đang bị phóng đại hoặc thiếu tính thực tiễn.
+
+[QUY TẮC BẢO CHỨNG THỰC THI & CHỐNG ẢO GIÁC BÁO CÁO LÁO (REALITY VERIFICATION & ANTI-HALLUCINATION)]:
+1. VỚI TÁC VỤ TẢI FILE, TRÍCH XUẤT MEDIA (VIDEO, AUDIO, ẢNH, DỮ LIỆU, FILE CODE):
+   - ĐÍCH ĐẾN BẮT BUỘC: Phải có file vật lý (.mp4, .zip, .png, .py, .json) thực sự xuất hiện trong thư mục máy tính hôm nay.
+   - TUYỆT ĐỐI NGHIÊM CẤM: Bịa đặt các đường link tải giả mạo (như video.xx.fbcdn.net, cdn...) hoặc đùn đẩy trách nhiệm bắt CEO tự mở web thao tác thủ công!
+   - CHIẾN LƯỢC XOAY SỞ ĐA TẦNG TỰ THÍCH ỨNG:
+     * Tầng 1 (CLI Tool): Dùng RUN_CMD gọi các công cụ sẵn có (ví dụ: yt-dlp, curl...).
+     * Tầng 2 (Tự động hóa Web): Dùng BROWSE_WEB với mảng actions để điền link vào ô input của web hỗ trợ tải, click nút download và đón file về máy.
+     * Tầng 3 (Viết Code Tự Động): Viết script Python/Node (SAVE_FILE) rồi chạy qua RUN_CMD để tải và lưu file vật lý.
+   - NGHIỆM THU: Chỉ báo cáo hoàn thành khi file thực tế đã được lưu vào máy tính.
+2. QUY TẮC BẮC CẦU TÌM KÊNH & PROFILE (TỰ ĐỘNG HÓA TỐI ĐA - ZERO LAZY ASKING):
+   - Khi người dùng chỉ đưa 1 link video/reel (Facebook, YouTube, TikTok...) và yêu cầu tìm thêm video của chủ sở hữu:
+     * BẮT BUỘC tự động lấy metadata (chạy yt-dlp --dump-json qua RUN_CMD) hoặc dùng BROWSE_WEB để tự tìm ra Tên tác giả (uploader) và Link trang cá nhân (uploader_id / profile link).
+     * TUYỆT ĐỐI NGHIÊM CẤM dừng lại hỏi xin người dùng link Facebook hay link kênh khi đã có sẵn 1 link video gốc!
+     * Tự động điều hướng sang tab /reels của chủ kênh đó để cào danh sách video theo yêu cầu.
+3. QUY CHẾ KHO COOKIE VĨNH VIỄN (PERSISTENT COOKIE VAULT PROTOCOL - ZERO ASKING WHEN VAULT READY):
+   - Khi CEO/Người dùng cung cấp cookie của bất kỳ trang web nào (Facebook, Upwork, Freelancer, LinkedIn, Taobao, v.v.): Toàn bộ cookie được tự động lưu trữ vĩnh viễn vào Cookie Vault (memory/cookie_vault.json và memory/cookies/<domain>.txt).
+   - Mọi lần duyệt web sau đó (BROWSE_WEB, FETCH_WEBPAGE, yt-dlp CLI): Hệ thống và AI Agent TỰ ĐỘNG NẠP COOKIE TỪ VAULT mà TUYỆT ĐỐI KHÔNG HỎI LẠI NGƯỜI DÙNG!
+   - CHỈ ĐƯỢC PHÉP HỎI LẠI NGƯỜI DÙNG KHI VÀ CHỈ KHI: Cookie thực sự bị hết hạn (trạng thái 'expired'), trình duyệt bị đẩy về trang Login, hoặc server báo lỗi xác thực không thể vượt qua sau khi đã thử dùng cookie từ Vault.
+   - Khi hỏi lại: Bắt buộc giải thích rõ cookie domain nào đã hết hạn và yêu cầu dán cookie mới để cập nhật vào Vault.
+4. GIAO THỨC TRÍCH XUẤT VIDEO TỪ TRANG/PROFILE FACEBOOK & PHÒNG CHỐNG BỊA ĐẶT LINK (FACEBOOK PAGE/PROFILE SCRAPER & ANTI-HALLUCINATION):
+   - Chế độ hiển thị: Mặc định BROWSE_WEB chạy ngầm (headless: true) để không chiếm màn hình và tiết kiệm tài nguyên. NẾU CEO yêu cầu muốn nhìn thấy web mở lên trực tiếp hoặc giám sát trực quan: BẮT BUỘC truyền tham số 'headless: false' khi gọi BROWSE_WEB để cửa sổ Chrome thật xuất hiện trên màn hình desktop cho CEO quan sát trực tiếp!
+   - Khi CEO cung cấp link một TRANG hoặc TRANG CÁ NHÂN (Page / Profile Facebook, ví dụ: facebook.com/<name> hoặc facebook.com/profile.php?id=...) và yêu cầu lấy video/reels:
+     * ĐÂY LÀ LINK TRANG/PROFILE, KHÔNG PHẢI LINK VIDEO ĐƠN LẺ.
+     * TUYỆT ĐỐI CẤM BỊA ĐẶT REEL ID GIẢ MẠO (như bịa link facebook.com/reel/1393666275466827).
+     * TUYỆT ĐỐI KHÔNG GỌI yt-dlp TRỰC TIẾP TRÊN LINK REEL BỊA ĐẶT vì sẽ gây lỗi crash vòng lặp và làm quá tải hệ thống!
+     * BẮT BUỘC SỬ DỤNG BROWSE_WEB:
+       - Truy cập link Page/Profile (Trình duyệt Stealth tự động tiêm Cookie từ Cookie Vault để vượt màn hình đăng nhập).
+       - Tự động điều hướng sang tab Reels (extractReels: true hoặc URL với &sk=reels_tab / /reels).
+       - Cuộn trang (humanScroll: true) để Facebook render danh sách reels từ DOM.
+       - Hệ thống tự động bóc tách 100% URL reel thật dạng https://www.facebook.com/reel/<id>/ từ các thẻ a[href*="/reel/"] và trả về trong deepMediaLinks.
+       - Lấy danh sách link reel thật đã kiểm chứng từ DOM để lưu vào file .csv / .md hoặc tải về theo yêu cầu của CEO.
 
 [QUY TẮC ĐIỀU HÀNH PHÒNG BAN CHUYÊN BIỆT & PHẢN BÁC TỰ HÀNH (DYNAMIC SWARM & PEER DEBATE)]:
 ⚠️ ĐIỀU RĂN TỐI THƯỢNG CHO PHÓ GIÁM ĐỐC: HÀNH ĐỘNG BẰNG TOOL THẬT THAY VÌ NÓI SUÔNG TRÊN VĂN BẢN (ACTION OVER WORDS):
@@ -4862,8 +4913,11 @@ Gatekeeper đã thẩm định và xác nhận đây là chủ đề GIÁ TRỊ 
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         url: args.url,
-                        action: args.actionType || 'read',
-                        humanScroll: args.humanScroll !== false
+                        action: args.actionType || args.action || 'read',
+                        headless: args.headless !== undefined ? args.headless : undefined,
+                        humanScroll: args.humanScroll !== false,
+                        actions: args.actions || undefined,
+                        downloadPath: args.downloadPath || undefined
                     })
                 });
                 const d = await res.json();
@@ -4876,13 +4930,16 @@ Gatekeeper đã thẩm định và xác nhận đây là chủ đề GIÁ TRỊ 
                     }
                     detailsHtml = `<div style="color:#60a5fa; font-weight:600;">✓ ${escapeHtml(d.title || args.url)}</div>${imgHtml}`;
                 }
+                if (d.success && d.downloadedFiles && d.downloadedFiles.length > 0) {
+                    detailsHtml = `<div style="margin-top:4px; color:#10b981; font-weight:600;">📥 Đã tải về ${d.downloadedFiles.length} tệp: ${d.downloadedFiles.map(f => escapeHtml(f.name)).join(', ')}</div>` + (detailsHtml || '');
+                }
                 updateSearchCardHtml(browseCardId, {
                     type: 'browse',
                     url: args.url,
                     isScanning: false,
                     duration: duration,
                     success: d.success,
-                    statusText: d.success ? 'Đã duyệt xong trang (Stealth)' : `Lỗi duyệt web: ${d.error || 'Thất bại'}`,
+                    statusText: d.success ? (d.downloadedFiles && d.downloadedFiles.length > 0 ? `Đã tải về ${d.downloadedFiles.length} tệp` : 'Đã duyệt xong trang (Stealth)') : `Lỗi duyệt web: ${d.error || 'Thất bại'}`,
                     details: detailsHtml || undefined
                 });
                 return d;
@@ -5131,10 +5188,11 @@ QUY TẮC CÔNG TÁC & CHỌN ĐỊNH DẠNG FILE CHUẨN:
    - Lưu ý quan trọng: Chỉ áp dụng quy tắc này khi nhiệm vụ được giao là ĐI TÌM VIỆC / SĂN KHÁCH HÀNG. Nếu nhiệm vụ được giao là Kiểm tra / Thẩm định kinh nghiệm, Đọc tài liệu, hoặc Phản biện tri thức thì TUYỆT ĐỐI KHÔNG ĐƯỢC TỰ Ý ĐI TÌM VIỆC UPWORK!
    - TUYỆT ĐỐI KHÔNG TỰ TIỆN CODE GIAO DIỆN WEB!
    - Bắt buộc dùng WEB_SEARCH, READ_URL, BROWSE_WEB để quét Google, Upwork, Freelancer, LinkedIn, Facebook Groups tìm các bài đăng tuyển thật.
-   - BẮT BUỘC TRÍCH XUẤT ĐƯỜNG DẪN CHI TIẾT TỪNG BÀI ĐĂNG (DEEP LINK PROTOCOL):
-     * TUYỆT ĐỐI KHÔNG dùng link danh mục tổng quan (như /freelance-jobs/vietnamese/).
-     * Khi gọi READ_URL hoặc BROWSE_WEB vào trang tuyển dụng, hãy đọc phần 'DANH SÁCH CÁC LINK BÀI TUYỂN DỤNG CỤ THỂ' được hệ thống trích xuất.
-     * Lấy đúng các link cụ thể đó (dạng https://www.upwork.com/jobs/~... hoặc https://www.freelancer.com/projects/...) để đưa vào cột 'Job Link' trong file .csv và trong báo cáo để CEO có thể click thẳng vào bài đăng của khách hàng!
+   - BẢO CHỨNG ĐƯỜNG DẪN GỐC & CHỐNG LINK ẢO (STRICT URL PROVENANCE & ZERO HALLUCINATED URLS):
+     * MỌI đường link trong file .csv và .md BẮT BUỘC phải là link THẬT 100%, được COPY NGUYÊN VĂN từ kết quả của công cụ WEB_SEARCH, READ_URL hoặc BROWSE_WEB.
+     * TUYỆT ĐỐI NGHIÊM CẤM tự bịa đặt ID, tự nghĩ ra link mẫu hay link placeholder (như ~01abc..., saas-dashboard-dev...).
+     * Lấy đúng các link dự án thật từ kết quả WEB_SEARCH (chứa URL thật dạng https://www.freelancer.com/projects/..., ngân sách thật, kỹ năng thật) để đưa vào cột 'Job Link' trong file .csv và soạn Proposal cá nhân hóa trong file .md.
+     * Nếu sàn nào chặn bot không trả link bài trực tiếp, TUYỆT ĐỐI KHÔNG tự sáng tác link giả; hãy dùng 100% link dự án thật từ sàn Freelancer.com hoặc nguồn công cụ cung cấp.
    - Trích xuất bảng dữ liệu các job vào file '.csv' (Excel).
    - Soạn thảo các kịch bản tin nhắn tiếp cận (Cold Outreach) vào file '.md'.
 6. XIN DUYỆT TÀI NGUYÊN HOẶC DUYỆT TIN NHẮN TỪ CEO ('REQUEST_CEO_RESOURCE'):
@@ -5151,7 +5209,15 @@ QUY TẮC CÔNG TÁC & CHỌN ĐỊNH DẠNG FILE CHUẨN:
    - Giao thức hành vi ứng dụng thực hành (Heuristics): Nhận thức, Thể chất, Cộng sinh AI (tuyệt đối không gắn mác chuẩn McKinsey, không bịa đặt số liệu ảo).
    - Tuyệt đối NGHIÊM CẤM bịa đặt kỷ lục thể thao, sự kiện tương lai hoặc nghiên cứu giả mạo.
    - Tiết kiệm token: Chỉ tạo DUY NHẤT 1 sản phẩm canonical hoàn thiện, không tạo file nháp/barem/SOP vụn vặt.
-9. Báo cáo kết quả cuối cùng đầy đủ, chi tiết, súc tích và có giá trị cao nhất.`;
+9. QUY TẮC THỰC THI TÁC VỤ VẬT LÝ & TẢI FILE (ANTI-OFFLOADING & PHYSICAL DELIVERABLES):
+   - Khi nhiệm vụ yêu cầu tải file, tải video (Facebook, YouTube, TikTok...), xuất dữ liệu, hoặc kiểm thử:
+     * BẮT BUỘC dùng RUN_CMD (chạy yt-dlp, curl, python script) hoặc BROWSE_WEB (với actions: click, type, wait, download) để tải file THỰC TẾ về máy!
+     * TUYỆT ĐỐI NGHIÊM CẤM tạo file .csv hay .md chứa link mẫu/giả lập (ví dụ reel/1001, reel/123456789) rồi ghi chú "người dùng hãy tự thay link để tải"!
+     * TUYỆT ĐỐI KHÔNG ĐƯỢC đùn đẩy việc lại cho người dùng khi được giao trọn gói. Nếu một phương án gặp lỗi (ví dụ yt-dlp bị Cannot parse data), BẮT BUỘC phải chuyển sang phương án 2 (dùng BROWSE_WEB vào web trung gian tải hoặc bóc tách DOM) hoặc tự viết script python/node vượt rào để lấy file thật!
+10. QUY CHẾ KHO COOKIE VĨNH VIỄN & CÀO REEL TỪ TRANG/PROFILE FACEBOOK (COOKIE VAULT & REAL REEL EXTRACTION):
+    - Khi truy cập Facebook, Upwork hay bất kỳ web nào: Hệ thống tự động nạp Cookie từ Cookie Vault vĩnh viễn, TUYỆT ĐỐI KHÔNG HỎI LẠI NGƯỜI DÙNG trừ khi cookie thực sự hết hạn (bị đẩy về trang Login).
+    - Khi nhận URL Fanpage/Profile Facebook để lấy video: TUYỆT ĐỐI KHÔNG BỊA REEL ID GIẢ! Bắt buộc dùng BROWSE_WEB với extractReels: true để lấy danh sách link Reel thật 100% từ DOM trước khi lưu file hoặc tải.
+11. Báo cáo kết quả cuối cùng đầy đủ, chi tiết, súc tích và có giá trị cao nhất.`;
 
         const allowedNames = specialist.allowedTools || [];
         const filteredToolDefs = NATIVE_TOOLS[0].functionDeclarations.filter(t => allowedNames.includes(t.name));
@@ -5291,19 +5357,34 @@ QUY TẮC CÔNG TÁC & CHỌN ĐỊNH DẠNG FILE CHUẨN:
                         const toolResult = await executeToolForSpecialist(fnName, fnArgs, specialist);
 
                         // NẾU TẠO HOẶC XUẤT BẢN FILE THÀNH CÔNG: TỰ ĐỘNG HIỂN THỊ THẺ ARTIFACT & TOAST CHO CEO
-                        if (toolResult && toolResult.success && (fnName === 'SAVE_FILE' || fnName === 'EXPORT_DESIGN' || fnName === 'GENERATE_IMAGE')) {
-                            const targetFp = toolResult.filePath || toolResult.exportedPath || toolResult.fullPath || fnArgs.filePath || fnArgs.fileName;
-                            if (targetFp) {
-                                actualSavedFiles.push({
-                                    tool: fnName,
-                                    filePath: targetFp,
-                                    fullPath: toolResult.fullPath || targetFp,
-                                    fileName: toolResult.fileName || targetFp.split(/[\/\\]/).pop(),
-                                    size: toolResult.size
-                                });
-                                const artifactCard = createArtifactCardHtml(targetFp, toolResult.size, toolResult.format, specialist);
-                                appendCorporateMessage(specialist.id, specialist, artifactCard, 'system-message');
-                                showFloatingArtifactToast(targetFp, targetFp.split(/[\/\\]/).pop());
+                        if (toolResult && toolResult.success) {
+                            if (fnName === 'SAVE_FILE' || fnName === 'EXPORT_DESIGN' || fnName === 'GENERATE_IMAGE') {
+                                const targetFp = toolResult.filePath || toolResult.exportedPath || toolResult.fullPath || fnArgs.filePath || fnArgs.fileName;
+                                if (targetFp) {
+                                    actualSavedFiles.push({
+                                        tool: fnName,
+                                        filePath: targetFp,
+                                        fullPath: toolResult.fullPath || targetFp,
+                                        fileName: toolResult.fileName || targetFp.split(/[\/\\]/).pop(),
+                                        size: toolResult.size
+                                    });
+                                    const artifactCard = createArtifactCardHtml(targetFp, toolResult.size, toolResult.format, specialist);
+                                    appendCorporateMessage(specialist.id, specialist, artifactCard, 'system-message');
+                                    showFloatingArtifactToast(targetFp, targetFp.split(/[\/\\]/).pop());
+                                }
+                            } else if (fnName === 'BROWSE_WEB' && toolResult.downloadedFiles && toolResult.downloadedFiles.length > 0) {
+                                for (const dl of toolResult.downloadedFiles) {
+                                    actualSavedFiles.push({
+                                        tool: 'BROWSE_WEB',
+                                        filePath: dl.fullPath,
+                                        fullPath: dl.fullPath,
+                                        fileName: dl.name,
+                                        size: dl.size
+                                    });
+                                    const artifactCard = createArtifactCardHtml(dl.fullPath, dl.size, dl.name.split('.').pop(), specialist);
+                                    appendCorporateMessage(specialist.id, specialist, artifactCard, 'system-message');
+                                    showFloatingArtifactToast(dl.fullPath, dl.name);
+                                }
                             }
                         }
 
@@ -5438,7 +5519,7 @@ QUY TẮC CÔNG TÁC & CHỌN ĐỊNH DẠNG FILE CHUẨN:
                 avatar: "🛡️",
                 color: "#ef4444",
                 role: "Chuyên gia phản biện khắt khe, kiểm chứng dữ liệu thực tế và bắt bẻ lỗ hổng",
-                allowedTools: ["SAVE_FILE", "READ_FILE", "LIST_FILES", "WEB_SEARCH", "ACADEMIC_SEARCH", "VERIFY_SOURCE_METADATA", "EXTRACT_CLAIMS", "AUDIT_CITATION_ENTAILMENT", "ENFORCE_QUALITY_GATE"]
+                allowedTools: ["SAVE_FILE", "READ_FILE", "LIST_FILES", "RUN_CMD", "BROWSE_WEB", "WEB_SEARCH", "ACADEMIC_SEARCH", "VERIFY_SOURCE_METADATA", "EXTRACT_CLAIMS", "AUDIT_CITATION_ENTAILMENT", "ENFORCE_QUALITY_GATE"]
             };
             corporateState.specialists[fallbackSpec.id] = fallbackSpec;
             participants.push(fallbackSpec);
@@ -5644,21 +5725,38 @@ QUY TẮC TRANH BIỆN & CHUẨN MỰC CHẤT LƯỢNG KIỆT TÁC 9.0+ ĐẾN 9
                             const fnArgs = fnCallObj.args || {};
                             const toolResult = await executeToolForSpecialist(fnName, fnArgs, specialist);
 
-                            if (toolResult && toolResult.success && (fnName === 'SAVE_FILE' || fnName === 'EXPORT_DESIGN' || fnName === 'GENERATE_IMAGE')) {
-                                const targetFp = toolResult.filePath || toolResult.exportedPath || toolResult.fullPath || fnArgs.filePath || fnArgs.fileName;
-                                if (targetFp) {
-                                    const fileObj = {
-                                        tool: fnName,
-                                        filePath: targetFp,
-                                        fullPath: toolResult.fullPath || targetFp,
-                                        fileName: toolResult.fileName || targetFp.split(/[\/\\]/).pop(),
-                                        size: toolResult.size
-                                    };
-                                    turnFiles.push(fileObj);
-                                    debateSavedFiles.push(fileObj);
-                                    const artifactCard = createArtifactCardHtml(targetFp, toolResult.size, toolResult.format, specialist);
-                                    appendCorporateMessage(specialist.id, specialist, artifactCard, 'system-message');
-                                    showFloatingArtifactToast(targetFp, targetFp.split(/[\/\\]/).pop());
+                            if (toolResult && toolResult.success) {
+                                if (fnName === 'SAVE_FILE' || fnName === 'EXPORT_DESIGN' || fnName === 'GENERATE_IMAGE') {
+                                    const targetFp = toolResult.filePath || toolResult.exportedPath || toolResult.fullPath || fnArgs.filePath || fnArgs.fileName;
+                                    if (targetFp) {
+                                        const fileObj = {
+                                            tool: fnName,
+                                            filePath: targetFp,
+                                            fullPath: toolResult.fullPath || targetFp,
+                                            fileName: toolResult.fileName || targetFp.split(/[\/\\]/).pop(),
+                                            size: toolResult.size
+                                        };
+                                        turnFiles.push(fileObj);
+                                        debateSavedFiles.push(fileObj);
+                                        const artifactCard = createArtifactCardHtml(targetFp, toolResult.size, toolResult.format, specialist);
+                                        appendCorporateMessage(specialist.id, specialist, artifactCard, 'system-message');
+                                        showFloatingArtifactToast(targetFp, targetFp.split(/[\/\\]/).pop());
+                                    }
+                                } else if (fnName === 'BROWSE_WEB' && toolResult.downloadedFiles && toolResult.downloadedFiles.length > 0) {
+                                    for (const dl of toolResult.downloadedFiles) {
+                                        const fileObj = {
+                                            tool: 'BROWSE_WEB',
+                                            filePath: dl.fullPath,
+                                            fullPath: dl.fullPath,
+                                            fileName: dl.name,
+                                            size: dl.size
+                                        };
+                                        turnFiles.push(fileObj);
+                                        debateSavedFiles.push(fileObj);
+                                        const artifactCard = createArtifactCardHtml(dl.fullPath, dl.size, dl.name.split('.').pop(), specialist);
+                                        appendCorporateMessage(specialist.id, specialist, artifactCard, 'system-message');
+                                        showFloatingArtifactToast(dl.fullPath, dl.name);
+                                    }
                                 }
                             }
 
@@ -7628,8 +7726,11 @@ Báo cáo gồm:
                             method: 'POST', headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 url: args.url,
-                                action: args.actionType || 'read',
-                                humanScroll: args.humanScroll !== false
+                                action: args.actionType || args.action || 'read',
+                                headless: args.headless !== undefined ? args.headless : undefined,
+                                humanScroll: args.humanScroll !== false,
+                                actions: args.actions || undefined,
+                                downloadPath: args.downloadPath || undefined
                             })
                         });
                         const resultData = await res.json();
@@ -7640,7 +7741,11 @@ Báo cáo gồm:
                             if (resultData.screenshotBase64) {
                                 imgHtml = `<div style="margin-top:8px;"><img src="${resultData.screenshotBase64}" style="max-width:100%; max-height:220px; border-radius:6px; border:1px solid rgba(255,255,255,0.1);"></div>`;
                             }
-                            detailsHtml = `<div style="color:#60a5fa; font-weight:600;">✓ ${escapeHtml(resultData.title || args.url)}</div>${imgHtml}`;
+                            let dlHtml = '';
+                            if (resultData.downloadedFiles && resultData.downloadedFiles.length > 0) {
+                                dlHtml = `<div style="margin-top:4px; color:#10b981; font-weight:600;">📥 Đã tải về ${resultData.downloadedFiles.length} tệp: ${resultData.downloadedFiles.map(f => escapeHtml(f.name)).join(', ')}</div>`;
+                            }
+                            detailsHtml = `<div style="color:#60a5fa; font-weight:600;">✓ ${escapeHtml(resultData.title || args.url)}</div>${dlHtml}${imgHtml}`;
                         }
                         updateSearchCardHtml(browseCardId, {
                             type: 'browse',
@@ -7648,7 +7753,7 @@ Báo cáo gồm:
                             isScanning: false,
                             duration: duration,
                             success: resultData.success,
-                            statusText: resultData.success ? 'Đã duyệt xong trang (Stealth thành công)' : `Lỗi duyệt web: ${resultData.error}`,
+                            statusText: resultData.success ? (resultData.downloadedFiles && resultData.downloadedFiles.length > 0 ? `Đã tải về ${resultData.downloadedFiles.length} tệp` : 'Đã duyệt xong trang (Stealth thành công)') : `Lỗi duyệt web: ${resultData.error}`,
                             details: detailsHtml || undefined
                         });
                         chatHistory.push({
@@ -7661,6 +7766,8 @@ Báo cáo gồm:
                                         title: resultData.title,
                                         content: resultData.content,
                                         screenshotPath: resultData.screenshotPath,
+                                        actionLogs: resultData.actionLogs,
+                                        downloadedFiles: resultData.downloadedFiles,
                                         error: resultData.error
                                     }
                                 }
@@ -7946,6 +8053,8 @@ Báo cáo gồm:
                             const tools = s.allowedTools || [];
                             if (!tools.includes("SAVE_EXPERIENCE")) tools.push("SAVE_EXPERIENCE");
                             if (!tools.includes("REQUEST_CEO_RESOURCE")) tools.push("REQUEST_CEO_RESOURCE");
+                            if (!tools.includes("BROWSE_WEB")) tools.push("BROWSE_WEB");
+                            if (!tools.includes("RUN_CMD")) tools.push("RUN_CMD");
                             corporateState.specialists[s.id] = {
                                 ...s,
                                 allowedTools: tools,
@@ -8102,9 +8211,9 @@ Báo cáo gồm:
                         // Nếu phòng ban chưa thành lập hoặc ít hơn 2 người: Tự động khởi tạo Hội đồng 3 chuyên gia đa diện
                         if (participants.length < 2) {
                             const defaultCouncil = [
-                                { id: "spec_lead_architect", name: "Chuyên viên Giải pháp & Kiến trúc", title: "Lead Architect", avatar: "🏛️", color: "#06b6d4", role: "Đề xuất giải pháp, thiết kế kiến trúc toàn diện và lưu trữ file chuẩn mực trên đĩa cứng.", allowedTools: ["SAVE_FILE", "READ_FILE", "LIST_FILES", "WEB_SEARCH", "ACADEMIC_SEARCH", "VERIFY_SOURCE_METADATA", "EXTRACT_CLAIMS", "AUDIT_CITATION_ENTAILMENT", "ENFORCE_QUALITY_GATE"] },
-                                { id: "spec_qa_auditor", name: "Thẩm định viên Độc lập", title: "Independent Auditor & QA", avatar: "🛡️", color: "#ef4444", role: "Phản biện khắt khe, kiểm chứng dữ liệu, soi xét lỗ hổng và bắt bẻ tính khả thi.", allowedTools: ["READ_FILE", "LIST_FILES", "WEB_SEARCH", "SAVE_FILE", "ACADEMIC_SEARCH", "VERIFY_SOURCE_METADATA", "EXTRACT_CLAIMS", "AUDIT_CITATION_ENTAILMENT", "ENFORCE_QUALITY_GATE"] },
-                                { id: "spec_domain_practitioner", name: "Chuyên gia Tác chiến & Tối ưu", title: "Domain Field Specialist", avatar: "⚡", color: "#10b981", role: "Đánh giá khả năng áp dụng thực tế, đề xuất phương án cải tiến và kiểm thử kết quả.", allowedTools: ["WEB_SEARCH", "READ_URL", "SAVE_FILE", "LIST_FILES", "ACADEMIC_SEARCH", "VERIFY_SOURCE_METADATA", "EXTRACT_CLAIMS", "AUDIT_CITATION_ENTAILMENT", "ENFORCE_QUALITY_GATE"] }
+                                { id: "spec_lead_architect", name: "Chuyên viên Giải pháp & Kiến trúc", title: "Lead Architect", avatar: "🏛️", color: "#06b6d4", role: "Đề xuất giải pháp, thiết kế kiến trúc toàn diện và lưu trữ file chuẩn mực trên đĩa cứng.", allowedTools: ["SAVE_FILE", "READ_FILE", "LIST_FILES", "RUN_CMD", "BROWSE_WEB", "WEB_SEARCH", "ACADEMIC_SEARCH", "VERIFY_SOURCE_METADATA", "EXTRACT_CLAIMS", "AUDIT_CITATION_ENTAILMENT", "ENFORCE_QUALITY_GATE"] },
+                                { id: "spec_qa_auditor", name: "Thẩm định viên Độc lập", title: "Independent Auditor & QA", avatar: "🛡️", color: "#ef4444", role: "Phản biện khắt khe, kiểm chứng dữ liệu, soi xét lỗ hổng và bắt bẻ tính khả thi.", allowedTools: ["READ_FILE", "LIST_FILES", "RUN_CMD", "BROWSE_WEB", "WEB_SEARCH", "SAVE_FILE", "ACADEMIC_SEARCH", "VERIFY_SOURCE_METADATA", "EXTRACT_CLAIMS", "AUDIT_CITATION_ENTAILMENT", "ENFORCE_QUALITY_GATE"] },
+                                { id: "spec_domain_practitioner", name: "Chuyên gia Tác chiến & Tối ưu", title: "Domain Field Specialist", avatar: "⚡", color: "#10b981", role: "Đánh giá khả năng áp dụng thực tế, đề xuất phương án cải tiến và kiểm thử kết quả.", allowedTools: ["WEB_SEARCH", "READ_URL", "BROWSE_WEB", "RUN_CMD", "SAVE_FILE", "LIST_FILES", "ACADEMIC_SEARCH", "VERIFY_SOURCE_METADATA", "EXTRACT_CLAIMS", "AUDIT_CITATION_ENTAILMENT", "ENFORCE_QUALITY_GATE"] }
                             ];
                             defaultCouncil.forEach(s => { corporateState.specialists[s.id] = s; });
                             participants = defaultCouncil;

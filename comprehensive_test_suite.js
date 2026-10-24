@@ -253,7 +253,60 @@ async function runTestSuite() {
         assert(false, 'API /api/academic/quality-gate', e.message);
     }
 
-    // =========================================================================
+        // 17. Persistent Cookie Vault (/api/cookie-vault)
+    try {
+        const cvRes = await fetch(`${BASE_URL}/api/cookie-vault`);
+        const cvData = await cvRes.json();
+        assert(cvData && cvData.success && Array.isArray(cvData.vault) && cvData.vault.some(v => v.domain === 'facebook.com'), 'API /api/cookie-vault (Kho Cookie Vĩnh Viễn)', `Tổng domain: ${cvData.totalDomains}`);
+    } catch(e) {
+        assert(false, 'API /api/cookie-vault', e.message);
+    }
+
+    // 18. Cookie Status Check (/api/check-cookie-status)
+    try {
+        const csRes = await fetch(`${BASE_URL}/api/check-cookie-status`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ urlOrDomain: 'https://www.facebook.com/profile.php?id=100006882992463' })
+        });
+        const csData = await csRes.json();
+        assert(csData && csData.success && csData.hasCookie && csData.status === 'valid', 'API /api/check-cookie-status (Kiểm tra Cookie Facebook)', `Status: ${csData.status}, Count: ${csData.count}`);
+    } catch(e) {
+        assert(false, 'API /api/check-cookie-status', e.message);
+    }
+
+    // 19. Save / Update Cookie (/api/save-cookie)
+    try {
+        const scRes = await fetch(`${BASE_URL}/api/save-cookie`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                domainOrUrl: 'freelancer.com',
+                cookies: [{ name: 'test_token', value: 'xyz_freelance_123', domain: '.freelancer.com', path: '/' }],
+                status: 'valid'
+            })
+        });
+        const scData = await scRes.json();
+        assert(scData && scData.success && scData.domain === 'freelancer.com', 'API /api/save-cookie (Lưu Cookie Domain Mới)', `Domain: ${scData.domain}`);
+    } catch(e) {
+        assert(false, 'API /api/save-cookie', e.message);
+    }
+
+    // 20. Facebook Page / Profile Real Reel Extraction Contract
+    try {
+        const fbRes = await fetch(`${BASE_URL}/api/browse-web`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                url: 'https://www.facebook.com/profile.php?id=100006882992463',
+                extractReels: true,
+                humanScroll: false
+            })
+        });
+        const fbData = await fbRes.json();
+        assert(fbData && fbData.success && Array.isArray(fbData.deepMediaLinks) && fbData.deepMediaLinks.length > 0 && fbData.deepMediaLinks[0].url.includes('/reel/'), 'API /api/browse-web (Trích xuất 100% Reel Thật từ Facebook Profile)', `Trích xuất được ${fbData.deepMediaLinks.length} reel thật`);
+    } catch(e) {
+        assert(false, 'API /api/browse-web (Trích xuất Reel Thật)', e.message);
+    }
+
+// =========================================================================
     // PART B: FRONTEND BROWSER INTEGRATION & UI FIDELITY
     // =========================================================================
     console.log('\n--- PHẦN 2: KIỂM THỬ GIAO DIỆN FRONTEND & TÍCH HỢP TRÌNH DUYỆT ---');
@@ -478,6 +531,13 @@ async function runTestSuite() {
     // 7. Kiểm tra An toàn khi Agent gặp lỗi (Tuyệt đối không tự ý gán Đồng thuận khi Agent gặp lỗi API)
     const hasSafeErrorHandling = indexHtmlContent.includes('bảo lưu quyền phản biện.* [TIẾP TỤC TRANH BIỆN]');
     assert(hasSafeErrorHandling, 'An toàn khi Agent gặp sự cố: Không bao giờ giả mạo Đồng thuận', 'Gắn nhãn cảnh báo và tiếp tục tranh biện');
+
+    // 8. Kiểm tra Quy chế Kho Cookie Vĩnh viễn (Zero Lazy Asking) & Cào Reel Thật (Anti-Hallucination)
+    const hasCookieVaultProtocol = indexHtmlContent.includes('QUY CHẾ KHO COOKIE VĨNH VIỄN') &&
+                                   indexHtmlContent.includes('TỰ ĐỘNG NẠP COOKIE TỪ VAULT');
+    const hasRealFbReelScraperRule = indexHtmlContent.includes('GIAO THỨC TRÍCH XUẤT VIDEO TỪ TRANG/PROFILE FACEBOOK') &&
+                                     indexHtmlContent.includes('TUYỆT ĐỐI CẤM BỊA ĐẶT REEL ID GIẢ MẠO');
+    assert(hasCookieVaultProtocol && hasRealFbReelScraperRule, 'Quy chế Kho Cookie Vĩnh viễn & Cào Reel Thật (Chống bịa link)', 'Tự động tái sử dụng Cookie và trích xuất link thật 100%');
 
     console.log('\n================================================================');
     console.log(`📊 KẾT QUẢ KIỂM THỬ: ${passedTests}/${totalTests} TESTS PASS (${((passedTests/totalTests)*100).toFixed(1)}%)`);

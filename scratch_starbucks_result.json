@@ -1,0 +1,15 @@
+{
+  "success": true,
+  "result": "",
+  "qualityScore": 85,
+  "critique": {
+    "text": ""
+  },
+  "grounding": null,
+  "stats": {
+    "executionTime": "103747ms",
+    "agentCalls": 3,
+    "averageLatency": "16490ms"
+  },
+  "version": "v2.0-ultimate"
+}
