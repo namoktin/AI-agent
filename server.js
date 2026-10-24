@@ -5204,7 +5204,7 @@ function getOrchestrator() {
 
         globalOrchestrator = new AgentOrchestrator(apiKey, {
             maxRetries: 3,
-            timeout: 180000,
+            timeout: 75000,
             parallelLimit: 5
         });
 

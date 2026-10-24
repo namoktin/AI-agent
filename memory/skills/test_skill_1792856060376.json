@@ -1,0 +1,21 @@
+{
+  "id": "test_skill_1792856060376",
+  "name": "Test Skill Verification",
+  "description": "Temporary skill for testing recordExecution",
+  "triggerPatterns": [],
+  "actionGraph": [
+    {
+      "tool": "READ_FILE",
+      "args": {}
+    }
+  ],
+  "verified": true,
+  "acceptanceCriteria": [
+    "100% independent verification checks passed"
+  ],
+  "executionCount": 3,
+  "successCount": 2,
+  "failureCount": 1,
+  "successRate": 0.67,
+  "updatedAt": "2026-10-24T15:34:20.388Z"
+}

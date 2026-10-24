@@ -5,18 +5,18 @@
 
 class ModelRouter {
     constructor(customConfig = {}) {
-        this.defaultModel = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
+        this.defaultModel = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
 
         // Unified Model Registry with Distinct Tiers (Fast, Standard, Reasoning Pro)
         this.registry = {
-            FAST: process.env.GEMINI_MODEL_FAST || 'gemini-flash-lite-latest',
-            STANDARD: process.env.GEMINI_MODEL_STANDARD || this.defaultModel || 'gemini-3.1-flash-lite',
-            REASONING: process.env.GEMINI_MODEL_HEAVY || 'gemini-pro-latest',
+            FAST: process.env.GEMINI_MODEL_FAST || 'gemini-3.5-flash',
+            STANDARD: process.env.GEMINI_MODEL_STANDARD || this.defaultModel || 'gemini-3.6-flash',
+            REASONING: process.env.GEMINI_MODEL_HEAVY || 'gemini-3-flash-preview',
             FALLBACK_POOL: [
-                'gemini-3.1-flash-lite',
-                'gemini-flash-lite-latest',
-                'gemini-flash-latest',
-                'gemini-3.1-flash-lite-preview'
+                'gemini-3.5-flash',
+                'gemini-3.6-flash',
+                'gemini-3-flash-preview',
+                'gemini-flash-latest'
             ],
             ...customConfig
         };
@@ -60,7 +60,11 @@ class ModelRouter {
         const pool = this.registry.FALLBACK_POOL;
         if (!pool || pool.length === 0) return this.defaultModel;
 
-        const nextModel = pool[(attempt - 1) % pool.length];
+        // Filter out current model to guarantee an actual model switch
+        const available = pool.filter(m => m !== currentModel);
+        const candidates = available.length > 0 ? available : pool;
+
+        const nextModel = candidates[(attempt - 1) % candidates.length];
         console.log(`🔄 [ModelRouter] Fallback (attempt ${attempt}): [${currentModel}] -> [${nextModel}]`);
         return nextModel;
     }

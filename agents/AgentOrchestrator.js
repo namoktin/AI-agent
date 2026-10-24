@@ -70,10 +70,10 @@ class AgentOrchestrator {
     constructor(geminiApiKey, config = {}) {
         this.apiKey = geminiApiKey;
         this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-        this.defaultModel = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
+        this.defaultModel = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
         this.config = {
             maxRetries: 3,
-            timeout: 180000,
+            timeout: 75000,
             parallelLimit: 5,
             thinkingDepth: 'deep',
             serverUrl: config.serverUrl || 'http://localhost:3000',
@@ -383,8 +383,12 @@ class AgentOrchestrator {
                 context: { ...context, mode: 'fast', model: fastModel }
             });
             const fastVerification = this.verifier.verifyFastResponse(userRequest, fastResult);
+            const isFastSuccess = fastResult.success && fastVerification.verified;
+            if (context.matchedSkill) {
+                this.skillLibrary.recordExecution(context.matchedSkill.id, isFastSuccess);
+            }
             return {
-                success: fastResult.success && fastVerification.verified,
+                success: isFastSuccess,
                 result: fastResult.response,
                 mode: 'fast',
                 qualityScore: fastVerification.qualityScore,
@@ -479,7 +483,7 @@ class AgentOrchestrator {
                 // DYNAMIC REPLANNING: Nếu có task thất bại, tìm lại task gốc và kích hoạt Adaptive Replanning
                 for (let i = 0; i < specialistResults.length; i++) {
                     const res = specialistResults[i];
-                    if (!res.success && (context.replanAttempts || 0) < 1) {
+                    if (!res.success && !res.skippedDueToDependency && (context.replanAttempts || 0) < 1) {
                         const failedTaskId = res.taskId || res.id;
                         const originalTask = (taskPlan.tasks || []).find(t => t.id === failedTaskId) || {
                             id: failedTaskId,
@@ -497,6 +501,37 @@ class AgentOrchestrator {
                                 replanAttempts: (context.replanAttempts || 0) + 1
                             });
                             specialistResults.push(...recoveryResults);
+
+                            // RECOVERY RESUMPTION: Sau khi phục hồi thành công, chạy tiếp các nhiệm vụ phụ thuộc bị hoãn
+                            const allRecoveryPassed = recoveryResults.every(r => r.success !== false);
+                            if (allRecoveryPassed) {
+                                const pendingDownstreamTasks = (replanned.tasks || []).filter(t => {
+                                    if (t.isRecovery || t.id === failedTaskId) return false;
+                                    const prevRes = specialistResults.find(sr => (sr.taskId || sr.id) === t.id);
+                                    return !prevRes || prevRes.success === false || prevRes.skippedDueToDependency;
+                                });
+
+                                if (pendingDownstreamTasks.length > 0) {
+                                    this.log(`🚀 Phục hồi thành công! Chạy tiếp ${pendingDownstreamTasks.length} nhiệm vụ phụ thuộc còn dang dở...`);
+                                    const priorSuccessfulTaskIds = specialistResults
+                                        .filter(sr => sr.success !== false)
+                                        .map(sr => sr.taskId || sr.id);
+
+                                    const downstreamResults = await this.executeTasksParallel(pendingDownstreamTasks, {
+                                        ...enrichedContext,
+                                        completedTaskIds: priorSuccessfulTaskIds,
+                                        replanAttempts: (context.replanAttempts || 0) + 1
+                                    });
+                                    for (const dsRes of downstreamResults) {
+                                        const idx = specialistResults.findIndex(sr => (sr.taskId || sr.id) === (dsRes.taskId || dsRes.id));
+                                        if (idx !== -1) {
+                                            specialistResults[idx] = dsRes;
+                                        } else {
+                                            specialistResults.push(dsRes);
+                                        }
+                                    }
+                                }
+                            }
                         }
                         break;
                     }
@@ -530,13 +565,12 @@ class AgentOrchestrator {
                     });
                 }
 
-                return {
-                    success: true,
-                    result: arbDirective || arbitration.response,
-                    executionLog: this.executionLog,
-                    consensusAchieved: false,
-                    arbitrated: true
-                };
+                // KHÔNG return success: true VỘI! Tiếp tục chuyển qua Stage 5 & 6 để thẩm định thực tế
+                consensus.finalResult = typeof arbDirective === 'object' && arbDirective !== null
+                    ? (arbDirective.solution || arbDirective.arbitratedResult || arbDirective.decision || JSON.stringify(arbDirective))
+                    : String(arbitration.response);
+                consensus.arbitrated = true;
+                this.log('⚖️ Director đã phân xử xong. Chuyển tiếp kết quả qua IndependentVerifier để thẩm định thực tế...');
             }
 
             // STAGE 5: Independent Verification Engine (Zero Blind Trust)
@@ -601,6 +635,9 @@ class AgentOrchestrator {
             // STAGE 6: Director Approval
             if (verdict === 'APPROVED' && overallScore >= 80) {
                 this.log('🎉 EXECUTION SUCCESSFUL - Director Approved');
+                if (context.matchedSkill) {
+                    this.skillLibrary.recordExecution(context.matchedSkill.id, true);
+                }
                 return {
                     success: true,
                     result: consensus.finalResult,
@@ -619,9 +656,14 @@ class AgentOrchestrator {
                     }]
                 });
             } else {
-                this.log('⚠️ Final output completed with noted caveats');
+                this.log('⚠️ Final output did not pass quality gate or requires revision');
+                if (context.matchedSkill) {
+                    this.skillLibrary.recordExecution(context.matchedSkill.id, false);
+                }
                 return {
-                    success: true,
+                    success: false,
+                    status: 'NEEDS_REVISION',
+                    error: `Kết quả chưa đạt chuẩn nghiệm thu phê duyệt (Điểm chất lượng: ${overallScore}/100, Phán quyết: ${verdict})`,
                     result: consensus.finalResult,
                     qualityScore: overallScore,
                     critique: critique,
@@ -631,6 +673,9 @@ class AgentOrchestrator {
 
         } catch (error) {
             this.log('💥 EXECUTION FAILED', { error: error.message });
+            if (context.matchedSkill) {
+                this.skillLibrary.recordExecution(context.matchedSkill.id, false);
+            }
             return {
                 success: false,
                 error: error.message,
@@ -642,12 +687,13 @@ class AgentOrchestrator {
     /**
      * Execute tasks in parallel where safe with dependency resolution
      */
-    async executeTasksParallel(tasks, context) {
+    async executeTasksParallel(tasks, context = {}) {
         if (!Array.isArray(tasks) || tasks.length === 0) return [];
 
-        const sortedBatches = this.topologicalSort(tasks);
+        const priorCompleted = context.completedTaskIds || [];
+        const sortedBatches = this.topologicalSort(tasks, priorCompleted);
         const results = [];
-        const completed = new Set();
+        const completed = new Set(priorCompleted);
         const failedTaskIds = new Set();
 
         for (const batch of sortedBatches) {
@@ -699,12 +745,12 @@ class AgentOrchestrator {
     /**
      * Topological sort for task dependencies with circular dependency guard
      */
-    topologicalSort(tasks) {
+    topologicalSort(tasks, initialCompleted = []) {
         if (!Array.isArray(tasks) || tasks.length === 0) return [];
 
         const batches = [];
         const remaining = [...tasks];
-        const completed = new Set();
+        const completed = new Set(initialCompleted || []);
         let maxIterations = tasks.length + 2;
 
         while (remaining.length > 0 && maxIterations > 0) {
