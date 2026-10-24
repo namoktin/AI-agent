@@ -192,3 +192,4 @@ class IndependentVerifier {
 }
 
 module.exports = { IndependentVerifier };
+

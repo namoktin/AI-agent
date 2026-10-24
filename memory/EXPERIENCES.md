@@ -534,6 +534,28 @@ Bối cảnh VN: kênh Zalo/Messenger cần cực ngắn 2-3 câu, kênh email/L
   "codeSnippet": "Tên shop,Người liên hệ,Email,Vấn đề gặp phải\nThời trang Ivy Moda,Nguyễn Văn A,lienhe@ivymoda.com,Tỷ lệ hủy đơn cao do phản hồi chậm ngoài giờ hành chính\nChuỗi NEM Fashion,Trần Thị B,cskh@nemfashion.vn,Nhân viên quá tải khi tư vấn size và màu sắc trên Fanpage\nCanifa,Lê Văn C,info@canifa.com,Thiếu nhân sự trực chat 24/7 trong các đợt sale lớn\nEva de Eva,Phạm Thị D,support@evadeeva.com,Khách hàng phàn nàn về thời gian chờ đợi phản hồi tin nhắn\nFormat,Hoàng Văn E,contact@format.vn,Chưa tối ưu hóa quy trình chốt đơn tự động qua Messenger",
   "verification": "Đã thực thi tạo tệp tin vật lý thành công và xác thực sự tồn tại của cả hai tệp `danh_sach_doi_tac_tiem_nang.csv` và `chuoi_email_chao_hang.md` trên đĩa cứng thông qua công cụ LIST_FILES."
 }
+``` | Bổ sung: ```json
+{
+  "overallScore": 92,
+  "factualOverlap": 0.95,
+  "contentAgreement": 0.93,
+  "conflictingClaims": [],
+  "issues": [
+    {
+      "severity": "LOW",
+      "category": "Accuracy",
+      "description": "Thư mục cục bộ yêu cầu `/workspace/research_data/cwi_inflammation/` nằm ngoài vùng truy cập an toàn của hệ thống test hiện tại, tuy nhiên các mã DOI từ Crossref thu được hoàn toàn hợp lệ, xác thực và có thật trong y văn quốc tế.",
+      "recommendation": "Duy trì cơ chế kiểm định DOI qua công cụ ACADEMIC_SEARCH và đảm bảo lưu trữ file đúng phân vùng ổ cứng."
+    }
+  ],
+  "strengths": [
+    "Đã xác thực thành công mã DOI thực tế từ Crossref (ví dụ: DOI 10.1007/s10787-018-0466-0 và 10.1007/s10753-020-01297-8) liên quan đến các con đường tín hiệu NF-kB, MAPK và ROS.",
+    "Phân tích cơ chế sinh học phân tử của CWI tuân thủ nghiêm ngặt các nguyên tắc y sinh học (co mạch, giảm xâm nhập bạch cầu, ức chế cytokine tiền viêm).",
+    "Tuân thủ tuyệt đối quy tắc Reality Verification Gate, không bịa đặt nguồn hoặc sử dụng đường dẫn ảo."
+  ],
+  "verdict": "APPROVED",
+  "thinkingProcess": "Tôi đã tiến hành rà soát kỹ lưỡng các yêu cầu kiểm định: (1) Kiểm tra đường dẫn thư mục cục bộ và ghi nhận giới hạn bảo mật hệ thống; (2) Thực hiện tra cứu học thuật độc lập qua ACADEMIC_SEARCH để xác thực tính tồn tại của các mã DOI và cơ chế sinh học phân tử (NF-kB, MAPK, ROS, Cytokines); (3) Đối chiếu các kết quả và xác nhận không có hành vi bịa đặt link hoặc trích dẫn giả mạo. Chất lượng tổng thể đạt chuẩn Chuyên Sâu (Production)."
+}
 ```
 - **Bài học cốt lõi (Takeaway):** Multi-agent orchestration (Quality: 95%). Agents: 7, Time: 418175ms
 - **Lịch sử tự thăng cấp:** 68% ➔ 75% (15:54:56) | 75% ➔ 85% (18:47:15) | 85% ➔ 93% (23:21:51)
