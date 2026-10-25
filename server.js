@@ -5856,14 +5856,25 @@ app.get('/api/v2/tasks/:taskId/approval-request', (req, res) => {
  */
 app.post('/api/v2/tasks/:taskId/approve', async (req, res) => {
     const { taskId } = req.params;
-    const { decision = 'APPROVE', feedback = '', resume = false } = req.body;
+    const { decision = 'APPROVE', feedback = '' } = req.body;
+    // Mặc định tự động tiếp tục (resume = true) khi được phê duyệt, trừ khi client gửi resume: false
+    const shouldResume = req.body.resume !== false;
     try {
         const result = globalEventStream.submitDecision(taskId, decision, feedback);
         let resumeResult = null;
-        if (resume && globalOrchestrator && typeof globalOrchestrator.resumeGraph === 'function') {
-            resumeResult = await globalOrchestrator.resumeGraph(taskId, decision, feedback);
+        const { globalOrchestrator: orch } = getOrchestrator();
+        if (shouldResume && orch && typeof orch.resumeGraph === 'function') {
+            resumeResult = await orch.resumeGraph(taskId, decision, feedback);
         }
-        res.json({ success: true, result, resumed: Boolean(resumeResult) });
+        res.json({
+            success: true,
+            result,
+            resumed: Boolean(resumeResult),
+            status: resumeResult ? (resumeResult.status || 'RUNNING') : (shouldResume ? 'RESUME_TRIGGERED' : 'APPROVED'),
+            message: shouldResume
+                ? 'Task đã được phê duyệt và tự động tiếp tục thực thi.'
+                : 'Task đã được phê duyệt thành công (ở trạng thái chờ kích hoạt).'
+        });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
     }

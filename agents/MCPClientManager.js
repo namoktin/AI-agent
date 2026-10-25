@@ -23,6 +23,9 @@ class MCPClient extends EventEmitter {
         this.tools = []; // Array of raw MCP tool definitions
         this.status = 'DISCONNECTED'; // 'DISCONNECTED' | 'CONNECTING' | 'CONNECTED' | 'ERROR'
         this.stdoutBuffer = '';
+
+        // Default no-op error handler to prevent unhandled 'error' event crash
+        this.on('error', () => {});
     }
 
     async connect() {
@@ -52,6 +55,13 @@ class MCPClient extends EventEmitter {
                 this.process.stderr.on('data', (data) => {
                     this.emit('stderr', data.toString('utf8'));
                 });
+
+                if (this.process.stdin) {
+                    this.process.stdin.on('error', (err) => {
+                        // Suppress unhandled EPIPE when MCP process exits
+                        this.emit('stdin_error', err);
+                    });
+                }
 
                 this.process.on('error', (err) => {
                     this.status = 'ERROR';
@@ -145,7 +155,19 @@ class MCPClient extends EventEmitter {
             }, timeoutMs);
 
             this.pendingRequests.set(id, { resolve, reject, timeoutTimer });
-            this.process.stdin.write(payload);
+            try {
+                this.process.stdin.write(payload, (err) => {
+                    if (err && this.pendingRequests.has(id)) {
+                        clearTimeout(timeoutTimer);
+                        this.pendingRequests.delete(id);
+                        reject(err);
+                    }
+                });
+            } catch (writeErr) {
+                clearTimeout(timeoutTimer);
+                this.pendingRequests.delete(id);
+                reject(writeErr);
+            }
         });
     }
 
@@ -270,6 +292,9 @@ class MCPClientManager {
             this.clients.get(name).disconnect();
         }
         const client = new MCPClient(name, srvConfig);
+        client.on('error', (err) => {
+            console.warn(`⚠️ [MCPClient:${name}] Process error: ${err.message}`);
+        });
         if (Array.isArray(srvConfig.tools)) {
             client.tools = [...srvConfig.tools];
         }

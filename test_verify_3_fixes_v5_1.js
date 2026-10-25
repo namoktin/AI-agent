@@ -301,6 +301,83 @@ async function main() {
         assert.strictEqual(router.dailyRequests.length, 0, 'dailyRequests phải được thu hồi');
     });
 
+    await runTest('AgentOrchestrator hoãn gửi request khi scheduler từ chối cấp slot (QUOTA_WAITING)', async () => {
+        const orchestrator = new AgentOrchestrator('fake-key-for-test');
+        // Giả lập scheduler từ chối cấp slot
+        orchestrator.modelRouter.acquireDispatchSlot = async () => ({
+            granted: false,
+            waitedMs: 100,
+            quotaDeferred: true,
+            slotId: 'slot_denied_123'
+        });
+
+        const res = await orchestrator.callAgent('developer', { task: 'Do heavy compute' });
+        assert.strictEqual(res.success, false, 'Phải trả về success: false');
+        assert.strictEqual(res.status, 'QUOTA_WAITING', 'Trạng thái phải là QUOTA_WAITING');
+        assert.strictEqual(res.retryable, true, 'Phải có cờ retryable: true');
+    });
+
+    await runTest('releaseDispatchSlot với slotId không tồn tại KHÔNG ĐƯỢC giải phóng nhầm slot của request khác', async () => {
+        const router = new ModelRouter({ maxInflight: 5 });
+        const realSlot = await router.acquireDispatchSlot({ estimatedTokens: 1000 });
+        assert.strictEqual(router.activeSlots.size, 1);
+        assert.ok(router.activeSlots.has(realSlot.slotId));
+
+        // Giải phóng một slotId ma không tồn tại
+        router.releaseDispatchSlot(500, router.defaultModel, 'non_existent_slot_ghost_999');
+
+        // Slot thực sự của request khác VẪN PHẢI ĐƯỢC BẢO TOÀN!
+        assert.strictEqual(router.activeSlots.size, 1, 'activeSlots size vẫn phải là 1');
+        assert.ok(router.activeSlots.has(realSlot.slotId), 'Slot thật của request khác không được bị xóa nhầm');
+
+        // Giải phóng đúng slotId
+        router.releaseDispatchSlot(800, router.defaultModel, realSlot.slotId);
+        assert.strictEqual(router.activeSlots.size, 0, 'Sau khi truyền đúng slotId mới được xóa');
+    });
+
+    await runTest('resumeGraph tự động phục hồi StateGraph từ Checkpoint trên ổ cứng sau khi server restart', async () => {
+        const orchestrator = new AgentOrchestrator('fake-key-for-test');
+        const taskId = `restart_test_${Date.now()}`;
+
+        const graph = new StateGraph({
+            graphId: taskId,
+            checkpointManager: orchestrator.checkpointManager,
+            eventStream: orchestrator.eventStream
+        });
+
+        let executedOnResume = false;
+        graph.addNode({
+            id: 'node_restart_action',
+            description: 'Action waiting approval across server restart',
+            requiresApproval: true,
+            action: async () => {
+                executedOnResume = true;
+                return { success: true, processedAfterRestart: true };
+            }
+        });
+
+        // 1. Chạy ban đầu và dừng ở WAITING_APPROVAL (sẽ lưu checkpoint waiting_approval lên đĩa)
+        await orchestrator.executeGraph(graph);
+        assert.strictEqual(graph.status, 'WAITING_APPROVAL');
+        assert.strictEqual(executedOnResume, false);
+
+        // 2. GIẢ LẬP SERVER RESTART: Xóa toàn bộ bộ nhớ RAM (activeGraphs)
+        orchestrator.activeGraphs.clear();
+        assert.strictEqual(orchestrator.activeGraphs.size, 0, 'activeGraphs trong RAM đã bị xóa sạch hoàn toàn');
+
+        // 3. Gọi resumeGraph: Phải tự động load checkpoint cp_${taskId}.json trên đĩa và tái tạo đồ thị!
+        const resumeResult = await orchestrator.resumeGraph(taskId, 'APPROVE', 'Duyệt sau khi server restart', {
+            nodeActions: {
+                node_restart_action: async () => {
+                    executedOnResume = true;
+                    return { success: true, processedAfterRestart: true };
+                }
+            }
+        });
+        assert.strictEqual(resumeResult.status, 'COMPLETED', 'Đồ thị tái tạo từ đĩa phải hoàn thành COMPLETED');
+        assert.strictEqual(executedOnResume, true, 'Hành động phải được thực thi thành công sau khi phục hồi từ đĩa');
+    });
+
     console.log('\n===============================================================');
     console.log(`🎉 HOÀN TẤT KIỂM THỬ: ${passedTests}/${totalTests} TESTS PASSED (100%)`);
     console.log('===============================================================');

@@ -88,15 +88,21 @@ class StateNode {
             assignedTo: this.assignedTo,
             dependencies: this.dependencies,
             acceptanceCriteria: this.acceptanceCriteria,
+            requiresApproval: this.requiresApproval,
+            approvalDescription: this.approvalDescription,
             input: this.input,
             output: this.output,
             evidence: this.evidence,
             retryCount: this.retryCount,
             maxRetries: this.maxRetries,
+            timeoutMs: this.timeoutMs,
+            budgetTokens: this.budgetTokens,
             tokensUsed: this.tokensUsed,
+            idempotent: this.idempotent,
             executedSuccessfully: this.executedSuccessfully,
             loopIteration: this.loopIteration,
-            maxLoopIterations: this.maxLoopIterations
+            maxLoopIterations: this.maxLoopIterations,
+            taskPayload: this.taskPayload
         };
     }
 }
@@ -360,6 +366,14 @@ class StateGraph extends EventEmitter {
             node.status = 'WAITING_APPROVAL';
             this.status = 'WAITING_APPROVAL';
             this.executionLog.push(`[${node.id}] WAITING_APPROVAL: ${node.approvalDescription || node.description}`);
+
+            // Lưu checkpoint ngay lập tức khi dừng chờ duyệt để sẵn sàng khôi phục nếu server restart
+            if (this.checkpointManager && typeof this.checkpointManager.saveCheckpoint === 'function') {
+                try {
+                    this.checkpointManager.saveCheckpoint(this.graphId, 'waiting_approval', this.serialize());
+                } catch (e) {}
+            }
+
             if (this.eventStream && typeof this.eventStream.requestApproval === 'function') {
                 this.eventStream.requestApproval(this.graphId, node.id, node.approvalDescription || node.description, node.input);
             }
@@ -570,12 +584,14 @@ class StateGraph extends EventEmitter {
         if (decision === 'APPROVE') {
             node.status = 'APPROVED';
             node.requiresApproval = false;
-            if (node.type === 'human_approval' || (!node.action && !node.taskPayload?.id)) {
+            if (node.type === 'human_approval') {
                 node.executedSuccessfully = true;
                 this.completedNodes.add(node.id);
             } else {
-                // Action node: ready to execute upon resume
+                // Action node (task, tool, etc.): ready to execute upon resume
                 node.status = 'PENDING';
+                node.executedSuccessfully = false;
+                this.completedNodes.delete(node.id);
             }
             this.status = 'RUNNING';
             this.emit('NODE_APPROVED', { nodeId, feedback });
@@ -645,6 +661,9 @@ class StateGraph extends EventEmitter {
             for (const nData of data.nodes) {
                 const node = new StateNode(nData);
                 node.executedSuccessfully = Boolean(nData.executedSuccessfully);
+                if (config.nodeActions && typeof config.nodeActions[node.id] === 'function') {
+                    node.action = config.nodeActions[node.id];
+                }
                 graph.nodes.set(node.id, node);
             }
         }

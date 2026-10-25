@@ -953,8 +953,11 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
         this.log(`🌐 [StateGraph] Bắt đầu thực thi Đồ thị Tác vụ [${stateGraph.graphId}] với ${stateGraph.nodes.size} nodes`);
         this.activeGraphs.set(stateGraph.graphId, stateGraph);
         const executorFn = async (node, state, graph) => {
-            if (typeof node.action === 'function') {
-                return await node.action(node, state, graph);
+            const customAction = context?.nodeActions?.[node.id] || (typeof node.action === 'function' ? node.action : null);
+            if (typeof customAction === 'function') {
+                return customAction.length >= 3
+                    ? await customAction(node, state, graph)
+                    : await customAction(state, graph);
             }
             const task = {
                 id: node.id,
@@ -978,13 +981,36 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
 
     /**
      * Resume a paused StateGraph upon human supervisor decision
+     * Supports automatic recovery from disk checkpoint if server restarted.
      */
     async resumeGraph(taskId, decision = 'APPROVE', feedback = '', context = {}) {
-        const graph = this.activeGraphs.get(taskId);
-        if (!graph) {
-            this.log(`⚠️ resumeGraph: Graph [${taskId}] not currently active in memory.`);
-            return { success: false, error: `Graph [${taskId}] not found in memory.` };
+        let graph = this.activeGraphs.get(taskId);
+
+        // Phục hồi từ Checkpoint trên đĩa nếu graph không còn trong RAM (ví dụ server restart)
+        if (!graph && this.checkpointManager) {
+            const ckpt = this.checkpointManager.loadCheckpoint(taskId);
+            if (ckpt && ckpt.stageData) {
+                const latestStage = ckpt.lastStage || Object.keys(ckpt.stageData).pop();
+                const graphData = ckpt.stageData[latestStage];
+                if (graphData && (graphData.nodes || graphData.graphId)) {
+                    this.log(`📌 [resumeGraph] Tái tạo StateGraph [${taskId}] từ Checkpoint trên đĩa (Giai đoạn: ${latestStage})`);
+                    const { StateGraph } = require('./StateGraph');
+                    graph = StateGraph.deserialize(graphData, {
+                        checkpointManager: this.checkpointManager,
+                        verifier: this.verifier,
+                        eventStream: this.eventStream,
+                        nodeActions: context?.nodeActions || null
+                    });
+                    this.activeGraphs.set(taskId, graph);
+                }
+            }
         }
+
+        if (!graph) {
+            this.log(`⚠️ resumeGraph: Graph [${taskId}] không tìm thấy trong bộ nhớ RAM lẫn Checkpoint trên đĩa.`);
+            return { success: false, error: `Graph [${taskId}] not found in memory or checkpoints.` };
+        }
+
         const waitingNode = Array.from(graph.nodes.values()).find(n => n.status === 'WAITING_APPROVAL');
         if (waitingNode) {
             graph.submitHumanDecision(waitingNode.id, decision, feedback);
@@ -1191,6 +1217,18 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                 if (slot && slot.waitedMs > 0) {
                     this.log(`⏳ [QuotaScheduler] Đã điều tiết nhịp độ (chờ ${slot.waitedMs}ms) để bảo vệ hạn mức RPM/TPM`);
                 }
+                if (!slot?.granted) {
+                    this.log(`🛑 [QuotaScheduler] Từ chối cấp slot do kiệt hạn mức RPM/TPM/RPD cho [${modelName}]. Chuyển trạng thái QUOTA_WAITING.`);
+                    return {
+                        success: false,
+                        status: 'QUOTA_WAITING',
+                        retryable: true,
+                        quotaDeferred: true,
+                        error: 'Đang chờ ngân sách API (Quota limits saturated)',
+                        message: 'Đang chờ ngân sách API',
+                        response: 'Hệ thống đang tạm hoãn điều phối tác vụ do chạm ngưỡng RPM/TPM/RPD của Gemini API.'
+                    };
+                }
             }
 
             let response;
@@ -1306,6 +1344,10 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                         model: modelName,
                         priority: 2
                     });
+                    if (!followUpSlot?.granted) {
+                        this.log(`🛑 [QuotaScheduler] Tool follow-up hoãn do hết hạn mức Quota cho [${modelName}]. Dừng gọi tiếp.`);
+                        break;
+                    }
                 }
 
                 let followUpRes;

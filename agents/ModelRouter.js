@@ -230,6 +230,9 @@ class ModelRouter {
             this.schedulerTimer = null;
             this._drainDispatchQueue();
         }, Math.min(timeUntilWindowSlot, 1000));
+        if (this.schedulerTimer && typeof this.schedulerTimer.unref === 'function') {
+            this.schedulerTimer.unref();
+        }
     }
 
     _drainDispatchQueue() {
@@ -258,10 +261,18 @@ class ModelRouter {
     releaseDispatchSlot(actualTokens = 1000, model = '', slotId = null) {
         let targetSlotId = slotId;
         let removedSlot = null;
-        if (targetSlotId && this.activeSlots.has(targetSlotId)) {
-            removedSlot = this.activeSlots.get(targetSlotId);
-            this.activeSlots.delete(targetSlotId);
+        if (targetSlotId) {
+            // Đối chiếu chính xác slotId: Nếu slotId được truyền vào thì BẮT BUỘC phải tìm đúng slotId
+            if (this.activeSlots.has(targetSlotId)) {
+                removedSlot = this.activeSlots.get(targetSlotId);
+                this.activeSlots.delete(targetSlotId);
+            } else {
+                // slotId không tồn tại hoặc đã được giải phóng -> TUYỆT ĐỐI KHÔNG giải phóng nhầm slot của request khác!
+                this._drainDispatchQueue();
+                return;
+            }
         } else if (this.activeSlots.size > 0) {
+            // Chỉ fallback lấy slot lâu nhất khi caller là legacy code không truyền slotId (slotId == null)
             targetSlotId = this.activeSlots.keys().next().value;
             if (targetSlotId) {
                 removedSlot = this.activeSlots.get(targetSlotId);
