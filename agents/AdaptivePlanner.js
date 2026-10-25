@@ -234,7 +234,7 @@ class AdaptivePlanner {
         const { StateGraph } = require('./StateGraph');
         const plan = this.generatePlan(mode, userRequest, strategicDirective, matchedSkill);
         const graph = new StateGraph({
-            graphId: options.graphId || `graph_${Date.now()}`,
+            graphId: options.graphId || options.taskId || `graph_${Date.now()}`,
             initialState: {
                 userRequest,
                 mode: plan.mode,
@@ -242,7 +242,8 @@ class AdaptivePlanner {
                 ...options.initialState
             },
             checkpointManager: options.checkpointManager || null,
-            verifier: options.verifier || null
+            verifier: options.verifier || null,
+            eventStream: options.eventStream || null
         });
 
         // Add all tasks as StateNodes

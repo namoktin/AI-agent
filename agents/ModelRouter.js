@@ -70,7 +70,7 @@ class ModelRouter {
         const staleThreshold = now - 45000;
         for (const [sId, sInfo] of this.activeSlots.entries()) {
             if (sInfo.timestamp < staleThreshold) {
-                this.activeSlots.delete(sId);
+                this.cancelDispatchSlot(sId);
             }
         }
         this.inflightRequests = this.activeSlots.size;
@@ -91,7 +91,10 @@ class ModelRouter {
         // 3. RPM Limit
         if (this.requestTimestamps.length >= this.limits.maxRPM) return false;
 
-        // 4. TPM Limit
+        // 4. RPD Limit (Fix for Lỗi 3)
+        if (this.dailyRequests.length >= this.limits.maxRPD) return false;
+
+        // 5. TPM Limit
         const currentTPM = this.tokenUsage.reduce((s, x) => s + (x.tokens || 0), 0);
         if (currentTPM + estimatedTokens > this.limits.maxTPM) return false;
 
@@ -99,11 +102,79 @@ class ModelRouter {
     }
 
     /**
-     * PROACTIVE TOKEN-BUCKET SCHEDULER:
-     * Reserves slot and queues request BEFORE dispatching to prevent 429 rate limit spikes.
+     * Pre-reserve slot and budget in counters upon slot grant (Fix for Lỗi 3)
      */
-    async acquireDispatchSlot(options = {}) {
-        const { estimatedTokens = 1200, model = this.defaultModel, priority = 1, timeout = 10000 } = options;
+    _reserveSlot(slotId, model, estimatedTokens = 1200) {
+        const now = Date.now();
+        this.activeSlots.set(slotId, {
+            timestamp: now,
+            model,
+            estimatedTokens
+        });
+        this.inflightRequests = this.activeSlots.size;
+
+        // Pre-reserve request count in RPM & RPD counters immediately
+        this.requestTimestamps.push(now);
+        this.dailyRequests.push(now);
+
+        // Pre-reserve estimated tokens in TPM counter immediately
+        this.tokenUsage.push({
+            timestamp: now,
+            tokens: estimatedTokens,
+            slotId,
+            isReserved: true
+        });
+    }
+
+    /**
+     * Cancel slot and reclaim pre-reserved budgets if request is cancelled or fails before dispatch
+     */
+    cancelDispatchSlot(slotId) {
+        if (!slotId || !this.activeSlots.has(slotId)) return;
+        const slot = this.activeSlots.get(slotId);
+        this.activeSlots.delete(slotId);
+        this.inflightRequests = this.activeSlots.size;
+
+        // Reclaim pre-reserved request and token budgets
+        const tokenIdx = this.tokenUsage.findIndex(e => e.slotId === slotId);
+        if (tokenIdx !== -1) {
+            this.tokenUsage.splice(tokenIdx, 1);
+        }
+        const reqIdx = this.requestTimestamps.indexOf(slot.timestamp);
+        if (reqIdx !== -1) {
+            this.requestTimestamps.splice(reqIdx, 1);
+        }
+        const dailyIdx = this.dailyRequests.indexOf(slot.timestamp);
+        if (dailyIdx !== -1) {
+            this.dailyRequests.splice(dailyIdx, 1);
+        }
+        this._drainDispatchQueue();
+    }
+
+    /**
+     * PROACTIVE TOKEN-BUCKET SCHEDULER:
+     * Pre-reserves slot and budget BEFORE dispatching to prevent 429 rate limit spikes under concurrency.
+     */
+    async acquireDispatchSlot(optionsOrModel = {}, estimatedTokensArg = 1200, timeoutArg = 10000, extraOptions = {}) {
+        let options = {};
+        if (typeof optionsOrModel === 'string') {
+            options = {
+                model: optionsOrModel,
+                estimatedTokens: estimatedTokensArg,
+                timeout: timeoutArg,
+                ...(typeof extraOptions === 'object' ? extraOptions : {})
+            };
+        } else if (optionsOrModel && typeof optionsOrModel === 'object') {
+            options = { ...optionsOrModel };
+        }
+
+        const {
+            estimatedTokens = 1200,
+            model = this.defaultModel,
+            priority = 1,
+            timeout = 10000
+        } = options;
+
         const startTime = Date.now();
         const slotId = `slot_${++this.slotCounter}_${startTime}`;
 
@@ -120,8 +191,7 @@ class ModelRouter {
 
             // Immediate slot allocation if under limits
             if (this._canDispatchNow(estimatedTokens)) {
-                this.activeSlots.set(slotId, { timestamp: Date.now(), model });
-                this.inflightRequests = this.activeSlots.size;
+                this._reserveSlot(slotId, model, estimatedTokens);
                 return resolve({ granted: true, waitedMs: 0, immediate: true, slotId });
             }
 
@@ -134,12 +204,11 @@ class ModelRouter {
                 const viableFallback = this.getFallbackModel(model, 1);
                 if (viableFallback && this.isModelAvailable(viableFallback) && this._canDispatchNow(estimatedTokens)) {
                     console.log(`🔄 [QuotaScheduler V2] Queue wait completed: Điều tuyến sang model khả dụng [${viableFallback}]`);
-                    this.activeSlots.set(slotId, { timestamp: Date.now(), model: viableFallback });
-                    this.inflightRequests = this.activeSlots.size;
+                    this._reserveSlot(slotId, viableFallback, estimatedTokens);
                     return resolve({ granted: true, waitedMs: Date.now() - startTime, model: viableFallback, slotId });
                 }
 
-                // Nếu tất cả model đều kẹt quota, từ chối cấp slot cưỡng bức để bảo vệ hạn mức RPM/TPM
+                // Nếu tất cả model đều kẹt quota, từ chối cấp slot cưỡng bức để bảo vệ hạn mức RPM/TPM/RPD
                 console.warn(`⏳ [QuotaScheduler V2] Queue wait timeout (${timeout}ms). Giữ vững kỷ luật quota, hoãn slot.`);
                 resolve({ granted: false, waitedMs: Date.now() - startTime, quotaDeferred: true, slotId });
             }, timeout);
@@ -169,8 +238,7 @@ class ModelRouter {
             if (this._canDispatchNow(nextItem.estimatedTokens)) {
                 this.dispatchQueue.shift();
                 if (nextItem.timeoutTimer) clearTimeout(nextItem.timeoutTimer);
-                this.activeSlots.set(nextItem.slotId, { timestamp: Date.now(), model: nextItem.model });
-                this.inflightRequests = this.activeSlots.size;
+                this._reserveSlot(nextItem.slotId, nextItem.model, nextItem.estimatedTokens);
                 nextItem.resolve({ granted: true, waitedMs: Date.now() - nextItem.startTime, immediate: false, slotId: nextItem.slotId });
             } else {
                 this._scheduleNextDrain();
@@ -185,17 +253,37 @@ class ModelRouter {
     }
 
     /**
-     * Release slot upon API completion
+     * Release slot upon API completion and reconcile actual tokens (Fix for Lỗi 3)
      */
     releaseDispatchSlot(actualTokens = 1000, model = '', slotId = null) {
-        if (slotId && this.activeSlots.has(slotId)) {
-            this.activeSlots.delete(slotId);
+        let targetSlotId = slotId;
+        let removedSlot = null;
+        if (targetSlotId && this.activeSlots.has(targetSlotId)) {
+            removedSlot = this.activeSlots.get(targetSlotId);
+            this.activeSlots.delete(targetSlotId);
         } else if (this.activeSlots.size > 0) {
-            const oldestKey = this.activeSlots.keys().next().value;
-            if (oldestKey) this.activeSlots.delete(oldestKey);
+            targetSlotId = this.activeSlots.keys().next().value;
+            if (targetSlotId) {
+                removedSlot = this.activeSlots.get(targetSlotId);
+                this.activeSlots.delete(targetSlotId);
+            }
         }
         this.inflightRequests = this.activeSlots.size;
-        this.recordUsage(actualTokens, model);
+
+        // Reconcile pre-reserved tokens with actual tokens
+        let reconciled = false;
+        if (targetSlotId) {
+            const entry = this.tokenUsage.find(e => e.slotId === targetSlotId);
+            if (entry) {
+                entry.tokens = actualTokens;
+                entry.isReserved = false;
+                reconciled = true;
+            }
+        }
+        if (!reconciled) {
+            this.recordUsage(actualTokens, model);
+        }
+
         this._drainDispatchQueue();
     }
 

@@ -251,8 +251,17 @@ class StateGraph extends EventEmitter {
                     }
 
                     if (pendingNodes.length === 0 && runningNodes.length === 0) {
-                        // All reachable nodes completed!
-                        this.status = 'COMPLETED';
+                        if (this.failedNodes.size > 0) {
+                            this.status = 'FAILED';
+                            this.emit('GRAPH_FAILED', {
+                                graphId: this.graphId,
+                                reason: `${this.failedNodes.size} node(s) failed without recovery`,
+                                failedNodes: Array.from(this.failedNodes)
+                            });
+                        } else {
+                            // All reachable nodes completed!
+                            this.status = 'COMPLETED';
+                        }
                         break;
                     }
 
@@ -302,6 +311,10 @@ class StateGraph extends EventEmitter {
             if (this.stepCounter >= this.maxTotalSteps && this.status === 'RUNNING') {
                 this.status = 'FAILED';
                 this.emit('GRAPH_FAILED', { graphId: this.graphId, reason: 'Exceeded maxTotalSteps limit' });
+            }
+
+            if (this.status === 'COMPLETED' && this.failedNodes.size > 0) {
+                this.status = 'FAILED';
             }
 
             if (this.status === 'COMPLETED') {
@@ -376,6 +389,14 @@ class StateGraph extends EventEmitter {
                         setTimeout(() => reject(new Error(`Node [${node.id}] timed out after ${node.timeoutMs}ms`)), node.timeoutMs)
                     )
                 ]);
+
+                // Coi success: false là thất bại trước mọi bước nghiệm thu (Lỗi 1 Fix)
+                if (!result || result.success === false) {
+                    const errMsg = (result && (result.error || result.message))
+                        ? (result.error || result.message)
+                        : `Node [${node.id}] action returned failure (success: false)`;
+                    throw new Error(errMsg);
+                }
 
                 // Acceptance criteria evaluation if verifier is attached
                 let verified = true;
@@ -537,10 +558,25 @@ class StateGraph extends EventEmitter {
             throw new Error(`StateGraph: Node '${nodeId}' is not waiting for approval (Current status: ${node.status}).`);
         }
 
+        // Sync with attached AgentEventStream if available
+        if (this.eventStream && typeof this.eventStream.submitDecision === 'function') {
+            try {
+                this.eventStream.submitDecision(this.graphId, decision, feedback);
+            } catch (e) {
+                // Non-blocking if already submitted
+            }
+        }
+
         if (decision === 'APPROVE') {
             node.status = 'APPROVED';
-            node.executedSuccessfully = true;
-            this.completedNodes.add(node.id);
+            node.requiresApproval = false;
+            if (node.type === 'human_approval' || (!node.action && !node.taskPayload?.id)) {
+                node.executedSuccessfully = true;
+                this.completedNodes.add(node.id);
+            } else {
+                // Action node: ready to execute upon resume
+                node.status = 'PENDING';
+            }
             this.status = 'RUNNING';
             this.emit('NODE_APPROVED', { nodeId, feedback });
             return { status: 'APPROVED', nodeId };
@@ -559,6 +595,16 @@ class StateGraph extends EventEmitter {
             this.emit('NODE_REJECTED', { nodeId, feedback });
             return { status: 'REJECTED', nodeId };
         }
+    }
+
+    /**
+     * Resume a paused or waiting StateGraph
+     */
+    async resume(executorFn = null, context = {}) {
+        if (this.status === 'WAITING_APPROVAL' || this.status === 'PAUSED') {
+            this.status = 'RUNNING';
+        }
+        return await this.run(executorFn, context);
     }
 
     serialize() {

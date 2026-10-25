@@ -23,6 +23,7 @@ const { IndependentVerifier } = require('./IndependentVerifier');
 const { SkillLibrary } = require('./SkillLibrary');
 const { CheckpointManager } = require('./CheckpointManager');
 const { AdaptivePlanner } = require('./AdaptivePlanner');
+const { AgentEventStream, globalEventStream } = require('./AgentEventStream');
 
 // Ưu tiên sử dụng fetch chuẩn có sẵn của Node.js (Node 18+ / v22) để hỗ trợ đầy đủ AbortSignal và Connection Pooling
 const fetch = typeof globalThis.fetch === 'function' ? globalThis.fetch : function fetchPolyfill(url, options = {}) {
@@ -87,7 +88,9 @@ class AgentOrchestrator {
             ...config
         };
 
-        // Unified Model Router, Verifier, Skills, Checkpoints, Adaptive Planner
+        // Unified Model Router, Verifier, Skills, Checkpoints, Adaptive Planner, EventStream
+        this.eventStream = config.eventStream || globalEventStream;
+        this.activeGraphs = new Map(); // taskId -> StateGraph
         this.modelRouter = new ModelRouter({ defaultModel: this.defaultModel });
         this.verifier = new IndependentVerifier(process.cwd());
         this.skillLibrary = new SkillLibrary(process.cwd());
@@ -508,11 +511,28 @@ class AgentOrchestrator {
                 };
                 if (mode === 'graph' || context.useGraph) {
                     const { graph } = this.adaptivePlanner.generateStateGraph(mode, userRequest, directive, context.matchedSkill, {
-                        graphId: `graph_${taskId}`,
+                        graphId: taskId,
+                        taskId: taskId,
                         checkpointManager: this.checkpointManager,
-                        verifier: this.verifier
+                        verifier: this.verifier,
+                        eventStream: this.eventStream
                     });
-                    await this.executeGraph(graph, enrichedContext);
+                    const graphRunResult = await this.executeGraph(graph, enrichedContext);
+
+                    // If paused waiting for human approval, return early with state & details
+                    if (graph.status === 'WAITING_APPROVAL') {
+                        this.log(`⏸️ StateGraph [${taskId}] paused waiting for human supervisor approval.`);
+                        return {
+                            success: true,
+                            status: 'WAITING_APPROVAL',
+                            taskId: taskId,
+                            graphId: taskId,
+                            waitingNode: graphRunResult?.waitingApprovalNode || null,
+                            message: 'StateGraph paused waiting for human supervisor approval via /api/v2/tasks/:taskId/approve',
+                            plan: taskPlan
+                        };
+                    }
+
                     specialistResults = Array.from(graph.nodes.values()).map(n => ({
                         taskId: n.id,
                         id: n.id,
@@ -931,7 +951,11 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
      */
     async executeGraph(stateGraph, context = {}) {
         this.log(`🌐 [StateGraph] Bắt đầu thực thi Đồ thị Tác vụ [${stateGraph.graphId}] với ${stateGraph.nodes.size} nodes`);
+        this.activeGraphs.set(stateGraph.graphId, stateGraph);
         const executorFn = async (node, state, graph) => {
+            if (typeof node.action === 'function') {
+                return await node.action(node, state, graph);
+            }
             const task = {
                 id: node.id,
                 description: node.description,
@@ -940,7 +964,32 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
             };
             return await this.executeTask(task, { ...context, state, graph });
         };
-        return await stateGraph.run(executorFn, context);
+        try {
+            const result = await stateGraph.run(executorFn, context);
+            if (stateGraph.status === 'COMPLETED' || stateGraph.status === 'FAILED') {
+                this.activeGraphs.delete(stateGraph.graphId);
+            }
+            return result;
+        } catch (err) {
+            this.activeGraphs.delete(stateGraph.graphId);
+            throw err;
+        }
+    }
+
+    /**
+     * Resume a paused StateGraph upon human supervisor decision
+     */
+    async resumeGraph(taskId, decision = 'APPROVE', feedback = '', context = {}) {
+        const graph = this.activeGraphs.get(taskId);
+        if (!graph) {
+            this.log(`⚠️ resumeGraph: Graph [${taskId}] not currently active in memory.`);
+            return { success: false, error: `Graph [${taskId}] not found in memory.` };
+        }
+        const waitingNode = Array.from(graph.nodes.values()).find(n => n.status === 'WAITING_APPROVAL');
+        if (waitingNode) {
+            graph.submitHumanDecision(waitingNode.id, decision, feedback);
+        }
+        return await this.executeGraph(graph, context);
     }
 
     /**
@@ -1156,9 +1205,10 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                     }
                 );
 
+                let errBody = '';
                 // Tự động fallback tức thì nếu model chính bị 429 hoặc 503
                 if (!response.ok && (response.status === 429 || response.status === 503)) {
-                    const errBody = await response.text();
+                    errBody = await response.text();
                     this.modelRouter.recordQuotaError(modelName, response.status, errBody);
                     const altModel = this.modelRouter.getFallbackModel(modelName, attempt + 1);
                     if (altModel) {
@@ -1174,13 +1224,14 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                                 signal: AbortSignal.timeout(this.config.timeout || 45000)
                             }
                         );
+                        errBody = '';
                     } else {
                         this.log(`🚨 [CircuitBreaker] Tất cả model đều đã chạm quota 429. Dừng chuyển model lặp vô ích.`);
                     }
                 }
 
                 if (!response.ok) {
-                    const error = await response.text();
+                    const error = errBody || await response.text();
                     throw new Error(`API Error ${response.status}: ${error}`);
                 }
             } catch (fetchErr) {

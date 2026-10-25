@@ -251,8 +251,20 @@ class AgentEventStream extends EventEmitter {
         return approval;
     }
 
+    _findApproval(taskId) {
+        if (!taskId) return null;
+        let approval = this.pendingApprovals.get(taskId);
+        if (!approval && taskId.startsWith('graph_')) {
+            approval = this.pendingApprovals.get(taskId.replace(/^graph_/, ''));
+        }
+        if (!approval && !taskId.startsWith('graph_')) {
+            approval = this.pendingApprovals.get(`graph_${taskId}`);
+        }
+        return approval || null;
+    }
+
     getApprovalStatus(taskId) {
-        return this.pendingApprovals.get(taskId) || null;
+        return this._findApproval(taskId);
     }
 
     getAllPendingApprovals() {
@@ -264,7 +276,7 @@ class AgentEventStream extends EventEmitter {
     }
 
     getApprovalDecision(taskId, nodeId) {
-        const approval = this.pendingApprovals.get(taskId);
+        const approval = this._findApproval(taskId);
         if (approval && (!nodeId || approval.nodeId === nodeId)) {
             return approval.status;
         }
@@ -275,7 +287,7 @@ class AgentEventStream extends EventEmitter {
      * HUMAN-IN-THE-LOOP: Submit decision (APPROVE | REJECT | REVISE)
      */
     submitDecision(taskId, decision, feedback = '') {
-        const approval = this.pendingApprovals.get(taskId);
+        const approval = this._findApproval(taskId);
         if (!approval) {
             throw new Error(`No pending approval found for task [${taskId}]`);
         }

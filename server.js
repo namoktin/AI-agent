@@ -5854,12 +5854,16 @@ app.get('/api/v2/tasks/:taskId/approval-request', (req, res) => {
  * POST /api/v2/tasks/:taskId/approve
  * Human supervisor decision endpoint (APPROVE | REJECT | REVISE)
  */
-app.post('/api/v2/tasks/:taskId/approve', (req, res) => {
+app.post('/api/v2/tasks/:taskId/approve', async (req, res) => {
     const { taskId } = req.params;
-    const { decision = 'APPROVE', feedback = '' } = req.body;
+    const { decision = 'APPROVE', feedback = '', resume = false } = req.body;
     try {
         const result = globalEventStream.submitDecision(taskId, decision, feedback);
-        res.json({ success: true, result });
+        let resumeResult = null;
+        if (resume && globalOrchestrator && typeof globalOrchestrator.resumeGraph === 'function') {
+            resumeResult = await globalOrchestrator.resumeGraph(taskId, decision, feedback);
+        }
+        res.json({ success: true, result, resumed: Boolean(resumeResult) });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
     }

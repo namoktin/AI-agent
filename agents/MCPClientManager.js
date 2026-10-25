@@ -319,10 +319,7 @@ class MCPClientManager {
                         type: 'OBJECT',
                         properties,
                         required: Array.isArray(schema.required) ? schema.required : []
-                    },
-                    isMCP: true,
-                    serverName,
-                    originalToolName: tool.name
+                    }
                 });
             }
         }

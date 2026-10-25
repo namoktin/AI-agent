@@ -50,11 +50,11 @@
     ],
     "bestRoute": "BẮT BUỘC viết file script Node.js hoặc Python vào thư mục chỉ định, sau đó gọi START_BACKGROUND_TASK với scriptPath hoặc command để chạy ngầm không gây nghẽn chat. Dùng MANAGE_BACKGROUND_TASK action='status' để theo dõi tiến độ.",
     "tokensSaved": 2500,
-    "runsCount": 16,
-    "successCount": 16,
+    "runsCount": 22,
+    "successCount": 22,
     "successRate": 1,
-    "lastOutcomeAt": "2026-10-25T17:10:43.337Z",
-    "wilsonScore": 0.806
+    "lastOutcomeAt": "2026-10-25T17:47:19.915Z",
+    "wilsonScore": 0.851
   },
   "facebook_reels_download": {
     "pattern": "facebook.com/reel",
