@@ -35,20 +35,20 @@ class StateNode {
         
         // Resilience & Budgeting
         this.maxRetries = typeof config.maxRetries === 'number' ? config.maxRetries : 2;
-        this.retryCount = 0;
+        this.retryCount = typeof config.retryCount === 'number' ? config.retryCount : 0;
         this.backoffMs = config.backoffMs || 1000;
         this.timeoutMs = config.timeoutMs || 45000;
         this.budgetTokens = config.budgetTokens || 15000;
-        this.tokensUsed = 0;
+        this.tokensUsed = typeof config.tokensUsed === 'number' ? config.tokensUsed : 0;
         
         // Idempotency & Checkpointing
         this.idempotent = config.idempotent !== false; // Default true
         this.idempotentKey = config.idempotentKey || `${this.id}_${this.type}`;
         this.checkpointable = config.checkpointable !== false;
-        this.executedSuccessfully = false;
+        this.executedSuccessfully = Boolean(config.executedSuccessfully);
         
         // Loop control
-        this.loopIteration = 0;
+        this.loopIteration = typeof config.loopIteration === 'number' ? config.loopIteration : 0;
         this.maxLoopIterations = typeof config.maxLoopIterations === 'number' ? config.maxLoopIterations : (config.maxLoops || 3);
 
         // Custom task payload
@@ -59,7 +59,7 @@ class StateNode {
         if (this.status === 'COMPLETED' && this.idempotent && this.executedSuccessfully) {
             return false;
         }
-        if (this.status === 'RUNNING' || this.status === 'WAITING_APPROVAL') {
+        if (this.status === 'RUNNING' || this.status === 'WAITING_APPROVAL' || this.status === 'WAITING_QUOTA') {
             return false;
         }
 
@@ -211,8 +211,14 @@ class StateGraph extends EventEmitter {
     async run(executorFn = null, options = {}) {
         let actualExecutor = executorFn;
         if (typeof actualExecutor !== 'function') {
-            actualExecutor = async (node, state, graph) => {
+            actualExecutor = async (node, state, graph, executionContext = {}) => {
                 if (typeof node.action === 'function') {
+                    node.abortSignal = executionContext.signal || null;
+                    if (node.action.length >= 4) {
+                        return await node.action(node, state, graph, executionContext);
+                    } else if (node.action.length === 3) {
+                        return await node.action(node, state, graph);
+                    }
                     return await node.action(state, graph);
                 }
                 return { success: true };
@@ -233,6 +239,9 @@ class StateGraph extends EventEmitter {
                     node.status = 'FAILED';
                     this.failedNodes.add(node.id);
                 }
+            } else if (node.status === 'WAITING_QUOTA') {
+                // Tự động chuyển node WAITING_QUOTA sang PENDING để thực thi khi khởi động lại luồng
+                node.status = 'PENDING';
             }
         }
 
@@ -241,16 +250,28 @@ class StateGraph extends EventEmitter {
                 const readyNodes = this.getReadyNodes();
 
                 if (readyNodes.length === 0) {
-                    // Check if all nodes are completed or waiting approval
+                    // Check if all nodes are completed or waiting approval / waiting quota
                     const pendingNodes = Array.from(this.nodes.values()).filter(n => n.status === 'PENDING');
                     const runningNodes = Array.from(this.nodes.values()).filter(n => n.status === 'RUNNING');
                     const waitingApproval = Array.from(this.nodes.values()).filter(n => n.status === 'WAITING_APPROVAL');
+                    const waitingQuota = Array.from(this.nodes.values()).filter(n => n.status === 'WAITING_QUOTA');
 
                     if (waitingApproval.length > 0) {
                         this.status = 'WAITING_APPROVAL';
                         this.emit('GRAPH_WAITING_APPROVAL', {
                             graphId: this.graphId,
                             waitingNodes: waitingApproval.map(n => n.id),
+                            state: this.state
+                        });
+                        break;
+                    }
+
+                    // TẠM HOÃN AN TOÀN DO QUOTA (Fix Lỗi A): Nếu node đang chờ cấp quota, dừng đồ thị sạch sẽ
+                    if (waitingQuota.length > 0) {
+                        this.status = 'WAITING_QUOTA';
+                        this.emit('GRAPH_WAITING_QUOTA', {
+                            graphId: this.graphId,
+                            waitingNodes: waitingQuota.map(n => n.id),
                             state: this.state
                         });
                         break;
@@ -328,12 +349,14 @@ class StateGraph extends EventEmitter {
             }
 
             const waitingNode = Array.from(this.nodes.values()).find(n => n.status === 'WAITING_APPROVAL');
+            const waitingQuotaNode = Array.from(this.nodes.values()).find(n => n.status === 'WAITING_QUOTA');
             return {
                 status: this.status,
                 state: this.state,
                 completedNodes: Array.from(this.completedNodes),
                 failedNodes: Array.from(this.failedNodes),
                 waitingApprovalNode: waitingNode ? waitingNode.id : null,
+                waitingQuotaNode: waitingQuotaNode ? waitingQuotaNode.id : null,
                 executionLog: this.executionLog,
                 stepCounter: this.stepCounter
             };
@@ -396,13 +419,59 @@ class StateGraph extends EventEmitter {
             attempt++;
             node.retryCount = attempt - 1;
 
+            const abortController = new AbortController();
+            let timeoutTimer = null;
+            const timeoutPromise = new Promise((_, reject) => {
+                timeoutTimer = setTimeout(() => {
+                    const timeoutErr = new Error(`Node [${node.id}] timed out after ${node.timeoutMs}ms`);
+                    abortController.abort(timeoutErr);
+                    reject(timeoutErr);
+                }, node.timeoutMs);
+            });
+
             try {
+                const executionContext = {
+                    signal: abortController.signal,
+                    abortController,
+                    attempt,
+                    graphId: this.graphId
+                };
+
                 const result = await Promise.race([
-                    executorFn(node, this.state, this),
-                    new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error(`Node [${node.id}] timed out after ${node.timeoutMs}ms`)), node.timeoutMs)
-                    )
+                    executorFn(node, this.state, this, executionContext),
+                    timeoutPromise
                 ]);
+
+                // XỬ LÝ QUOTA WAITING (LỖI A): Nếu API kiệt quota, tạm hoãn node và graph sạch sẽ, không tính lỗi, không hao retry
+                if (result?.status === 'QUOTA_WAITING' || result?.quotaDeferred) {
+                    node.status = 'WAITING_QUOTA';
+                    this.status = 'WAITING_QUOTA';
+                    this.executionLog.push(`[${node.id}] WAITING_QUOTA: API quota saturated, node safely paused for replenishment.`);
+
+                    if (this.checkpointManager && typeof this.checkpointManager.saveCheckpoint === 'function') {
+                        try {
+                            this.checkpointManager.saveCheckpoint(this.graphId, 'waiting_quota', this.serialize());
+                        } catch (e) {}
+                    }
+
+                    if (this.eventStream && typeof this.eventStream.emitEvent === 'function') {
+                        this.eventStream.emitEvent(this.graphId, 'QUOTA_WAITING', {
+                            nodeId: node.id,
+                            reason: result.error || result.message || 'API Quota Saturated'
+                        });
+                        this.eventStream.emitEvent(this.graphId, 'TASK_PAUSED', {
+                            nodeId: node.id,
+                            reason: 'QUOTA_WAITING'
+                        });
+                    }
+
+                    this.emit('NODE_WAITING_QUOTA', {
+                        nodeId: node.id,
+                        reason: result.error || result.message,
+                        state: this.state
+                    });
+                    return null;
+                }
 
                 // Coi success: false là thất bại trước mọi bước nghiệm thu (Lỗi 1 Fix)
                 if (!result || result.success === false) {
@@ -450,7 +519,11 @@ class StateGraph extends EventEmitter {
                                 maxLoops: loop.maxLoops
                             });
 
-                            // Reset target node to PENDING to re-run
+                            // Đặt lại cả targetNode và node hiện tại về PENDING để vòng lặp chạy lại sạch sẽ, không bị kẹt status 'RUNNING' (Fix Lỗi E)
+                            node.status = 'PENDING';
+                            node.executedSuccessfully = false;
+                            this.completedNodes.delete(node.id);
+
                             const targetNode = this.nodes.get(loop.to);
                             if (targetNode) {
                                 targetNode.status = 'PENDING';
@@ -488,6 +561,9 @@ class StateGraph extends EventEmitter {
 
             } catch (err) {
                 lastError = err;
+                if (!abortController.signal.aborted && err.message?.includes('timed out')) {
+                    abortController.abort(err);
+                }
                 this.emit('NODE_ATTEMPT_FAILED', {
                     nodeId: node.id,
                     attempt,
@@ -499,6 +575,8 @@ class StateGraph extends EventEmitter {
                     const delay = node.backoffMs * Math.pow(2, attempt - 1);
                     await new Promise(r => setTimeout(r, delay));
                 }
+            } finally {
+                if (timeoutTimer) clearTimeout(timeoutTimer);
             }
         }
 
@@ -617,8 +695,13 @@ class StateGraph extends EventEmitter {
      * Resume a paused or waiting StateGraph
      */
     async resume(executorFn = null, context = {}) {
-        if (this.status === 'WAITING_APPROVAL' || this.status === 'PAUSED') {
+        if (this.status === 'WAITING_APPROVAL' || this.status === 'PAUSED' || this.status === 'WAITING_QUOTA') {
             this.status = 'RUNNING';
+        }
+        for (const node of this.nodes.values()) {
+            if (node.status === 'WAITING_QUOTA') {
+                node.status = 'PENDING';
+            }
         }
         return await this.run(executorFn, context);
     }
@@ -639,6 +722,7 @@ class StateGraph extends EventEmitter {
                 maxLoops: l.maxLoops,
                 currentLoops: l.currentLoops
             })),
+            executionLog: [...this.executionLog],
             executionHistory: this.executionHistory
         };
     }
@@ -655,11 +739,17 @@ class StateGraph extends EventEmitter {
         graph.completedNodes = new Set(data.completedNodes || []);
         graph.failedNodes = new Set(data.failedNodes || []);
         graph.executionHistory = data.executionHistory || [];
+        if (Array.isArray(data.executionLog)) {
+            graph.executionLog = [...data.executionLog];
+        }
 
-        // Restore nodes
+        // Restore nodes with exact persisted state (Fix Lỗi C)
         if (Array.isArray(data.nodes)) {
             for (const nData of data.nodes) {
                 const node = new StateNode(nData);
+                node.retryCount = typeof nData.retryCount === 'number' ? nData.retryCount : node.retryCount;
+                node.loopIteration = typeof nData.loopIteration === 'number' ? nData.loopIteration : node.loopIteration;
+                node.tokensUsed = typeof nData.tokensUsed === 'number' ? nData.tokensUsed : node.tokensUsed;
                 node.executedSuccessfully = Boolean(nData.executedSuccessfully);
                 if (config.nodeActions && typeof config.nodeActions[node.id] === 'function') {
                     node.action = config.nodeActions[node.id];
@@ -672,6 +762,23 @@ class StateGraph extends EventEmitter {
         if (Array.isArray(data.edges)) {
             for (const e of data.edges) {
                 graph.addEdge(e.from, e.to);
+            }
+        }
+
+        // Restore conditional loops (Fix Lỗi C)
+        if (Array.isArray(data.conditionalLoops)) {
+            for (const l of data.conditionalLoops) {
+                const condKey = `${l.from}->${l.to}`;
+                const condFn = (config.loopConditions && config.loopConditions[condKey])
+                    || (config.loopConditions && config.loopConditions[l.from])
+                    || (() => l.currentLoops < l.maxLoops);
+                graph.conditionalLoops.push({
+                    from: l.from,
+                    to: l.to,
+                    maxLoops: l.maxLoops || 3,
+                    currentLoops: l.currentLoops || 0,
+                    condition: condFn
+                });
             }
         }
 

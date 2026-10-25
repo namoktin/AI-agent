@@ -278,6 +278,12 @@ class ToolExecutor {
 
         const endpoint = this.getToolEndpoint(toolName);
 
+        const reqSignal = context?.signal
+            ? (typeof AbortSignal.any === 'function'
+                ? AbortSignal.any([AbortSignal.timeout(120000), context.signal])
+                : context.signal)
+            : AbortSignal.timeout(120000);
+
         const response = await fetch(`${this.serverUrl}${endpoint}`, {
             method: 'POST',
             headers: {
@@ -285,7 +291,7 @@ class ToolExecutor {
                 'Authorization': context.authToken ? `Bearer ${context.authToken}` : ''
             },
             body: JSON.stringify(args),
-            signal: AbortSignal.timeout(120000)
+            signal: reqSignal
         });
 
         if (!response.ok) {

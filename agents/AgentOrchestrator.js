@@ -533,6 +533,22 @@ class AgentOrchestrator {
                         };
                     }
 
+                    // If paused waiting for API quota availability (Fix Lỗi A)
+                    if (graph.status === 'WAITING_QUOTA') {
+                        this.log(`⏳ StateGraph [${taskId}] paused waiting for API quota availability.`);
+                        return {
+                            success: false,
+                            status: 'QUOTA_WAITING',
+                            retryable: true,
+                            quotaDeferred: true,
+                            taskId: taskId,
+                            graphId: taskId,
+                            waitingNodes: Array.from(graph.nodes.values()).filter(n => n.status === 'WAITING_QUOTA').map(n => n.id),
+                            message: 'StateGraph paused waiting for Gemini API quota replenishment. Checkpointed and ready to resume.',
+                            plan: taskPlan
+                        };
+                    }
+
                     specialistResults = Array.from(graph.nodes.values()).map(n => ({
                         taskId: n.id,
                         id: n.id,
@@ -952,12 +968,12 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
     async executeGraph(stateGraph, context = {}) {
         this.log(`🌐 [StateGraph] Bắt đầu thực thi Đồ thị Tác vụ [${stateGraph.graphId}] với ${stateGraph.nodes.size} nodes`);
         this.activeGraphs.set(stateGraph.graphId, stateGraph);
-        const executorFn = async (node, state, graph) => {
+        const executorFn = async (node, state, graph, executionContext = {}) => {
             const customAction = context?.nodeActions?.[node.id] || (typeof node.action === 'function' ? node.action : null);
             if (typeof customAction === 'function') {
-                return customAction.length >= 3
-                    ? await customAction(node, state, graph)
-                    : await customAction(state, graph);
+                return customAction.length >= 4
+                    ? await customAction(node, state, graph, executionContext)
+                    : (customAction.length >= 3 ? await customAction(node, state, graph) : await customAction(state, graph));
             }
             const task = {
                 id: node.id,
@@ -965,7 +981,7 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                 assignedTo: node.assignedTo,
                 ...node.taskPayload
             };
-            return await this.executeTask(task, { ...context, state, graph });
+            return await this.executeTask(task, { ...context, state, graph, ...executionContext });
         };
         try {
             const result = await stateGraph.run(executorFn, context);
@@ -1145,6 +1161,29 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
     }
 
     /**
+     * Create unified AbortSignal merging internal timeout with caller external signal (Fix Lỗi D)
+     */
+    _createSignal(timeoutMs = 45000, externalSignal = null) {
+        const timeoutSignal = AbortSignal.timeout(timeoutMs);
+        if (!externalSignal) return timeoutSignal;
+        if (typeof AbortSignal.any === 'function') {
+            return AbortSignal.any([timeoutSignal, externalSignal]);
+        }
+        const controller = new AbortController();
+        const onAbort = () => controller.abort(externalSignal.reason);
+        if (externalSignal.aborted) {
+            controller.abort(externalSignal.reason);
+            return controller.signal;
+        }
+        externalSignal.addEventListener('abort', onAbort, { once: true });
+        const timer = setTimeout(() => {
+            controller.abort(new Error(`Timed out after ${timeoutMs}ms`));
+            externalSignal.removeEventListener('abort', onAbort);
+        }, timeoutMs);
+        return controller.signal;
+    }
+
+    /**
      * Call individual agent with Function Calling, Exponential Backoff with Jitter
      */
     async callAgent(agentRole, payload, attempt = 1, toolIteration = 0) {
@@ -1155,6 +1194,7 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
         }
 
         const startTime = Date.now();
+        const externalSignal = payload?.context?.signal || null;
 
         try {
             // Lấy danh sách công cụ nếu agent được phép dùng tools
@@ -1239,19 +1279,48 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(requestBody),
-                        signal: AbortSignal.timeout(this.config.timeout || 45000)
+                        signal: this._createSignal(this.config.timeout || 45000, externalSignal)
                     }
                 );
 
                 let errBody = '';
-                // Tự động fallback tức thì nếu model chính bị 429 hoặc 503
+                // Tự động fallback tức thì nếu model chính bị 429 hoặc 503 (Fix Lỗi B: Xin slot mới qua scheduler)
                 if (!response.ok && (response.status === 429 || response.status === 503)) {
                     errBody = await response.text();
                     this.modelRouter.recordQuotaError(modelName, response.status, errBody);
                     const altModel = this.modelRouter.getFallbackModel(modelName, attempt + 1);
                     if (altModel) {
-                        this.log(`⚠️ Model [${modelName}] gặp HTTP ${response.status}, hoán đổi tức thì sang [${altModel}]...`);
+                        // 1. Giải phóng slot của model cũ
+                        if (this.modelRouter && typeof this.modelRouter.releaseDispatchSlot === 'function') {
+                            this.modelRouter.releaseDispatchSlot(0, modelName, slot?.slotId);
+                        }
+                        slot = null;
+
+                        this.log(`⚠️ Model [${modelName}] gặp HTTP ${response.status}, yêu cầu slot mới qua scheduler và hoán đổi tức thì sang [${altModel}]...`);
                         await new Promise(r => setTimeout(r, 1000));
+
+                        // 2. Yêu cầu slot mới cho altModel qua ModelRouter
+                        if (this.modelRouter && typeof this.modelRouter.acquireDispatchSlot === 'function') {
+                            const priority = agentRole === 'director' ? 3 : (agentRole === 'coordinator' ? 2 : 1);
+                            slot = await this.modelRouter.acquireDispatchSlot({
+                                estimatedTokens: 1500,
+                                model: altModel,
+                                priority
+                            });
+                            if (!slot?.granted) {
+                                this.log(`🛑 [QuotaScheduler] Model dự phòng [${altModel}] hết quota. Chuyển trạng thái QUOTA_WAITING.`);
+                                return {
+                                    success: false,
+                                    status: 'QUOTA_WAITING',
+                                    retryable: true,
+                                    quotaDeferred: true,
+                                    error: `Đang chờ ngân sách API cho model dự phòng [${altModel}]`,
+                                    message: 'Đang chờ ngân sách API',
+                                    response: 'Model chính gặp 429 và model dự phòng chưa có quota khả dụng.'
+                                };
+                            }
+                        }
+
                         modelName = altModel;
                         response = await fetch(
                             `${this.baseUrl}/models/${modelName}:generateContent?key=${this.apiKey}`,
@@ -1259,7 +1328,7 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify(requestBody),
-                                signal: AbortSignal.timeout(this.config.timeout || 45000)
+                                signal: this._createSignal(this.config.timeout || 45000, externalSignal)
                             }
                         );
                         errBody = '';
@@ -1312,7 +1381,7 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                     args: p.functionCall.args || {}
                 }));
 
-                const toolResults = await this.toolExecutor.executeTools(toolCalls, { agentRole });
+                const toolResults = await this.toolExecutor.executeTools(toolCalls, { ...payload?.context, agentRole, signal: externalSignal });
 
                 const functionResponseParts = [];
                 for (let i = 0; i < functionCallParts.length; i++) {
@@ -1358,7 +1427,7 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(followUpBody),
-                            signal: AbortSignal.timeout(this.config.timeout || 45000)
+                            signal: this._createSignal(this.config.timeout || 45000, externalSignal)
                         }
                     );
 
@@ -1366,15 +1435,36 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                         this.modelRouter.recordQuotaError(modelName, followUpRes.status);
                         const fallbackModel = this.modelRouter.getFallbackModel(modelName, toolIterationCount + 1);
                         if (fallbackModel) {
-                            this.log(`⚠️ Tool follow-up gặp ${followUpRes.status}, tự động xoay model sang [${fallbackModel}]...`);
+                            // 1. Giải phóng slot của model cũ (Fix Lỗi B)
+                            if (this.modelRouter && typeof this.modelRouter.releaseDispatchSlot === 'function') {
+                                this.modelRouter.releaseDispatchSlot(0, modelName, followUpSlot?.slotId);
+                            }
+                            followUpSlot = null;
+
+                            this.log(`⚠️ Tool follow-up gặp ${followUpRes.status}, yêu cầu slot mới và tự động xoay model sang [${fallbackModel}]...`);
                             await new Promise(r => setTimeout(r, 1000));
+
+                            // 2. Yêu cầu slot mới cho fallbackModel (Fix Lỗi B)
+                            if (this.modelRouter && typeof this.modelRouter.acquireDispatchSlot === 'function') {
+                                followUpSlot = await this.modelRouter.acquireDispatchSlot({
+                                    estimatedTokens: 1000,
+                                    model: fallbackModel,
+                                    priority: 2
+                                });
+                                if (!followUpSlot?.granted) {
+                                    this.log(`🛑 [QuotaScheduler] Tool follow-up model fallback [${fallbackModel}] hết quota. Dừng gọi tiếp.`);
+                                    break;
+                                }
+                            }
+
+                            modelName = fallbackModel;
                             followUpRes = await fetch(
-                                `${this.baseUrl}/models/${fallbackModel}:generateContent?key=${this.apiKey}`,
+                                `${this.baseUrl}/models/${modelName}:generateContent?key=${this.apiKey}`,
                                 {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify(followUpBody),
-                                    signal: AbortSignal.timeout(this.config.timeout || 45000)
+                                    signal: this._createSignal(this.config.timeout || 45000, externalSignal)
                                 }
                             );
                         }
@@ -1411,33 +1501,49 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
 
             // BẢO CHỨNG ĐẦU RA (OUTPUT SAFETY GATE): Nếu đã chạy công cụ nhưng text rỗng, tự động tổng kết báo cáo
             if (!text.trim() && toolIterationCount > 0) {
+                let finSlot = null;
                 try {
-                    const finalizeBody = {
-                        contents: [
-                            ...conversationContents,
-                            { role: 'user', parts: [{ text: "Hãy tổng kết toàn bộ kết quả thực thi các công cụ trên và trả về kết quả nghiệm thu cuối cùng theo đúng định dạng JSON yêu cầu của bạn." }] }
-                        ],
-                        systemInstruction: requestBody.systemInstruction,
-                        generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
-                    };
-                    const finRes = await fetch(
-                        `${this.baseUrl}/models/${modelName || 'gemini-3.1-flash-lite'}:generateContent?key=${this.apiKey}`,
-                        {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(finalizeBody),
-                            signal: AbortSignal.timeout(this.config.timeout || 45000)
-                        }
-                    );
-                    if (finRes.ok) {
-                        const finData = await finRes.json();
-                        const finCandidate = finData.candidates?.[0];
-                        if (finCandidate && finCandidate.content) {
-                            text = finCandidate.content.parts?.filter(p => p.text).map(p => p.text).join('\n') || text;
+                    const finModel = modelName || 'gemini-3.1-flash-lite';
+                    if (this.modelRouter && typeof this.modelRouter.acquireDispatchSlot === 'function') {
+                        finSlot = await this.modelRouter.acquireDispatchSlot({
+                            estimatedTokens: 800,
+                            model: finModel,
+                            priority: 1
+                        });
+                    }
+
+                    if (!finSlot || finSlot.granted) {
+                        const finalizeBody = {
+                            contents: [
+                                ...conversationContents,
+                                { role: 'user', parts: [{ text: "Hãy tổng kết toàn bộ kết quả thực thi các công cụ trên và trả về kết quả nghiệm thu cuối cùng theo đúng định dạng JSON yêu cầu của bạn." }] }
+                            ],
+                            systemInstruction: requestBody.systemInstruction,
+                            generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
+                        };
+                        const finRes = await fetch(
+                            `${this.baseUrl}/models/${finModel}:generateContent?key=${this.apiKey}`,
+                            {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(finalizeBody),
+                                signal: this._createSignal(this.config.timeout || 45000, externalSignal)
+                            }
+                        );
+                        if (finRes.ok) {
+                            const finData = await finRes.json();
+                            const finCandidate = finData.candidates?.[0];
+                            if (finCandidate && finCandidate.content) {
+                                text = finCandidate.content.parts?.filter(p => p.text).map(p => p.text).join('\n') || text;
+                            }
                         }
                     }
                 } catch (finErr) {
                     this.log(`⚠️ Finalize note: ${finErr.message}`);
+                } finally {
+                    if (finSlot && this.modelRouter && typeof this.modelRouter.releaseDispatchSlot === 'function') {
+                        this.modelRouter.releaseDispatchSlot(500, modelName, finSlot.slotId);
+                    }
                 }
             }
 

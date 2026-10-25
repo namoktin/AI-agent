@@ -378,6 +378,271 @@ async function main() {
         assert.strictEqual(executedOnResume, true, 'Hành động phải được thực thi thành công sau khi phục hồi từ đĩa');
     });
 
+    // -------------------------------------------------------------
+    // LỖI A: HẾT QUOTA TRONG GRAPH TẠM HOÃN AN TOÀN (KHÔNG BIẾN THÀNH FAILED)
+    // -------------------------------------------------------------
+    console.log('\n--- 4. KIỂM THỬ LỖI A: QUOTA_WAITING STATEGRAPH GRACEFUL PAUSE & RESUME ---');
+
+    await runTest('Node nhận QUOTA_WAITING tạm hoãn WAITING_QUOTA, không hao retries và không bị coi là FAILED', async () => {
+        const graph = new StateGraph({ graphId: `graph_quota_test_${Date.now()}` });
+        let callCount = 0;
+
+        graph.addNode({
+            id: 'node_quota_wait',
+            description: 'Action hits quota wait',
+            maxRetries: 3,
+            action: async () => {
+                callCount++;
+                if (callCount === 1) {
+                    return {
+                        success: false,
+                        status: 'QUOTA_WAITING',
+                        quotaDeferred: true,
+                        error: 'RPM/TPM saturated'
+                    };
+                }
+                return { success: true, result: 'Quota replenished, task finished' };
+            }
+        });
+
+        // 1. Chạy lần đầu: Chạm quota
+        const runRes = await graph.run();
+        const node = graph.nodes.get('node_quota_wait');
+
+        assert.strictEqual(node.status, 'WAITING_QUOTA', 'Node status phải là WAITING_QUOTA');
+        assert.strictEqual(graph.status, 'WAITING_QUOTA', 'Graph status phải là WAITING_QUOTA');
+        assert.strictEqual(node.retryCount, 0, 'retryCount không được hao (phải bằng 0)');
+        assert.strictEqual(callCount, 1, 'Chỉ gọi đúng 1 lần trước khi tạm hoãn');
+        assert.strictEqual(graph.failedNodes.has('node_quota_wait'), false, 'Node KHÔNG được nằm trong failedNodes');
+        assert.strictEqual(runRes.status, 'WAITING_QUOTA', 'Kết quả trả về phải là WAITING_QUOTA');
+
+        // 2. Resume khi có quota: Tự động chuyển PENDING và chạy thành công
+        const resumeRes = await graph.resume();
+        assert.strictEqual(node.status, 'COMPLETED', 'Node status phải là COMPLETED sau khi resume');
+        assert.strictEqual(graph.status, 'COMPLETED', 'Graph status phải là COMPLETED');
+        assert.strictEqual(callCount, 2, 'Gọi lần thứ 2 khi quota đã sẵn sàng');
+        assert.ok(graph.completedNodes.has('node_quota_wait'), 'Node phải nằm trong completedNodes');
+    });
+
+    // -------------------------------------------------------------
+    // LỖI B: MODEL FALLBACK & TOOL FOLLOW-UP QUA QUOTA SCHEDULER
+    // -------------------------------------------------------------
+    console.log('\n--- 5. KIỂM THỬ LỖI B: FALLBACK CALLS & TOOL FOLLOW-UP SLOTS IN MODELROUTER ---');
+
+    await runTest('Fallback model và tool follow-up được kiểm soát slot, chuyển QUOTA_WAITING nếu fallback hết quota', async () => {
+        const orchestrator = new AgentOrchestrator({
+            apiKey: 'mock_key',
+            defaultModel: 'gemini-3.5-flash'
+        });
+
+        // Mock ModelRouter
+        let requestedModels = [];
+        let releasedSlots = [];
+        orchestrator.modelRouter = {
+            resolveModel: () => 'gemini-3.5-flash',
+            getFallbackModel: () => 'gemini-3.5-flash-lite',
+            recordQuotaError: () => {},
+            acquireDispatchSlot: async ({ model }) => {
+                requestedModels.push(model);
+                if (model === 'gemini-3.5-flash-lite') {
+                    // Giả lập model dự phòng cũng hết quota
+                    return { granted: false, quotaDeferred: true };
+                }
+                return { granted: true, slotId: 'slot_primary' };
+            },
+            releaseDispatchSlot: (tokens, model, slotId) => {
+                releasedSlots.push({ model, slotId });
+            }
+        };
+
+        // Giả lập fetch: Model chính bị 429
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = async (url) => {
+            return {
+                ok: false,
+                status: 429,
+                text: async () => 'RESOURCE_EXHAUSTED'
+            };
+        };
+
+        try {
+            const res = await orchestrator.callAgent('developer', { task: 'Test fallback quota' });
+            assert.strictEqual(res.status, 'QUOTA_WAITING', 'Phải trả về trạng thái QUOTA_WAITING khi fallback hết quota');
+            assert.strictEqual(res.retryable, true, 'Phải có cờ retryable: true');
+            assert.ok(requestedModels.includes('gemini-3.5-flash'), 'Phải xin slot cho model chính');
+            assert.ok(requestedModels.includes('gemini-3.5-flash-lite'), 'Phải xin slot cho model dự phòng qua Scheduler');
+            assert.ok(releasedSlots.some(s => s.slotId === 'slot_primary'), 'Slot cũ phải được giải phóng');
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+
+    // -------------------------------------------------------------
+    // LỖI C: KHÔI PHỤC GRAPH ĐẦY ĐỦ CONDITIONAL LOOPS, RETRYCOUNT, TOKENS
+    // -------------------------------------------------------------
+    console.log('\n--- 6. KIỂM THỬ LỖI C: STATEGRAPH FULL SEMANTIC DESERIALIZATION ---');
+
+    await runTest('deserialize() phục hồi nguyên vẹn conditionalLoops, retryCount, loopIteration và tokensUsed', async () => {
+        const graph = new StateGraph({ graphId: 'graph_semantic_test' });
+        graph.addNode({
+            id: 'node_alpha',
+            description: 'Alpha task',
+            retryCount: 2,
+            loopIteration: 1,
+            tokensUsed: 1250,
+            executedSuccessfully: false
+        });
+        graph.addNode({
+            id: 'node_beta',
+            description: 'Beta task',
+            dependencies: ['node_alpha']
+        });
+        graph.addConditionalLoop('node_beta', 'node_alpha', (res) => res?.needRevise, 3);
+        graph.executionLog.push('Initial test log entry');
+
+        const serialized = graph.serialize();
+        assert.strictEqual(serialized.conditionalLoops.length, 1, 'Serialize phải chứa conditionalLoops');
+
+        // Deserialize
+        const restoredGraph = StateGraph.deserialize(serialized);
+
+        // Kiểm tra conditionalLoops
+        assert.strictEqual(restoredGraph.conditionalLoops.length, 1, 'Restored graph phải phục hồi conditionalLoops');
+        assert.strictEqual(restoredGraph.conditionalLoops[0].from, 'node_beta');
+        assert.strictEqual(restoredGraph.conditionalLoops[0].to, 'node_alpha');
+        assert.strictEqual(restoredGraph.conditionalLoops[0].maxLoops, 3);
+
+        // Kiểm tra StateNode attributes
+        const restoredAlpha = restoredGraph.nodes.get('node_alpha');
+        assert.strictEqual(restoredAlpha.retryCount, 2, 'retryCount phải được bảo toàn là 2');
+        assert.strictEqual(restoredAlpha.loopIteration, 1, 'loopIteration phải được bảo toàn là 1');
+        assert.strictEqual(restoredAlpha.tokensUsed, 1250, 'tokensUsed phải được bảo toàn là 1250');
+        assert.strictEqual(restoredGraph.executionLog.length, 1, 'executionLog phải được phục hồi');
+    });
+
+    // -------------------------------------------------------------
+    // LỖI D: TIMEOUT HỦY CÔNG VIỆC THỰC TẾ QUA ABORTSIGNAL
+    // -------------------------------------------------------------
+    console.log('\n--- 7. KIỂM THỬ LỖI D: REAL TIMEOUT CANCELLATION VIA ABORTCONTROLLER ---');
+
+    await runTest('Timeout trong StateGraph kích hoạt AbortController.abort() hủy executorFn đang chạy', async () => {
+        const graph = new StateGraph({ graphId: `graph_timeout_${Date.now()}` });
+        let abortTriggered = false;
+        let abortReason = '';
+
+        graph.addNode({
+            id: 'node_long_running',
+            description: 'Hanging action',
+            timeoutMs: 100, // Timeout ngắn 100ms
+            maxRetries: 0,
+            action: async (node, state, g, execContext) => {
+                if (execContext && execContext.signal) {
+                    execContext.signal.addEventListener('abort', () => {
+                        abortTriggered = true;
+                        abortReason = execContext.signal.reason?.message || 'Aborted';
+                    });
+                }
+                // Giả lập tác vụ treo 1000ms
+                await new Promise(r => setTimeout(r, 1000));
+                return { success: true };
+            }
+        });
+
+        const res = await graph.run();
+        assert.strictEqual(res.status, 'FAILED', 'Graph phải FAILED do timeout');
+        assert.strictEqual(abortTriggered, true, 'AbortSignal BẮT BUỘC phải được kích hoạt');
+        assert.ok(abortReason.includes('timed out after 100ms'), 'Lý do abort phải ghi rõ timeout');
+    });
+
+    // -------------------------------------------------------------
+    // LỖI E: VÒNG LẶP ĐIỀU KIỆN KHÔNG BỊ TREO STATUS 'RUNNING'
+    // -------------------------------------------------------------
+    console.log('\n--- 8. KIỂM THỬ LỖI E: CONDITIONAL LOOP STATUS RESET GUARD ---');
+
+    await runTest('Vòng lặp conditional loop reset cả targetNode và node về PENDING, không kẹt RUNNING', async () => {
+        const graph = new StateGraph({ graphId: `graph_loop_status_${Date.now()}` });
+        let passCounter = 0;
+
+        graph.addNode({
+            id: 'step_create',
+            action: async () => {
+                passCounter++;
+                return { success: true, version: passCounter };
+            }
+        });
+
+        graph.addNode({
+            id: 'step_review',
+            dependencies: ['step_create'],
+            action: async (state) => {
+                const version = state.step_create?.version || 1;
+                if (version < 2) {
+                    return { success: true, needsRevision: true };
+                }
+                return { success: true, needsRevision: false };
+            }
+        });
+
+        graph.addConditionalLoop('step_review', 'step_create', (result) => result?.needsRevision === true, 2);
+
+        const result = await graph.run();
+        assert.strictEqual(result.status, 'COMPLETED', 'Đồ thị phải hoàn thành COMPLETED');
+        assert.strictEqual(passCounter, 2, 'Vòng lặp phải hoàn thành đúng 2 lượt revision');
+        assert.strictEqual(graph.nodes.get('step_create').status, 'COMPLETED');
+        assert.strictEqual(graph.nodes.get('step_review').status, 'COMPLETED');
+    });
+
+    // -------------------------------------------------------------
+    // LỖI F: ENDPOINT /api/v2/tasks/:taskId/resume TỰ ĐỘNG KHÔI PHỤC VÀ TIẾP TỤC
+    // -------------------------------------------------------------
+    console.log('\n--- 9. KIỂM THỬ LỖI F: RESUME GRAPH API & CHECKPOINT INTEGRATION ---');
+
+    await runTest('resumeGraph kích hoạt tiếp tục đồ thị từ bộ nhớ hoặc checkpoint trên đĩa', async () => {
+        const taskId = `resume_endpoint_test_${Date.now()}`;
+        const { CheckpointManager } = require('./agents/CheckpointManager');
+        const checkpointManager = new CheckpointManager();
+
+        const orchestrator = new AgentOrchestrator({
+            apiKey: 'mock_key',
+            defaultModel: 'gemini-3.5-flash',
+            checkpointManager
+        });
+
+        const graph = new StateGraph({
+            graphId: taskId,
+            checkpointManager
+        });
+
+        let executedStep2 = false;
+
+        graph.addNode({
+            id: 'node_init',
+            action: async () => ({ success: true, init: true })
+        });
+
+        graph.addNode({
+            id: 'node_step2',
+            dependencies: ['node_init'],
+            action: async () => {
+                if (!executedStep2) {
+                    // Dừng lần 1 vì quota
+                    return { success: false, status: 'QUOTA_WAITING' };
+                }
+                return { success: true, step2Finished: true };
+            }
+        });
+
+        const initialRun = await orchestrator.executeGraph(graph);
+        assert.strictEqual(graph.status, 'WAITING_QUOTA');
+
+        // Tự động tiếp tục qua resumeGraph
+        executedStep2 = true;
+        const resumed = await orchestrator.resumeGraph(taskId);
+        assert.strictEqual(resumed.status, 'COMPLETED', 'Đồ thị phải COMPLETED sau khi resume');
+        assert.strictEqual(graph.status, 'COMPLETED');
+        assert.strictEqual(executedStep2, true);
+    });
+
     console.log('\n===============================================================');
     console.log(`🎉 HOÀN TẤT KIỂM THỬ: ${passedTests}/${totalTests} TESTS PASSED (100%)`);
     console.log('===============================================================');

@@ -5880,6 +5880,31 @@ app.post('/api/v2/tasks/:taskId/approve', async (req, res) => {
     }
 });
 
+/**
+ * POST /api/v2/tasks/:taskId/resume
+ * Explicit resume endpoint for tasks paused on WAITING_APPROVAL or WAITING_QUOTA (Fix Lỗi F)
+ */
+app.post('/api/v2/tasks/:taskId/resume', async (req, res) => {
+    const { taskId } = req.params;
+    const { decision = 'APPROVE', feedback = '' } = req.body || {};
+    try {
+        const { globalOrchestrator: orch } = getOrchestrator();
+        if (!orch || typeof orch.resumeGraph !== 'function') {
+            return res.status(500).json({ success: false, error: 'Orchestrator not initialized' });
+        }
+        const resumeResult = await orch.resumeGraph(taskId, decision, feedback);
+        res.json({
+            success: true,
+            taskId,
+            status: resumeResult?.status || 'RUNNING',
+            result: resumeResult,
+            message: 'Tác vụ đã được kích hoạt tiếp tục thực thi.'
+        });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+});
+
 // 7. SERVER LAUNCH
 // ==========================================
 const PORT = process.env.PORT || 3000;
