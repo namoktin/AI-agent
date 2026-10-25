@@ -603,5 +603,33 @@
     },
     "endTime": "2026-10-25T15:11:58.751Z",
     "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1792945951523": {
+    "id": "test_dead_pid_1792945951523",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-25T16:32:31.525Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1792948261260": {
+    "id": "test_dead_pid_1792948261260",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-25T17:11:01.264Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
   }
 }

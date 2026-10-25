@@ -1,0 +1,57 @@
+{
+  "hitl_test_202": {
+    "taskId": "hitl_test_202",
+    "nodeId": "dangerous_action",
+    "description": "Action will alter remote system state",
+    "actionType": "WRITE_CRITICAL",
+    "input": {},
+    "risks": [],
+    "createdAt": "2026-10-25T17:05:02.238Z",
+    "status": "APPROVED",
+    "decision": "APPROVE",
+    "feedback": "Granted by admin",
+    "decidedAt": "2026-10-25T17:05:02.243Z"
+  },
+  "hitl_test_1792948161257_pg3m": {
+    "taskId": "hitl_test_1792948161257_pg3m",
+    "nodeId": "dangerous_action",
+    "description": "Action will alter remote system state",
+    "actionType": "WRITE_CRITICAL",
+    "input": {},
+    "risks": [],
+    "createdAt": "2026-10-25T17:09:21.259Z",
+    "status": "APPROVED",
+    "success": true,
+    "decision": "APPROVE",
+    "feedback": "Granted by admin",
+    "decidedAt": "2026-10-25T17:09:21.261Z"
+  },
+  "hitl_test_1792948200165_sdu7": {
+    "taskId": "hitl_test_1792948200165_sdu7",
+    "nodeId": "dangerous_action",
+    "description": "Action will alter remote system state",
+    "actionType": "WRITE_CRITICAL",
+    "input": {},
+    "risks": [],
+    "createdAt": "2026-10-25T17:10:00.167Z",
+    "status": "APPROVED",
+    "success": true,
+    "decision": "APPROVE",
+    "feedback": "Granted by admin",
+    "decidedAt": "2026-10-25T17:10:00.168Z"
+  },
+  "hitl_test_1792948280854_fc9a": {
+    "taskId": "hitl_test_1792948280854_fc9a",
+    "nodeId": "dangerous_action",
+    "description": "Action will alter remote system state",
+    "actionType": "WRITE_CRITICAL",
+    "input": {},
+    "risks": [],
+    "createdAt": "2026-10-25T17:11:20.855Z",
+    "status": "APPROVED",
+    "success": true,
+    "decision": "APPROVE",
+    "feedback": "Granted by admin",
+    "decidedAt": "2026-10-25T17:11:20.857Z"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "mcpServers": {
+    "local_test": {
+      "command": "node",
+      "args": ["test/mcp-test-server.js"],
+      "disabled": false,
+      "description": "Local test MCP server with echo and calculate tools",
+      "tools": [
+        {
+          "name": "echo",
+          "description": "Echoes back the input message",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "message": { "type": "string", "description": "Text message to echo back" }
+            },
+            "required": ["message"]
+          }
+        },
+        {
+          "name": "calculate",
+          "description": "Safely evaluates a basic math expression",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "expression": { "type": "string", "description": "Mathematical expression (e.g. '100 * 2.5')" }
+            },
+            "required": ["expression"]
+          }
+        }
+      ]
+    }
+  }
+}
+

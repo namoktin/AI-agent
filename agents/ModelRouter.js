@@ -128,14 +128,24 @@ class ModelRouter {
             // Otherwise, enqueue and schedule orderly drainage
             queueItem.timeoutTimer = setTimeout(() => {
                 this._removeFromQueue(queueItem);
-                this.activeSlots.set(slotId, { timestamp: Date.now(), model });
-                this.inflightRequests = this.activeSlots.size;
-                console.warn(`⏳ [QuotaScheduler] Queue wait timeout (${timeout}ms). Force granting slot.`);
-                resolve({ granted: true, waitedMs: Date.now() - startTime, forced: true, slotId });
+                
+                // V2: Không tự cấp slot cưỡng bức nếu đang vi phạm quota.
+                // Thử tìm model fallback còn quota trước:
+                const viableFallback = this.getFallbackModel(model, 1);
+                if (viableFallback && this.isModelAvailable(viableFallback) && this._canDispatchNow(estimatedTokens)) {
+                    console.log(`🔄 [QuotaScheduler V2] Queue wait completed: Điều tuyến sang model khả dụng [${viableFallback}]`);
+                    this.activeSlots.set(slotId, { timestamp: Date.now(), model: viableFallback });
+                    this.inflightRequests = this.activeSlots.size;
+                    return resolve({ granted: true, waitedMs: Date.now() - startTime, model: viableFallback, slotId });
+                }
+
+                // Nếu tất cả model đều kẹt quota, từ chối cấp slot cưỡng bức để bảo vệ hạn mức RPM/TPM
+                console.warn(`⏳ [QuotaScheduler V2] Queue wait timeout (${timeout}ms). Giữ vững kỷ luật quota, hoãn slot.`);
+                resolve({ granted: false, waitedMs: Date.now() - startTime, quotaDeferred: true, slotId });
             }, timeout);
 
             this.dispatchQueue.push(queueItem);
-            this.dispatchQueue.sort((a, b) => b.priority - a.priority);
+            this.dispatchQueue.sort((a, b) => (b.priority - a.priority) || (a.startTime - b.startTime));
             this._scheduleNextDrain();
         });
     }
@@ -219,24 +229,75 @@ class ModelRouter {
         return Date.now() < this.globalCooldownUntil;
     }
 
+    get quotas() {
+        return this.limits;
+    }
+
+    parseRetryDelay(errorDetails) {
+        if (!errorDetails) return 0;
+        try {
+            const text = typeof errorDetails === 'string' ? errorDetails : JSON.stringify(errorDetails);
+            const hourMatch = text.match(/(\d+)\s*h(?:our|ours)?/i);
+            const minMatch = text.match(/(\d+)\s*m(?:in|inute|inutes)?(?![a-z])/i);
+            const secMatch = text.match(/(\d+(?:\.\d+)?)\s*s(?:ec|econd|econds)?(?![a-z])/i);
+
+            let parsedSeconds = 0;
+            if (hourMatch) parsedSeconds += parseInt(hourMatch[1], 10) * 3600;
+            if (minMatch) parsedSeconds += parseInt(minMatch[1], 10) * 60;
+            if (secMatch) parsedSeconds += parseFloat(secMatch[1]);
+
+            return Math.round(parsedSeconds * 1000);
+        } catch (e) {
+            return 0;
+        }
+    }
+
+    calculateBackoff(model, baseDelayMs = 20000) {
+        const jitter = Math.floor(Math.random() * Math.min(baseDelayMs * 0.2, 4000));
+        return baseDelayMs + jitter;
+    }
+
+    async acquireSlot(model, estimatedTokens, timeoutMs, options) {
+        return this.acquireDispatchSlot(model, estimatedTokens, timeoutMs, options);
+    }
+
     /**
-     * Record quota / 429 error and update cooldowns
+     * Record quota / 429 error and update cooldowns with dynamic retryDelay parsing
      */
-    recordQuotaError(model, statusCode = 429, errorDetails = '') {
+    recordQuotaError(model, statusCodeOrErr = 429, errorDetails = '') {
+        let statusCode = 429;
+        let details = errorDetails;
+
+        if (typeof statusCodeOrErr === 'number') {
+            statusCode = statusCodeOrErr;
+        } else if (statusCodeOrErr && typeof statusCodeOrErr === 'object') {
+            details = statusCodeOrErr;
+            statusCode = statusCodeOrErr.status || statusCodeOrErr.statusCode || 429;
+        }
+
         const now = Date.now();
-        // 503 là lỗi quá tải tạm thời (Spike in demand) nên chỉ cần cooldown 5 giây; 429 là hết hạn ngạch nên cooldown 60 giây
-        const cooldownDuration = statusCode === 503 ? 5000 : 60000;
+        let cooldownDuration = statusCode === 503 ? 5000 : 60000;
+
+        // Bóc tách retryDelay động từ phản hồi của Gemini API
+        if (details) {
+            try {
+                const parsedMs = this.parseRetryDelay(details);
+                if (parsedMs > 0) {
+                    cooldownDuration = this.calculateBackoff(model, parsedMs);
+                }
+            } catch (e) {}
+        }
 
         if (statusCode === 429 || statusCode === 503) {
             this.modelCooldowns.set(model, now + cooldownDuration);
-            console.warn(`⚠️ [ModelRouter Quota Guard] Model [${model}] gặp lỗi ${statusCode}. Cooldown ${cooldownDuration / 1000}s.`);
+            console.warn(`⚠️ [ModelRouter Quota Guard] Model [${model}] gặp lỗi ${statusCode}. Dynamic cooldown ${Math.round(cooldownDuration / 1000)}s.`);
 
             // Check if all models in FALLBACK_POOL are currently exhausted
             const pool = this.registry.FALLBACK_POOL || [];
             const allExhausted = pool.every(m => !this.isModelAvailable(m));
 
             if (allExhausted && statusCode === 429) {
-                this.globalCooldownUntil = now + 30000; // 30s pause
+                this.globalCooldownUntil = now + Math.min(cooldownDuration, 30000); // Max 30s pause for circuit breaker
                 console.warn(`⚠️ [ModelRouter Circuit Breaker] Các model trong pool đang phục hồi nhịp độ quota...`);
             }
         }

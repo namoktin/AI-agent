@@ -10,6 +10,7 @@ const vm = require('vm');
 const { createPathGuard } = require('./utils/pathSafety');
 const { AsyncMutex } = require('./utils/mutex');
 const { RateLimiter } = require('./utils/rateLimiter');
+const { globalEventStream } = require('./agents/AgentEventStream');
 const { createAuthMiddleware } = require('./middleware/auth');
 const { compactAccessibilityTree, executeBrowserActions, extractContextualText } = require('./utils/browserActions');
 const { UniversalSocialScraper } = require('./utils/UniversalSocialScraper');
@@ -5798,6 +5799,72 @@ app.post('/api/v2/reset', async (req, res) => {
 });
 
 // ==========================================
+/**
+ * ==========================================
+ * REAL-TIME AGENT STREAMING (SSE) ENDPOINTS
+ * ==========================================
+ */
+
+/**
+ * GET /api/v2/stream/:taskId
+ * Server-Sent Events (SSE) for task execution progress
+ */
+app.get('/api/v2/stream/:taskId', (req, res) => {
+    const { taskId } = req.params;
+    globalEventStream.subscribe(taskId, res);
+});
+
+/**
+ * GET /api/v2/events
+ * Global Server-Sent Events (SSE) stream for all active tasks
+ */
+app.get('/api/v2/events', (req, res) => {
+    globalEventStream.subscribe('global', res);
+});
+
+/**
+ * ==========================================
+ * HUMAN-IN-THE-LOOP (HITL) APPROVAL ENDPOINTS
+ * ==========================================
+ */
+
+/**
+ * GET /api/v2/approvals/pending
+ * List all tasks waiting for human supervisor approval
+ */
+app.get('/api/v2/approvals/pending', (req, res) => {
+    const pending = globalEventStream.getAllPendingApprovals();
+    res.json({ success: true, count: pending.length, approvals: pending });
+});
+
+/**
+ * GET /api/v2/tasks/:taskId/approval-request
+ * Retrieve specific pending approval details for a task
+ */
+app.get('/api/v2/tasks/:taskId/approval-request', (req, res) => {
+    const { taskId } = req.params;
+    const approval = globalEventStream.getApprovalStatus(taskId);
+    if (!approval) {
+        return res.status(404).json({ success: false, error: `No approval request found for task ${taskId}` });
+    }
+    res.json({ success: true, approval });
+});
+
+/**
+ * POST /api/v2/tasks/:taskId/approve
+ * Human supervisor decision endpoint (APPROVE | REJECT | REVISE)
+ */
+app.post('/api/v2/tasks/:taskId/approve', (req, res) => {
+    const { taskId } = req.params;
+    const { decision = 'APPROVE', feedback = '' } = req.body;
+    try {
+        const result = globalEventStream.submitDecision(taskId, decision, feedback);
+        res.json({ success: true, result });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+});
+
 // 7. SERVER LAUNCH
 // ==========================================
 const PORT = process.env.PORT || 3000;

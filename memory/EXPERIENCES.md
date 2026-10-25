@@ -1929,6 +1929,26 @@ console.log("Danh sách số nguyên tố tìm được:", primeNumbers);
   "confidence": 1.0,
   "limitations": "Thuật toán tối ưu cho số nguyên tiêu chuẩn trong phạm vi an toàn của JavaScript (`Number.MAX_SAFE_INTEGER`). Với các số nguyên cực lớn vượt quá giới hạn này, cần sử dụng thư viện BigInt."
 }
+``` | Bổ sung: ```json
+{
+  "report": "Định luật 1 Newton phát biểu rằng: Một vật sẽ giữ nguyên trạng thái đứng yên hoặc chuyển động thẳng đều nếu không có ngoại lực nào tác dụng lên nó hoặc nếu tổng các ngoại lực tác dụng lên nó bằng không.",
+  "findings": [
+    "Định luật 1 Newton (định luật quán tính) khẳng định rằng trạng thái chuyển động của một vật chỉ thay đổi khi có tác động của ngoại lực.",
+    "Yêu cầu được thực hiện theo đúng nguyên tắc tinh gọn (KISS) và trả về kết quả trong đúng 1 câu."
+  ],
+  "sources": [
+    {
+      "url": "https://vi.wikipedia.org/wiki/C%C3%A1c_%C4%91%E1%BB%8Bnh_lu%E1%BA%ADt_chuy%E1%BB%83n_%C4%91%E1%BB%99ng_Newton",
+      "title": "Các định luật chuyển động Newton - Wikipedia",
+      "credibility": "HIGH"
+    }
+  ],
+  "insights": [
+    "Định luật này đặt nền móng cho cơ học cổ điển thông qua khái niệm quán tính của vật chất."
+  ],
+  "confidence": 1.0,
+  "limitations": "Không có giới hạn đối với câu trả lời mang tính định nghĩa cơ bản này."
+}
 ```
 - **Bài học cốt lõi (Takeaway):** Multi-agent orchestration (Quality: 95%). Agents: 7, Time: 418175ms
 - **Lịch sử tự thăng cấp:** 68% ➔ 75% (15:54:56) | 75% ➔ 85% (18:47:15) | 85% ➔ 93% (23:21:51)

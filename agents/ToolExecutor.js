@@ -13,6 +13,7 @@ const http = require('http');
 const fs = require('fs').promises;
 const path = require('path');
 const { URL } = require('url');
+const { MCPClientManager } = require('./MCPClientManager');
 
 // Ưu tiên native fetch nếu có
 const fetch = typeof globalThis.fetch === 'function' ? globalThis.fetch : function fetch(url, options = {}) {
@@ -58,6 +59,13 @@ class ToolExecutor {
         this.serverUrl = serverUrl;
         this.executionCache = new Map();
         this.rateLimiter = new Map();
+        
+        // MCP Ecosystem integration
+        try {
+            this.mcpClientManager = new MCPClientManager();
+        } catch (e) {
+            this.mcpClientManager = null;
+        }
 
         // Tool safety classification - strictly mutually exclusive
         this.toolCategories = {
@@ -263,6 +271,11 @@ class ToolExecutor {
      * Call tool API endpoint
      */
     async callToolAPI(toolName, args, context) {
+        // Handle MCP tools via MCPClientManager
+        if (this.mcpClientManager && this.mcpClientManager.isMCPTool(toolName)) {
+            return await this.mcpClientManager.executeTool(toolName, args);
+        }
+
         const endpoint = this.getToolEndpoint(toolName);
 
         const response = await fetch(`${this.serverUrl}${endpoint}`, {
@@ -321,7 +334,7 @@ class ToolExecutor {
      * Get Google Gemini Function Declarations for all available tools
      */
     getToolDefinitions() {
-        return [
+        const nativeTools = [
             {
                 name: 'READ_FILE',
                 description: 'Đọc nội dung của một file trong dự án hoặc thư mục làm việc.',
@@ -619,12 +632,25 @@ class ToolExecutor {
                 }
             }
         ];
+
+        // Merge MCP tools into unified registry
+        if (this.mcpClientManager) {
+            const mcpTools = this.mcpClientManager.getToolDefinitions();
+            if (Array.isArray(mcpTools) && mcpTools.length > 0) {
+                nativeTools.push(...mcpTools);
+            }
+        }
+
+        return nativeTools;
     }
 
     /**
      * Tool classification helpers
      */
     isReadOnly(toolName) {
+        if (this.mcpClientManager && this.mcpClientManager.isMCPTool(toolName)) {
+            return true;
+        }
         return this.toolCategories.readonly.includes(toolName);
     }
 

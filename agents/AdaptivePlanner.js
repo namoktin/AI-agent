@@ -226,6 +226,53 @@ class AdaptivePlanner {
             skipCritic: false
         };
     }
+
+    /**
+     * Generate an executable StateGraph instance from a plan
+     */
+    generateStateGraph(mode, userRequest, strategicDirective = {}, matchedSkill = null, options = {}) {
+        const { StateGraph } = require('./StateGraph');
+        const plan = this.generatePlan(mode, userRequest, strategicDirective, matchedSkill);
+        const graph = new StateGraph({
+            graphId: options.graphId || `graph_${Date.now()}`,
+            initialState: {
+                userRequest,
+                mode: plan.mode,
+                directive: strategicDirective,
+                ...options.initialState
+            },
+            checkpointManager: options.checkpointManager || null,
+            verifier: options.verifier || null
+        });
+
+        // Add all tasks as StateNodes
+        for (const task of plan.tasks) {
+            graph.addNode({
+                id: task.id,
+                description: task.description,
+                assignedTo: task.assignedTo,
+                dependencies: Array.isArray(task.dependencies) ? task.dependencies : [],
+                acceptanceCriteria: task.requirements || task.acceptanceCriteria || [],
+                timeoutMs: options.timeoutMs || 60000,
+                maxRetries: 2,
+                idempotent: true,
+                taskPayload: task
+            });
+        }
+
+        // Connect edges based on dependencies
+        for (const task of plan.tasks) {
+            if (Array.isArray(task.dependencies)) {
+                for (const depId of task.dependencies) {
+                    if (graph.nodes.has(depId)) {
+                        graph.addEdge(depId, task.id);
+                    }
+                }
+            }
+        }
+
+        return { graph, plan };
+    }
 }
 
 module.exports = { AdaptivePlanner };

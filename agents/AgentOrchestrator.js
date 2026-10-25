@@ -506,7 +506,24 @@ class AgentOrchestrator {
                     matchedSkill: context.matchedSkill || null,
                     groundingResult: context.groundingResult || null
                 };
-                specialistResults = await this.executeTasksParallel(taskPlan.tasks, enrichedContext);
+                if (mode === 'graph' || context.useGraph) {
+                    const { graph } = this.adaptivePlanner.generateStateGraph(mode, userRequest, directive, context.matchedSkill, {
+                        graphId: `graph_${taskId}`,
+                        checkpointManager: this.checkpointManager,
+                        verifier: this.verifier
+                    });
+                    await this.executeGraph(graph, enrichedContext);
+                    specialistResults = Array.from(graph.nodes.values()).map(n => ({
+                        taskId: n.id,
+                        id: n.id,
+                        agent: n.assignedTo,
+                        success: n.status === 'COMPLETED',
+                        response: n.output?.response || n.output || (n.status === 'COMPLETED' ? 'Node completed successfully' : 'Node failed'),
+                        error: n.output?.error
+                    }));
+                } else {
+                    specialistResults = await this.executeTasksParallel(taskPlan.tasks, enrichedContext);
+                }
 
                 // DYNAMIC REPLANNING: Nếu có task thất bại, tìm lại task gốc và kích hoạt Adaptive Replanning
                 for (let i = 0; i < specialistResults.length; i++) {
@@ -910,6 +927,23 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
     }
 
     /**
+     * Execute a stateful graph (StateGraph runtime)
+     */
+    async executeGraph(stateGraph, context = {}) {
+        this.log(`🌐 [StateGraph] Bắt đầu thực thi Đồ thị Tác vụ [${stateGraph.graphId}] với ${stateGraph.nodes.size} nodes`);
+        const executorFn = async (node, state, graph) => {
+            const task = {
+                id: node.id,
+                description: node.description,
+                assignedTo: node.assignedTo,
+                ...node.taskPayload
+            };
+            return await this.executeTask(task, { ...context, state, graph });
+        };
+        return await stateGraph.run(executorFn, context);
+    }
+
+    /**
      * Execute single task with appropriate agent & tool execution
      */
     async executeTask(task, context) {
@@ -1124,7 +1158,8 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
 
                 // Tự động fallback tức thì nếu model chính bị 429 hoặc 503
                 if (!response.ok && (response.status === 429 || response.status === 503)) {
-                    this.modelRouter.recordQuotaError(modelName, response.status);
+                    const errBody = await response.text();
+                    this.modelRouter.recordQuotaError(modelName, response.status, errBody);
                     const altModel = this.modelRouter.getFallbackModel(modelName, attempt + 1);
                     if (altModel) {
                         this.log(`⚠️ Model [${modelName}] gặp HTTP ${response.status}, hoán đổi tức thì sang [${altModel}]...`);
