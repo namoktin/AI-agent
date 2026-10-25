@@ -1,0 +1,24 @@
+{
+  "taskId": 8,
+  "domain": "Dự báo Tương lai Thế giới 2026-2040",
+  "title": "Kỷ nguyên Hậu AGI, Năng lượng Hạt nhân SMRs và Cuộc Cách mạng Robot Hình người",
+  "durationMs": 42199,
+  "durationSec": 42.2,
+  "success": true,
+  "qualityScore": 92,
+  "stats": {
+    "executionTime": "42120ms",
+    "agentCalls": 5,
+    "averageLatency": "8330ms"
+  },
+  "eval": {
+    "depthScore": 2.5,
+    "actionabilityScore": 3,
+    "reasoningScore": 2.5,
+    "bonus": 0.2,
+    "finalScore": 8.2,
+    "textLength": 1767
+  },
+  "sampleSnippet": "```json\n{\n  \"findings\": [\n    \"Kịch bản AGI trước 2030 đang đối mặt với sự dịch chuyển nút thắt từ thuật toán (Scaling Laws) sang năng lượng khổng lồ và hệ thống làm mát trung tâm dữ liệu.\",\n    \"Các tập đoàn Big Tech (Microsoft ký hợp đồng điện hạt nhân Three Mile Island với Constellation Energy, Amazon và Google đầu tư mạnh vào Small Modular Reactors - SMRs) đang trực tiếp bảo đảm nguồn điện nền (baseload) sạch cho AI.\",\n    \"Cuộc cách mạng Robot hình người (Tesla Optimus, Figure, Boston Dynam...",
+  "fullResponse": "```json\n{\n  \"findings\": [\n    \"Kịch bản AGI trước 2030 đang đối mặt với sự dịch chuyển nút thắt từ thuật toán (Scaling Laws) sang năng lượng khổng lồ và hệ thống làm mát trung tâm dữ liệu.\",\n    \"Các tập đoàn Big Tech (Microsoft ký hợp đồng điện hạt nhân Three Mile Island với Constellation Energy, Amazon và Google đầu tư mạnh vào Small Modular Reactors - SMRs) đang trực tiếp bảo đảm nguồn điện nền (baseload) sạch cho AI.\",\n    \"Cuộc cách mạng Robot hình người (Tesla Optimus, Figure, Boston Dynamics) đang tiến đến ngưỡng chi phí vận hành < 3 USD/giờ, đe dọa tái định hình hoàn toàn kinh tế sản xuất và chuỗi cung ứng toàn cầu.\",\n    \"Thị trường việc làm đối mặt với làn sóng tự động hóa văn phòng cấp thấp, thúc đẩy các tranh luận gay gắt về Thuế Robot (AI Tax) và Thu nhập cơ bản phổ quát (UBI).\"\n  ],\n  \"sources\": [\n    {\n      \"url\": \"https://en.wikipedia.org/wiki/Small_modular_reactor\",\n      \"title\": \"Small modular reactor - Wikipedia Standard\",\n      \"credibility\": \"HIGH\"\n    },\n    {\n      \"url\": \"https://en.wikipedia.org/wiki/Constellation_Energy\",\n      \"title\": \"Constellation Energy - Wikipedia Standard\",\n      \"credibility\": \"HIGH\"\n    }\n  ],\n  \"insights\": [\n    \"Năng lượng nguyên tử phân tán (SMRs) không chỉ là giải pháp xanh mà là điều kiện sống còn để duy trì định luật Scaling Laws của AGI mà không làm sập lưới điện quốc gia.\",\n    \"Robot hình người với chi phí vận hành dưới 3 USD/giờ sẽ chuyển đổi mô hình kinh tế từ 'lao động giá rẻ con người' sang 'vốn cố định phần cứng tự động' (CapEx-heavy labor).\"\n  ],\n  \"confidence\": 0.95,\n  \"limitations\": \"Các dự báo thương mại hóa SMRs trước năm 2030 phụ thuộc lớn vào khung pháp lý của cơ quan quản lý hạt nhân (NRC) và bài toán chuỗi cung ứng nhiên liệu uranium làm giàu cao (HALEU).\"\n}\n```"
+}

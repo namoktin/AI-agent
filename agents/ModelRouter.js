@@ -1,6 +1,6 @@
 /**
- * ModelRouter.js - Centralized Model Registry, Quota Guard and Dynamic Routing Engine
- * Cyber Agent Pro v4.0 Ultimate
+ * ModelRouter.js - Centralized Model Registry, Proactive Quota-Aware Scheduler and Dynamic Routing Engine
+ * Cyber Agent Pro v4.5 Enterprise
  */
 
 class ModelRouter {
@@ -9,14 +9,12 @@ class ModelRouter {
 
         // Unified Model Registry with Distinct Tiers (Fast, Standard, Reasoning Pro)
         this.registry = {
-            FAST: process.env.GEMINI_MODEL_FAST || 'gemini-3.1-flash-lite',
-            STANDARD: process.env.GEMINI_MODEL_STANDARD || this.defaultModel || 'gemini-3.5-flash',
-            REASONING: process.env.GEMINI_MODEL_HEAVY || 'gemini-3.5-flash',
+            FAST: process.env.GEMINI_MODEL_FAST || 'gemini-flash-lite-latest',
+            STANDARD: process.env.GEMINI_MODEL_STANDARD || this.defaultModel || 'gemini-3.5-flash-lite',
+            REASONING: process.env.GEMINI_MODEL_HEAVY || 'gemini-3.5-flash-lite',
             FALLBACK_POOL: [
-                'gemini-3.5-flash',
                 'gemini-3.5-flash-lite',
-                'gemini-3.1-flash-lite',
-                'gemini-3-flash-preview'
+                'gemini-flash-lite-latest'
             ],
             ...customConfig
         };
@@ -36,6 +34,14 @@ class ModelRouter {
         // Circuit Breaker & Quota Tracking
         this.modelCooldowns = new Map(); // modelName -> cooldownUntilTimestamp
         this.globalCooldownUntil = 0;
+
+        // PROACTIVE PRE-DISPATCH SCHEDULER & CONCURRENCY THROTTLE
+        this.inflightRequests = 0;
+        this.maxInflight = customConfig.maxInflight || 10;
+        this.activeSlots = new Map(); // slotId -> { timestamp, model }
+        this.slotCounter = 0;
+        this.dispatchQueue = [];
+        this.schedulerTimer = null;
 
         // Usage and fallback tracking
         this.dispatchLog = [];
@@ -59,6 +65,128 @@ class ModelRouter {
                 this.modelCooldowns.delete(model);
             }
         }
+
+        // Tự động giải phóng các slot đang bay bị treo (stale inflight slots > 45s) để chống nghẽn vĩnh viễn
+        const staleThreshold = now - 45000;
+        for (const [sId, sInfo] of this.activeSlots.entries()) {
+            if (sInfo.timestamp < staleThreshold) {
+                this.activeSlots.delete(sId);
+            }
+        }
+        this.inflightRequests = this.activeSlots.size;
+    }
+
+    /**
+     * Check if an API call can be safely dispatched immediately without violating quotas
+     */
+    _canDispatchNow(estimatedTokens = 1200) {
+        this.cleanSlidingWindows();
+
+        // 1. Circuit Breaker tripped
+        if (this.isCircuitBreakerTripped()) return false;
+
+        // 2. Max Inflight Concurrency
+        if (this.inflightRequests >= this.maxInflight) return false;
+
+        // 3. RPM Limit
+        if (this.requestTimestamps.length >= this.limits.maxRPM) return false;
+
+        // 4. TPM Limit
+        const currentTPM = this.tokenUsage.reduce((s, x) => s + (x.tokens || 0), 0);
+        if (currentTPM + estimatedTokens > this.limits.maxTPM) return false;
+
+        return true;
+    }
+
+    /**
+     * PROACTIVE TOKEN-BUCKET SCHEDULER:
+     * Reserves slot and queues request BEFORE dispatching to prevent 429 rate limit spikes.
+     */
+    async acquireDispatchSlot(options = {}) {
+        const { estimatedTokens = 1200, model = this.defaultModel, priority = 1, timeout = 10000 } = options;
+        const startTime = Date.now();
+        const slotId = `slot_${++this.slotCounter}_${startTime}`;
+
+        return new Promise((resolve) => {
+            const queueItem = {
+                slotId,
+                resolve,
+                estimatedTokens,
+                model,
+                priority,
+                startTime,
+                timeoutTimer: null
+            };
+
+            // Immediate slot allocation if under limits
+            if (this._canDispatchNow(estimatedTokens)) {
+                this.activeSlots.set(slotId, { timestamp: Date.now(), model });
+                this.inflightRequests = this.activeSlots.size;
+                return resolve({ granted: true, waitedMs: 0, immediate: true, slotId });
+            }
+
+            // Otherwise, enqueue and schedule orderly drainage
+            queueItem.timeoutTimer = setTimeout(() => {
+                this._removeFromQueue(queueItem);
+                this.activeSlots.set(slotId, { timestamp: Date.now(), model });
+                this.inflightRequests = this.activeSlots.size;
+                console.warn(`⏳ [QuotaScheduler] Queue wait timeout (${timeout}ms). Force granting slot.`);
+                resolve({ granted: true, waitedMs: Date.now() - startTime, forced: true, slotId });
+            }, timeout);
+
+            this.dispatchQueue.push(queueItem);
+            this.dispatchQueue.sort((a, b) => b.priority - a.priority);
+            this._scheduleNextDrain();
+        });
+    }
+
+    _scheduleNextDrain() {
+        if (this.schedulerTimer || this.dispatchQueue.length === 0) return;
+
+        this.cleanSlidingWindows();
+        const oldestTs = this.requestTimestamps[0] || Date.now();
+        const timeUntilWindowSlot = Math.max(100, (oldestTs + 60000) - Date.now() + 50);
+
+        this.schedulerTimer = setTimeout(() => {
+            this.schedulerTimer = null;
+            this._drainDispatchQueue();
+        }, Math.min(timeUntilWindowSlot, 1000));
+    }
+
+    _drainDispatchQueue() {
+        while (this.dispatchQueue.length > 0) {
+            const nextItem = this.dispatchQueue[0];
+            if (this._canDispatchNow(nextItem.estimatedTokens)) {
+                this.dispatchQueue.shift();
+                if (nextItem.timeoutTimer) clearTimeout(nextItem.timeoutTimer);
+                this.activeSlots.set(nextItem.slotId, { timestamp: Date.now(), model: nextItem.model });
+                this.inflightRequests = this.activeSlots.size;
+                nextItem.resolve({ granted: true, waitedMs: Date.now() - nextItem.startTime, immediate: false, slotId: nextItem.slotId });
+            } else {
+                this._scheduleNextDrain();
+                break;
+            }
+        }
+    }
+
+    _removeFromQueue(item) {
+        const idx = this.dispatchQueue.indexOf(item);
+        if (idx !== -1) this.dispatchQueue.splice(idx, 1);
+    }
+
+    /**
+     * Release slot upon API completion
+     */
+    releaseDispatchSlot(actualTokens = 1000, model = '', slotId = null) {
+        if (slotId && this.activeSlots.has(slotId)) {
+            this.activeSlots.delete(slotId);
+        } else if (this.activeSlots.size > 0) {
+            const oldestKey = this.activeSlots.keys().next().value;
+            if (oldestKey) this.activeSlots.delete(oldestKey);
+        }
+        this.inflightRequests = this.activeSlots.size;
+        this.recordUsage(actualTokens, model);
+        this._drainDispatchQueue();
     }
 
     /**
@@ -96,19 +224,20 @@ class ModelRouter {
      */
     recordQuotaError(model, statusCode = 429, errorDetails = '') {
         const now = Date.now();
-        const cooldownDuration = 60000; // 60s cooldown
+        // 503 là lỗi quá tải tạm thời (Spike in demand) nên chỉ cần cooldown 5 giây; 429 là hết hạn ngạch nên cooldown 60 giây
+        const cooldownDuration = statusCode === 503 ? 5000 : 60000;
 
         if (statusCode === 429 || statusCode === 503) {
             this.modelCooldowns.set(model, now + cooldownDuration);
-            console.warn(`⚠️ [ModelRouter Quota Guard] Model [${model}] gặp lỗi ${statusCode}. Cooldown 60s.`);
+            console.warn(`⚠️ [ModelRouter Quota Guard] Model [${model}] gặp lỗi ${statusCode}. Cooldown ${cooldownDuration / 1000}s.`);
 
             // Check if all models in FALLBACK_POOL are currently exhausted
             const pool = this.registry.FALLBACK_POOL || [];
             const allExhausted = pool.every(m => !this.isModelAvailable(m));
 
-            if (allExhausted) {
-                this.globalCooldownUntil = now + cooldownDuration;
-                console.error(`🚨 [ModelRouter Circuit Breaker] TOÀN BỘ model trong pool đều chạm hạn ngạch 429! Kích hoạt tạm dừng 60s để tránh đứt gãy nhiệm vụ.`);
+            if (allExhausted && statusCode === 429) {
+                this.globalCooldownUntil = now + 30000; // 30s pause
+                console.warn(`⚠️ [ModelRouter Circuit Breaker] Các model trong pool đang phục hồi nhịp độ quota...`);
             }
         }
     }
@@ -137,6 +266,11 @@ class ModelRouter {
                 current: currentRPD,
                 limit: this.limits.maxRPD,
                 percent: Math.min(100, Math.round((currentRPD / this.limits.maxRPD) * 100))
+            },
+            scheduler: {
+                inflightRequests: this.inflightRequests,
+                maxInflight: this.maxInflight,
+                queueLength: this.dispatchQueue.length
             },
             circuitBreaker: {
                 tripped: this.isCircuitBreakerTripped(),
@@ -192,14 +326,8 @@ class ModelRouter {
     getFallbackModel(currentModel, attempt = 1) {
         this.cleanSlidingWindows();
 
-        if (this.isCircuitBreakerTripped()) {
-            const remaining = Math.ceil((this.globalCooldownUntil - Date.now()) / 1000);
-            console.warn(`⏸️ [ModelRouter] Circuit Breaker đang kích hoạt. Tạm dừng chuyển model trong ${remaining}s.`);
-            return null;
-        }
-
         const pool = this.registry.FALLBACK_POOL || [];
-        if (pool.length === 0) return this.defaultModel;
+        if (pool.length === 0) return this.defaultModel || 'gemini-3.5-flash';
 
         // Ưu tiên chọn model khác model hiện tại VÀ không đang trong thời gian cooldown 429
         const viable = pool.filter(m => m !== currentModel && this.isModelAvailable(m));
@@ -216,10 +344,22 @@ class ModelRouter {
             return anyViable[0];
         }
 
-        // Toàn bộ pool đã dính 429 -> Kích hoạt Circuit Breaker
-        this.globalCooldownUntil = Date.now() + 60000;
-        console.error(`🚨 [ModelRouter] Tất cả các model trong Fallback Pool đều đã chạm giới hạn 429. Dừng chuyển model để bảo vệ API key.`);
-        return null;
+        // Circuit Breaker: Nếu toàn bộ Fallback Pool đều dính 429, ngắt mạch hoàn toàn và trả về null để dừng spam
+        if (this.isCircuitBreakerTripped()) {
+            return null;
+        }
+
+        // Nếu chưa trip circuit breaker, chọn model có thời gian cooldown sắp hết nhất
+        let earliestModel = pool[0];
+        let minCooldown = Infinity;
+        for (const m of pool) {
+            const cd = this.modelCooldowns.get(m) || 0;
+            if (cd < minCooldown) {
+                minCooldown = cd;
+                earliestModel = m;
+            }
+        }
+        return earliestModel || this.defaultModel || 'gemini-3.5-flash-lite';
     }
 
     logDispatch(role, mode, tier, model) {

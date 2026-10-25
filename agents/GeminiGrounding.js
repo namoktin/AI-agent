@@ -11,8 +11,8 @@ const https = require('https');
 const http = require('http');
 const { URL } = require('url');
 
-// Fetch polyfill
-function fetch(url, options = {}) {
+// Ưu tiên native fetch nếu có
+const fetch = typeof globalThis.fetch === 'function' ? globalThis.fetch : function fetch(url, options = {}) {
     return new Promise((resolve, reject) => {
         const parsedUrl = new URL(url);
         const client = parsedUrl.protocol === 'https:' ? https : http;
@@ -55,8 +55,8 @@ class GeminiGrounding {
         this.apiKey = geminiApiKey;
         this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
         this.models = {
-            flash: 'gemini-3.5-flash',
-            pro: 'gemini-3.5-flash'
+            flash: 'gemini-3.5-flash-lite',
+            pro: 'gemini-3.5-flash-lite'
         };
     }
 
@@ -123,7 +123,7 @@ class GeminiGrounding {
             if (!finalRes.ok && (finalRes.status === 429 || finalRes.status === 503)) {
                 console.warn(`[GeminiGrounding] Google Search grounding quota chạm giới hạn. Fallback sang sinh nội dung trực tiếp (Un-grounded)...`);
                 finalRes = await fetch(
-                    `${this.baseUrl}/models/${modelName}:generateContent?key=${this.apiKey}`,
+                    `${this.baseUrl}/models/gemini-3.5-flash-lite:generateContent?key=${this.apiKey}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },

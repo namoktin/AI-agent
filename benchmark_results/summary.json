@@ -1,0 +1,171 @@
+{
+  "timestamp": "2026-10-25T15:08:53.713Z",
+  "totalTasks": 20,
+  "successfulCount": 20,
+  "totalDurationSec": 137,
+  "averageDurationSec": 78.8,
+  "averageAntigravityScore": 9.79,
+  "exceedAntigravityCount": 11,
+  "tasksSummary": [
+    {
+      "id": 1,
+      "domain": "MMO - Cào dữ liệu & Khai phá sản phẩm Trending",
+      "title": "Cào & Bóc tách Dữ liệu Sản phẩm TikTok Shop / E-Commerce ngách Home & Living",
+      "durationSec": 137.1,
+      "success": true,
+      "finalScore": 10.2
+    },
+    {
+      "id": 2,
+      "domain": "Data Science & Định lượng Dữ liệu MMO",
+      "title": "Phân tích Thống kê Định lượng & Mô hình Dự báo View từ Bộ dữ liệu 1.000 Video",
+      "durationSec": 127,
+      "success": true,
+      "finalScore": 8.03
+    },
+    {
+      "id": 3,
+      "domain": "Đánh giá & Phản biện Mô hình Kinh doanh",
+      "title": "Phản biện Toàn diện Mô hình AI Dropshipping / Print-on-Demand (POD) 2026",
+      "durationSec": 115.4,
+      "success": true,
+      "finalScore": 9.7
+    },
+    {
+      "id": 4,
+      "domain": "Nội dung Hot nhất & Giải mã Viral Matrix",
+      "title": "Giải mã Thuật toán Phân phối Video Ngắn & 5 Mẫu Kịch bản Paradox Hook Triệu View",
+      "durationSec": 74.2,
+      "success": true,
+      "finalScore": 10.2
+    },
+    {
+      "id": 5,
+      "domain": "Hướng đi Kiếm tiền MMO 2026",
+      "title": "Kế hoạch Xây dựng Cỗ máy Kiếm tiền MMO Bền vững (Cash-Cow System)",
+      "durationSec": 52.2,
+      "success": true,
+      "finalScore": 8.2
+    },
+    {
+      "id": 6,
+      "domain": "Hướng đi Phát triển Doanh nghiệp Số",
+      "title": "Lộ trình Mở rộng Quy mô (Scaling Blueprint) từ 10.000$ lên 100.000$/tháng",
+      "durationSec": 38.7,
+      "success": true,
+      "finalScore": 10.7
+    },
+    {
+      "id": 7,
+      "domain": "Dự báo Tương lai Việt Nam 2025-2035",
+      "title": "Vị thế Chiến lược của Việt Nam trong Kỷ nguyên Bán dẫn, Năng lượng Xanh & AI",
+      "durationSec": 64.5,
+      "success": true,
+      "finalScore": 8.2
+    },
+    {
+      "id": 8,
+      "domain": "Dự báo Tương lai Thế giới 2026-2040",
+      "title": "Kỷ nguyên Hậu AGI, Năng lượng Hạt nhân SMRs và Cuộc Cách mạng Robot Hình người",
+      "durationSec": 42.2,
+      "success": true,
+      "finalScore": 8.2
+    },
+    {
+      "id": 9,
+      "domain": "Cập nhật Thông số & Công nghệ Tesla",
+      "title": "Cập nhật Thông số Kỹ thuật Mới nhất của Tesla: Cybercab, Pin 4680 Dry Cathode & AI5",
+      "durationSec": 109.7,
+      "success": true,
+      "finalScore": 10.7
+    },
+    {
+      "id": 10,
+      "domain": "Khai thác Dữ liệu X (Twitter) & Tài sản Tỷ phú",
+      "title": "Ai là Người Giàu nhất Thế giới trên X & Phân tích Biến động Tài sản Thời gian thực",
+      "durationSec": 92.9,
+      "success": true,
+      "finalScore": 10.7
+    },
+    {
+      "id": 11,
+      "domain": "Dữ liệu Y khoa & Công nghệ Đột phá",
+      "title": "Cập nhật Đột phá Y khoa Mới nhất: AlphaFold 3, CRISPR Prime Editing & Liệu pháp Tế bào",
+      "durationSec": 149.4,
+      "success": true,
+      "finalScore": 10.7
+    },
+    {
+      "id": 12,
+      "domain": "Dữ liệu trên X về Nông nghiệp Sạch",
+      "title": "Phân tích Dữ liệu Thảo luận trên X về Nông nghiệp Sạch & Tái sinh (Regenerative Agriculture)",
+      "durationSec": 63.5,
+      "success": true,
+      "finalScore": 10.7
+    },
+    {
+      "id": 13,
+      "domain": "Thiết bị Nông nghiệp Công nghệ cao",
+      "title": "Cập nhật Thông số & Ứng dụng Thực tế Thiết bị Nông nghiệp Tự hành Chất lượng cao",
+      "durationSec": 126.4,
+      "success": true,
+      "finalScore": 9.7
+    },
+    {
+      "id": 14,
+      "domain": "Hạ tầng Kỹ thuật Cào Dữ liệu Chống chặn",
+      "title": "Thiết kế Kiến trúc Pipeline Cào Dữ liệu Quy mô Lớn Bypass Cloudflare & DataDome",
+      "durationSec": 34.3,
+      "success": true,
+      "finalScore": 10.7
+    },
+    {
+      "id": 15,
+      "domain": "Tài chính Công nghệ & Định giá AI",
+      "title": "Định giá Cổ phiếu Big Tech và Đánh giá Rủi ro Bong bóng Đầu tư Hạ tầng AI",
+      "durationSec": 32.3,
+      "success": true,
+      "finalScore": 10.7
+    },
+    {
+      "id": 16,
+      "domain": "Web3 & Tài chính Phi tập trung (DeFi)",
+      "title": "Mô hình Kiếm tiền từ Token hóa Tài sản Thế giới Thực (RWA Tokenization)",
+      "durationSec": 38,
+      "success": true,
+      "finalScore": 9.7
+    },
+    {
+      "id": 17,
+      "domain": "Chuỗi Cung ứng & Tiêu chuẩn Nông sản Xuất khẩu",
+      "title": "Giải pháp Kỹ thuật Đáp ứng Quy định Chống Phá rừng EUDR và Tiêu chuẩn GlobalGAP",
+      "durationSec": 67.4,
+      "success": true,
+      "finalScore": 8.2
+    },
+    {
+      "id": 18,
+      "domain": "Kiến trúc Phần mềm Multi-Agent Nâng cao",
+      "title": "Thiết kế Kiến trúc Hệ thống 50 AI Agents Phân tán Tự Chữa lành (Self-Healing DAG)",
+      "durationSec": 54.9,
+      "success": true,
+      "finalScore": 10.2
+    },
+    {
+      "id": 19,
+      "domain": "An ninh Mạng & Phòng chống Gian lận Tài khoản MMO",
+      "title": "Giải mã Công nghệ Browser Fingerprinting và Kiến trúc Profile Cô lập Tuyệt đối",
+      "durationSec": 131,
+      "success": true,
+      "finalScore": 9.7
+    },
+    {
+      "id": 20,
+      "domain": "Chiến lược Xây dựng Rào cản Phòng thủ (Moat Building)",
+      "title": "Kế hoạch 90 Ngày Thiết lập Con hào Kinh tế (Economic Moat) cho Doanh nghiệp MMO",
+      "durationSec": 25,
+      "success": true,
+      "finalScore": 10.7
+    }
+  ]
+}

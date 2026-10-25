@@ -1,0 +1,24 @@
+{
+  "taskId": 5,
+  "domain": "Hướng đi Kiếm tiền MMO 2026",
+  "title": "Kế hoạch Xây dựng Cỗ máy Kiếm tiền MMO Bền vững (Cash-Cow System)",
+  "durationMs": 52163,
+  "durationSec": 52.2,
+  "success": true,
+  "qualityScore": 96,
+  "stats": {
+    "executionTime": "52065ms",
+    "agentCalls": 5,
+    "averageLatency": "10316ms"
+  },
+  "eval": {
+    "depthScore": 2.5,
+    "actionabilityScore": 3,
+    "reasoningScore": 2.5,
+    "bonus": 0.2,
+    "finalScore": 8.2,
+    "textLength": 1947
+  },
+  "sampleSnippet": "```json\n{\n  \"overallScore\": 96,\n  \"factualOverlap\": 0.98,\n  \"contentAgreement\": 0.95,\n  \"conflictingClaims\": [],\n  \"issues\": [\n    {\n      \"severity\": \"LOW\",\n      \"category\": \"Performance\",\n      \"description\": \"Nhiệm vụ tập trung hoàn toàn vào việc thiết kế chiến lược kinh doanh B2B SaaS & Tài chính công nghệ (Autonomous Cash-Cow Channel System) mặc dù phần system instruction có nhắc nhở về chiến lược tải video cũ (facebook_reels_download). Tuy nhiên, nội dung chiến lược kinh doanh và tài chín...",
+  "fullResponse": "```json\n{\n  \"overallScore\": 96,\n  \"factualOverlap\": 0.98,\n  \"contentAgreement\": 0.95,\n  \"conflictingClaims\": [],\n  \"issues\": [\n    {\n      \"severity\": \"LOW\",\n      \"category\": \"Performance\",\n      \"description\": \"Nhiệm vụ tập trung hoàn toàn vào việc thiết kế chiến lược kinh doanh B2B SaaS & Tài chính công nghệ (Autonomous Cash-Cow Channel System) mặc dù phần system instruction có nhắc nhở về chiến lược tải video cũ (facebook_reels_download). Tuy nhiên, nội dung chiến lược kinh doanh và tài chính được yêu cầu trong userRequest đã được giải quyết một cách xuất sắc, logic và toàn diện.\",\n      \"recommendation\": \"Duy trì sự tập trung tối đa vào yêu cầu cốt lõi của người dùng (Kế ho��ch kinh doanh 5k-15k$/tháng), đồng thời giữ vững tiêu chuẩn kiểm định thực tế.\"\n    }\n  ],\n  \"strengths\": [\n    \"Thiết kế phễu chuyển đổi 4 tầng (Short-form -> Long-form -> Lead Magnet -> Affiliate/Consulting) cực kỳ chặt chẽ và bám sát xu hướng AI Agentic Marketing 2026.\",\n    \"Danh sách 5 chương trình Affiliate B2B SaaS/AI trả hoa hồng trọn đời (lifetime recurring) hoàn toàn thực tế, uy tín cao trên thị trường toàn cầu.\",\n    \"Bảng dự toán tài chính 6 tháng đầu và kịch bản dòng tiền (Cash Flow Projection) có tính toán chi phí API, Proxy, Server minh bạch, logic và đạt điểm khả thi cao.\",\n    \"Tuân thủ tuyệt đối tư duy chiến lược CEO, không có hành vi báo cáo suông hay đùn đẩy việc cho người dùng.\"\n  ],\n  \"verdict\": \"APPROVED\",\n  \"thinkingProcess\": \"Tôi đã rà soát toàn bộ bối cảnh, yêu cầu của người dùng về bản kế hoạch kinh doanh 'Autonomous Cash-Cow Channel System' ngách B2B SaaS & Tài chính công nghệ tạo dòng tiền 5.000$ - 15.000$/tháng. Bản chiến lược giải quyết đầy đủ 3 trọng tâm: (1) Phễu chuyển đổi 4 tầng, (2) 5 chương trình Affiliate lifetime recurring uy tín, (3) Dự toán tài chính CAPEX/OPEX 6 th��ng và kịch bản dòng tiền. Các con số và cấu trúc mô hình hoàn toàn logic, thực tế và sẵn sàng triển khai. Phê duyệt hoàn toàn.\"\n}\n```"
+}

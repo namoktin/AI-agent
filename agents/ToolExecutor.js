@@ -14,8 +14,8 @@ const fs = require('fs').promises;
 const path = require('path');
 const { URL } = require('url');
 
-// Fetch polyfill
-function fetch(url, options = {}) {
+// Ưu tiên native fetch nếu có
+const fetch = typeof globalThis.fetch === 'function' ? globalThis.fetch : function fetch(url, options = {}) {
     return new Promise((resolve, reject) => {
         const parsedUrl = new URL(url);
         const client = parsedUrl.protocol === 'https:' ? https : http;

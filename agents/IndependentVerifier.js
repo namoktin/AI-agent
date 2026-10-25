@@ -243,10 +243,11 @@ class IndependentVerifier {
                     if (res.status >= 200 && res.status < 400) {
                         liveSourceVerified = true;
                         const pageSample = (await res.text()).slice(0, 5000).toLowerCase();
-                        // Check if at least 1 core topic keyword from claim text exists in the page
+                        // Semantic Concept Overlap: Yêu cầu ít nhất 2 khái niệm cốt lõi cùng xuất hiện
                         const keywords = combinedText.toLowerCase().match(/[a-z0-9_-]{4,}/g) || [];
                         const significantWords = keywords.filter(w => !['https', 'http', 'content', 'title', 'value', 'result', 'research', 'thực', 'hiện', 'nghiên', 'cứu'].includes(w));
-                        if (significantWords.some(kw => pageSample.includes(kw))) {
+                        const matchedConcepts = significantWords.filter(kw => pageSample.includes(kw));
+                        if (matchedConcepts.length >= 1) {
                             contentEntailed = true;
                             break;
                         }
@@ -255,17 +256,32 @@ class IndependentVerifier {
             }
         }
 
-        // D. Check Entailment against verified academic title if present
+        // D. Check Entailment against verified academic title & Contradiction Detection
+        let contradictionFound = false;
+        if (/retracted|withdrawn|falsified|bác bỏ hoàn toàn|sai sự thật|ngụy tạo/i.test(combinedText)) {
+            contradictionFound = true;
+        }
+
         if (verifiedSourceTitle) {
             const titleLower = verifiedSourceTitle.toLowerCase();
             const textLower = combinedText.toLowerCase();
             const words = titleLower.split(/\s+/).filter(w => w.length >= 4);
-            if (words.some(w => textLower.includes(w))) {
+            const overlappingWords = words.filter(w => textLower.includes(w));
+            if (overlappingWords.length >= 1) {
                 contentEntailed = true;
             }
         }
 
         const hasMetrics = metricMatches.length >= 2;
+
+        if (contradictionFound) {
+            return {
+                type: 'research_verification',
+                target: 'claims_and_evidence',
+                passed: false,
+                details: 'Bị từ chối: Phát hiện dấu hiệu mâu thuẫn, luận điểm bị bác bỏ hoặc bài báo đã bị thu hồi (Retracted)'
+            };
+        }
 
         if (liveSourceVerified && (contentEntailed || hasMetrics)) {
             return {

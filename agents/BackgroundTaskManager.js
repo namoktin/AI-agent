@@ -20,6 +20,7 @@ class BackgroundTaskManager {
         }
         this.tasks = this.loadTasks();
         this.reconcileInterruptedTasks();
+        this.startDetachedMonitor();
     }
 
     isPidAlive(pid) {
@@ -30,6 +31,108 @@ class BackgroundTaskManager {
         } catch (e) {
             return e.code === 'EPERM';
         }
+    }
+
+    verifyAcceptanceCriteria(task) {
+        const meta = task.metadata || {};
+        const criteria = meta.acceptanceCriteria || {};
+        const targetDir = meta.shortsDir || meta.targetDir || task.workDir || this.baseDir;
+        let actualItemCount = task.progress?.current || 0;
+        const verifiedArtifacts = [];
+        const missingArtifacts = [];
+
+        // 1. Kiểm tra từng file cụ thể được chỉ định trong expectedFiles
+        const expectedFiles = criteria.expectedFiles || meta.expectedFiles || [];
+        for (const file of expectedFiles) {
+            const filePath = path.isAbsolute(file) ? file : path.join(targetDir, file);
+            if (fs.existsSync(filePath) && fs.statSync(filePath).size > 0) {
+                verifiedArtifacts.push(filePath);
+            } else {
+                missingArtifacts.push(file);
+            }
+        }
+
+        // 2. Kiểm tra số lượng tệp vật lý thực tế trong thư mục đích nếu là task tạo tệp hàng loạt
+        if (task.type === 'download_shorts' || meta.isBatchFileTask || meta.shortsDir) {
+            try {
+                if (fs.existsSync(targetDir)) {
+                    const files = fs.readdirSync(targetDir);
+                    const mediaFiles = files.filter(f => /\.(mp4|mkv|webm|csv|json|md|txt)$/i.test(f));
+                    actualItemCount = mediaFiles.length;
+                    if (task.progress) task.progress.current = actualItemCount;
+                }
+            } catch (e) {}
+        }
+
+        const requiredCount = criteria.minItemCount || meta.totalCount || task.progress?.total || 0;
+        const filesPassed = missingArtifacts.length === 0;
+        const countPassed = requiredCount === 0 || actualItemCount >= requiredCount;
+
+        const passed = filesPassed && countPassed;
+        return {
+            passed,
+            actualItemCount,
+            requiredCount,
+            missingArtifacts,
+            verifiedArtifacts,
+            reason: !filesPassed ? `Thiếu tệp nghiệm thu thực tế: ${missingArtifacts.join(', ')}`
+                  : (!countPassed ? `Số lượng vật lý chưa đạt: ${actualItemCount}/${requiredCount}` : 'Đạt toàn bộ tiêu chí nghiệm thu vật lý')
+        };
+    }
+
+    resumeTask(taskId) {
+        const task = this.tasks[taskId];
+        if (!task) return { success: false, error: 'Không tìm thấy taskId' };
+
+        task.resumeCount = (task.resumeCount || 0) + 1;
+        task.status = 'QUEUED';
+        task.error = null;
+        task.startTime = null;
+        task.endTime = null;
+        if (task.progress) {
+            task.progress.message = `Đang tự động phục hồi lần ${task.resumeCount}...`;
+        }
+        this.saveTasks();
+
+        this.startExecution(taskId, {
+            scriptPath: task.scriptPath || task.metadata?.scriptPath,
+            args: task.args || task.metadata?.args || [],
+            command: task.command,
+            workDir: task.workDir
+        });
+
+        return { success: true, task };
+    }
+
+    startDetachedMonitor() {
+        if (this.detachedMonitorTimer) return;
+        this.detachedMonitorTimer = setInterval(() => {
+            const detachedTasks = Object.values(this.tasks).filter(t => t.status === 'RUNNING_DETACHED');
+            if (detachedTasks.length === 0) return;
+
+            let changed = false;
+            for (const task of detachedTasks) {
+                if (!this.isPidAlive(task.pid)) {
+                    task.endTime = new Date().toISOString();
+                    const audit = this.verifyAcceptanceCriteria(task);
+                    if (audit.passed) {
+                        task.status = 'COMPLETED';
+                        if (task.progress) {
+                            task.progress.percent = 100;
+                            task.progress.message = 'Tiến trình độc lập đã hoàn thành và nghiệm thu 100%';
+                        }
+                    } else {
+                        task.status = 'PARTIAL_COMPLETED';
+                        if (task.progress) {
+                            task.progress.message = `Tiến trình độc lập kết thúc: ${audit.reason}`;
+                        }
+                    }
+                    changed = true;
+                }
+            }
+            if (changed) this.saveTasks();
+        }, 5000);
+        if (this.detachedMonitorTimer.unref) this.detachedMonitorTimer.unref();
     }
 
     reconcileInterruptedTasks() {
@@ -51,6 +154,12 @@ class BackgroundTaskManager {
                         }
                     } catch (e) {}
                     changed = true;
+
+                    // TỰ ĐỘNG TIẾP TỤC (AUTO-RESUME) NẾU ĐƯỢC BẬT TRONG METADATA
+                    if (task.metadata?.autoResume === true && (task.resumeCount || 0) < 3) {
+                        console.log(`🔄 [AutoResume] Tự động tiếp tục task bị gián đoạn: ${task.id} (${task.title})`);
+                        this.resumeTask(task.id);
+                    }
                 } else {
                     task.status = 'RUNNING_DETACHED';
                     changed = true;
@@ -218,20 +327,23 @@ class BackgroundTaskManager {
 
             if (task.status !== 'CANCELLED') {
                 if (code === 0) {
-                    const total = task.progress?.total || 0;
-                    const current = task.progress?.current || 0;
-                    
-                    // Phân biệt: Hoàn thành tiến trình vs Hoàn thành mục tiêu nghiệp vụ
-                    if (total > 0 && current < total) {
+                    const audit = this.verifyAcceptanceCriteria(task);
+                    const total = task.progress?.total || audit.requiredCount || 0;
+                    const current = audit.actualItemCount !== undefined ? audit.actualItemCount : (task.progress?.current || 0);
+
+                    // Phân biệt: Hoàn thành tiến trình OS vs Hoàn thành & Nghiệm thu vật lý
+                    if (!audit.passed || (total > 0 && current < total)) {
                         task.status = 'PARTIAL_COMPLETED';
-                        task.progress.percent = Math.round((current / total) * 100);
-                        task.progress.message = `Tiến trình kết thúc: Đạt ${current}/${total} mục tiêu (${task.progress.percent}%)`;
-                        appendLog(`⚠️ Tiến trình ngầm kết thúc nhưng chỉ đạt một phần mục tiêu: ${current}/${total} (${task.progress.percent}%) (Exit code: 0)`);
+                        task.progress.current = current;
+                        task.progress.percent = total > 0 ? Math.round((current / total) * 100) : 50;
+                        task.progress.message = `Tiến trình kết thúc nhưng chưa đạt tiêu chí nghiệm thu: ${audit.reason}`;
+                        appendLog(`⚠️ Nghiệm thu vật lý (Acceptance Gate): ${audit.reason} (Exit code: 0)`);
                     } else {
                         task.status = 'COMPLETED';
+                        task.progress.current = current;
                         task.progress.percent = 100;
-                        task.progress.message = total > 0 ? `Hoàn thành 100% (${current}/${total})` : 'Hoàn thành 100%';
-                        appendLog(`✅ Tiến trình ngầm hoàn thành mục tiêu (Exit code: 0)`);
+                        task.progress.message = total > 0 ? `Hoàn thành & Nghiệm thu 100% (${current}/${total})` : 'Hoàn thành 100%';
+                        appendLog(`✅ Tiến trình ngầm hoàn thành & nghiệm thu vật lý đạt 100% (Exit code: 0)`);
                     }
                 } else {
                     task.status = 'FAILED';

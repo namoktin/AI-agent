@@ -1,0 +1,24 @@
+{
+  "taskId": 17,
+  "domain": "Chuỗi Cung ứng & Tiêu chuẩn Nông sản Xuất khẩu",
+  "title": "Giải pháp Kỹ thuật Đáp ứng Quy định Chống Phá rừng EUDR và Tiêu chuẩn GlobalGAP",
+  "durationMs": 47191,
+  "durationSec": 47.2,
+  "success": true,
+  "qualityScore": 96,
+  "stats": {
+    "executionTime": "47105ms",
+    "agentCalls": 5,
+    "averageLatency": "9413ms"
+  },
+  "eval": {
+    "depthScore": 2.5,
+    "actionabilityScore": 2.5,
+    "reasoningScore": 2.5,
+    "bonus": 0.2,
+    "finalScore": 7.7,
+    "textLength": 1887
+  },
+  "sampleSnippet": "```json\n{\n  \"overallScore\": 96,\n  \"factualOverlap\": 0.98,\n  \"contentAgreement\": 0.95,\n  \"conflictingClaims\": [],\n  \"issues\": [\n    {\n      \"severity\": \"LOW\",\n      \"category\": \"Performance\",\n      \"description\": \"Việc xử lý ảnh viễn thám quang học Sentinel-2 tại các vùng nhiệt đới theo mùa của Việt Nam (đặc biệt là Tây Nguyên vào mùa mưa) có thể gặp hiện tượng mây che phủ cao, đòi hỏi phải tích hợp đồng bộ dữ liệu radar Sentinel-1 SAR như đã đề xuất trong chiến lược.\",\n      \"recommendation\": \"D...",
+  "fullResponse": "```json\n{\n  \"overallScore\": 96,\n  \"factualOverlap\": 0.98,\n  \"contentAgreement\": 0.95,\n  \"conflictingClaims\": [],\n  \"issues\": [\n    {\n      \"severity\": \"LOW\",\n      \"category\": \"Performance\",\n      \"description\": \"Việc xử lý ảnh viễn thám quang học Sentinel-2 tại các vùng nhiệt đới theo mùa của Việt Nam (đặc biệt là Tây Nguyên vào mùa mưa) có thể gặp hiện tượng mây che phủ cao, đòi hỏi phải tích hợp đồng bộ dữ liệu radar Sentinel-1 SAR như đã đề xuất trong chiến lược.\",\n      \"recommendation\": \"Duy trì cơ chế kết hợp quang học và radar (Optical-SAR Data Fusion) trong quá trình triển khai thực tế trên Google Earth Engine.\"\n    }\n  ],\n  \"strengths\": [\n    \"Giải pháp kỹ thuật đáp ứng hoàn hảo 3 trụ cột cốt lõi của Quy định EUDR (Geospatial Polygon/GPS Mapping, Satellite Earth Observation từ 31/12/2020, và Digital Traceability Ledger tích hợp EU Information System).\",\n    \"Bám sát thực tiễn sản xuất nông sản Việt Nam (cà phê Tây Nguyên, cao su, hồ tiêu, gỗ) với quy mô nông hộ phân mảnh.\",\n    \"Đề xuất kiến trúc sổ cái số (Traceability Ledger) và tự động hóa hồ sơ Due Diligence Statement (DDS) chuẩn xác, giải quyết triệt để rủi ro pháp lý tại cửa khẩu EU.\",\n    \"Tuân thủ nghiêm ngặt định hướng chiến lược vĩ mô của CEO, không có hành vi lạc đề hay báo cáo suông.\"\n  ],\n  \"verdict\": \"APPROVED\",\n  \"thinkingProcess\": \"Tôi đã tiến hành rà soát toàn bộ các yêu cầu kỹ thuật và chiến lược đối với nhiệm vụ tuân thủ EUDR cho nông sản xuất khẩu sang Châu Âu: (1) Kiểm tra quy trình thu thập dữ liệu địa không gian đa giác (>4ha) và điểm GPS đơn lẻ (<4ha); (2) Đánh giá phương pháp đối soát ảnh viễn thám Sentinel-2 và Landsat chứng minh không phá rừng sau mốc 31/12/2020; (3) Thẩm định kiến trúc sổ cái số và kết nối EU Information System. Mọi nội dung đều logic, bám sát tiêu chuẩn pháp lý quốc tế và thực tiễn nông nghiệp Việt Nam 2026. Đạt chuẩn phê duyệt chất lượng cao.\"\n}\n```"
+}

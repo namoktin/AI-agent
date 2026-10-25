@@ -75,7 +75,31 @@ class SkillLibrary {
     }
 
     /**
-     * Retrieve optimal strategy to skip trial-and-error and minimize token consumption
+     * Record the outcome of applying an optimal strategy (Reinforcement Feedback)
+     */
+    recordStrategyOutcome(key, success = true) {
+        if (!key) return false;
+        try {
+            if (!fs.existsSync(this.optimalStrategiesFile)) return false;
+            const strategies = JSON.parse(fs.readFileSync(this.optimalStrategiesFile, 'utf8'));
+            if (!strategies[key]) return false;
+
+            const strat = strategies[key];
+            strat.runsCount = (strat.runsCount || 0) + 1;
+            strat.successCount = (strat.successCount || 0) + (success ? 1 : 0);
+            strat.successRate = Math.round((strat.successCount / strat.runsCount) * 100) / 100;
+            strat.lastOutcomeAt = new Date().toISOString();
+
+            fs.writeFileSync(this.optimalStrategiesFile, JSON.stringify(strategies, null, 2), 'utf8');
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    /**
+     * Retrieve optimal strategy based on Success-Rate Driven Selection
+     * Picks the strategy with the highest proven historical track record among candidates.
      */
     getOptimalStrategy(promptOrQuery) {
         if (!promptOrQuery || typeof promptOrQuery !== 'string') return null;
@@ -83,20 +107,35 @@ class SkillLibrary {
             if (!fs.existsSync(this.optimalStrategiesFile)) return null;
             const strategies = JSON.parse(fs.readFileSync(this.optimalStrategiesFile, 'utf8'));
             const lower = promptOrQuery.toLowerCase();
+            const candidates = [];
 
             for (const [key, strat] of Object.entries(strategies)) {
+                let isMatch = false;
                 if (strat.pattern && lower.includes(strat.pattern.toLowerCase())) {
-                    return { key, ...strat };
+                    isMatch = true;
                 }
-                if (Array.isArray(strat.keywords)) {
+                if (!isMatch && Array.isArray(strat.keywords)) {
                     for (const kw of strat.keywords) {
                         if (lower.includes(kw.toLowerCase())) {
-                            return { key, ...strat };
+                            isMatch = true;
+                            break;
                         }
                     }
                 }
+
+                if (isMatch) {
+                    const rate = strat.successRate !== undefined ? strat.successRate : 0.95;
+                    const runs = strat.runsCount || 1;
+                    const rankScore = rate * 100 + Math.log2(runs + 1);
+                    candidates.push({ key, ...strat, rankScore });
+                }
             }
-            return null;
+
+            if (candidates.length === 0) return null;
+
+            // Sort descending by rank score (highest success rate and verified runs first)
+            candidates.sort((a, b) => b.rankScore - a.rankScore);
+            return candidates[0];
         } catch (e) {
             return null;
         }

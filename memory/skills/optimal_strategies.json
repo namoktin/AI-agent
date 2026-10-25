@@ -18,7 +18,11 @@
       "tik tok"
     ],
     "bestRoute": "Dùng SCRAPE_SOCIAL_MEDIA hoặc BROWSE_WEB trích xuất trực tiếp selector [data-e2e='browse-video-desc'], like-count và comment-count qua UniversalSocialScraper.",
-    "tokensSaved": 1800
+    "tokensSaved": 1800,
+    "runsCount": 7,
+    "successCount": 7,
+    "successRate": 1,
+    "lastOutcomeAt": "2026-10-25T14:28:14.765Z"
   },
   "youtube_shorts": {
     "pattern": "youtube.com",
@@ -29,7 +33,11 @@
       "youtu.be"
     ],
     "bestRoute": "Dùng SCRAPE_SOCIAL_MEDIA bóc tách JSON-LD Schema.org VideoObject và thẻ ytd-watch-metadata để lấy chuẩn xác 100% view, like, author.",
-    "tokensSaved": 1900
+    "tokensSaved": 1900,
+    "runsCount": 1,
+    "successCount": 1,
+    "successRate": 1,
+    "lastOutcomeAt": "2026-10-25T12:19:38.445Z"
   },
   "batch_daemon": {
     "pattern": "tiến trình ngầm",
@@ -41,18 +49,25 @@
       "background task"
     ],
     "bestRoute": "BẮT BUỘC viết file script Node.js hoặc Python vào thư mục chỉ định, sau đó gọi START_BACKGROUND_TASK với scriptPath hoặc command để chạy ngầm không gây nghẽn chat. Dùng MANAGE_BACKGROUND_TASK action='status' để theo dõi tiến độ.",
-    "tokensSaved": 2500
+    "tokensSaved": 2500,
+    "runsCount": 10,
+    "successCount": 10,
+    "successRate": 1,
+    "lastOutcomeAt": "2026-10-25T15:09:08.590Z"
   },
   "facebook_reels_download": {
-    "pattern": "facebook",
+    "pattern": "facebook.com/reel",
     "keywords": [
-      "tải",
-      "download",
-      "reel",
-      "video",
-      "facebook"
+      "tải reel facebook",
+      "tải video facebook",
+      "download reel",
+      "download facebook reel"
     ],
     "bestRoute": "GỌI TRỰC TIẾP tool DOWNLOAD_VIDEO với URL hoặc đường dẫn file reel_list.txt (C:/Users/Nam/Desktop/gemini/2026-10-25/reel_list.txt) để tải toàn bộ video về máy. TUYỆT ĐỐI PHẢI PHÁT LỆNH GỌI TOOL DOWNLOAD_VIDEO NGAY, không chỉ trả lời bằng văn bản.",
-    "tokensSaved": 4000
+    "tokensSaved": 4000,
+    "runsCount": 11,
+    "successCount": 11,
+    "successRate": 1,
+    "lastOutcomeAt": "2026-10-25T15:08:50.608Z"
   }
 }

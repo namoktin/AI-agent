@@ -511,5 +511,97 @@
     },
     "endTime": "2026-10-25T10:58:04.915Z",
     "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1792929261900": {
+    "id": "test_dead_pid_1792929261900",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-25T11:54:21.900Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "task_1792929268402_f8qgu": {
+    "id": "task_1792929268402_f8qgu",
+    "title": "Live Test Full Completion",
+    "type": "generic",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T11:54:28.407Z",
+    "startTime": "2026-10-25T11:54:28.410Z",
+    "endTime": "2026-10-25T11:54:28.651Z",
+    "pid": 9272,
+    "progress": {
+      "current": 5,
+      "total": 5,
+      "percent": 100,
+      "message": "Hoàn thành & Nghiệm thu 100% (5/5)"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792929268402_f8qgu.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\AI agent",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\scratch_full_task.js",
+    "metadata": {
+      "totalCount": 5
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792929268813_szgwf": {
+    "id": "task_1792929268813_szgwf",
+    "title": "Live Test Partial Completion",
+    "type": "generic",
+    "status": "PARTIAL_COMPLETED",
+    "createdAt": "2026-10-25T11:54:28.815Z",
+    "startTime": "2026-10-25T11:54:28.817Z",
+    "endTime": "2026-10-25T11:54:29.032Z",
+    "pid": 840,
+    "progress": {
+      "current": 2,
+      "total": 5,
+      "percent": 40,
+      "message": "Tiến trình kết thúc nhưng chưa đạt tiêu chí nghiệm thu: Số lượng vật lý chưa đạt: 2/5"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792929268813_szgwf.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\AI agent",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\scratch_partial_task.js",
+    "metadata": {
+      "totalCount": 5
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "test_dead_pid_1792941042271": {
+    "id": "test_dead_pid_1792941042271",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-25T15:10:42.271Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1792941118750": {
+    "id": "test_dead_pid_1792941118750",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-25T15:11:58.751Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
   }
 }
