@@ -124,6 +124,9 @@ class AgentOrchestrator {
 
     initializeAgents() {
         const standardModel = this.defaultModel;
+        const now = new Date();
+        const dateStr = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
+        const timeStatement = `Hôm nay là ngày ${now.getDate()} tháng ${now.getMonth() + 1} năm ${now.getFullYear()} (${dateStr}). Mọi ấn phẩm, bài báo khoa học, video hoặc tài liệu năm ${now.getFullYear()} là hoàn toàn hợp lệ trong thời gian thực. TUYỆT ĐỐI KHÔNG coi năm ${now.getFullYear()} hoặc ngày ${dateStr} là tương lai hay ảo giác.`;
 
         return {
             // 🎯 DIRECTOR: Strategic mastermind
@@ -145,7 +148,7 @@ class AgentOrchestrator {
 - Đánh giá rủi ro và trade-offs
 - Tận dụng dữ liệu kiểm chứng (grounding) nếu có
 
-**THỜI GIAN HỆ THỐNG:** Hôm nay là ngày 23 tháng 10 năm 2026. Mọi ấn phẩm, bài báo khoa học, video hoặc tài liệu năm 2026 là hoàn toàn hợp lệ trong thời gian thực. TUYỆT ĐỐI KHÔNG coi năm 2026 là tương lai hay ảo giác.
+**THỜI GIAN HỆ THỐNG:** ${timeStatement}
 
 **MÔI TRƯỜNG THỰC THI (HOST OS):** Hệ thống đang chạy TRỰC TIẾP trên máy trạm Windows 11 cục bộ của người dùng (Native Windows Host, KHÔNG PHẢI Linux Sandbox hay Docker container). Mọi đường dẫn tệp dạng "C:\Users\..." là ĐƯỜNG DẪN VẬT LÝ HỢP LỆ VÀ CÓ THẬT 100%. TUYỆT ĐỐI KHÔNG coi đường dẫn Windows ổ C:\ là ảo giác hay sandbox error.
 
@@ -219,7 +222,7 @@ class AgentOrchestrator {
 4. Luôn phân biệt rõ ràng giữa Fact (sự thật có bằng chứng) và Opinion (ý kiến)
 5. TUYỆT ĐỐI KHÔNG dùng domain giả mạo (.example, dummy URLs). Mọi link BẮT BUỘC phải lấy từ nguồn thực tế (WEB_SEARCH, ACADEMIC_SEARCH, READ_URL).
 
-**THỜI GIAN HỆ THỐNG:** Hôm nay là ngày 23 tháng 10 năm 2026. Mọi ấn phẩm, bài báo khoa học, video hoặc tài liệu năm 2026 là hoàn toàn hợp lệ trong thời gian thực. TUYỆT ĐỐI KHÔNG coi năm 2026 là tương lai hay ảo giác.
+**THỜI GIAN HỆ THỐNG:** ${timeStatement}
 
 **ĐẦU RA (JSON hoặc báo cáo kèm công cụ):**
 \`\`\`json
@@ -253,7 +256,7 @@ class AgentOrchestrator {
 6. TUYỆT ĐỐI KHÔNG dùng domain giả mạo (.example, dummy URLs). Mọi link BẮT BUỘC phải lấy từ nguồn thực tế.
 7. TỰ ĐỘNG HÓA WEB TƯƠNG TÁC (BROWSE_WEB / BROWSER_ACTION): Khi nhiệm vụ yêu cầu truy cập website, bấm vào nút/link (như GIFT CARDS, More ways to gift...), cuộn trang hoặc trích xuất văn bản sau một từ khóa mốc (như sau chữ "Amazon"): Có thể dùng trực tiếp BROWSE_WEB với chuỗi actions (click, scroll, extract) và findAfter để lấy dữ liệu thực tế tức thì, siêu tiết kiệm token và chính xác tuyệt đối.
 
-**THỜI GIAN HỆ THỐNG:** Hôm nay là ngày 23 tháng 10 năm 2026. Mọi ấn phẩm, bài báo khoa học, video hoặc tài liệu năm 2026 là hoàn toàn hợp lệ trong thời gian thực. TUYỆT ĐỐI KHÔNG coi năm 2026 là tương lai hay ảo giác.
+**THỜI GIAN HỆ THỐNG:** ${timeStatement}
 
 **QUY TẮC THỰC THI & TỰ THÍCH ỨNG (ADAPTIVE PROBLEM SOLVING):**
 - Khi nhiệm vụ yêu cầu tải file, xử lý media (video, audio, ảnh, dữ liệu), cào web hoặc tự động hóa: ĐÍCH ĐẾN BẮT BUỘC LÀ FILE VẬT LÝ NẰM TRÊN Ổ ĐĨA MÁY TÍNH.
@@ -311,7 +314,7 @@ class AgentOrchestrator {
 - Với các nhiệm vụ yêu cầu tạo ra sản phẩm thực tế (code, file, media, video, tài liệu): Phải đối chiếu xem file đó có thực sự được tạo/tải về máy tính hay không.
 - QUY TẮC ĐỐI CHIẾU FILE THỰC TẾ: Khi kiểm định báo cáo mã nguồn, Critic BẮT BUỘC dùng LIST_FILES hoặc READ_FILE để đối chiếu xem các file Developer nhắc tới có tồn tại trên đĩa thật hay không. Nếu phát hiện file bịa đặt, BẮT BUỘC REJECT ngay lập tức.
 
-**THỜI GIAN HỆ THỐNG:** Hôm nay là ngày 23 tháng 10 năm 2026. Mọi ấn phẩm, bài báo khoa học, video hoặc tài liệu năm 2026 là hoàn toàn hợp lệ trong thời gian thực. TUYỆT ĐỐI KHÔNG coi năm 2026 là tương lai hay ảo giác.
+**THỜI GIAN HỆ THỐNG:** ${timeStatement}
 - BẮT BUỘC BÁC BỎ (VERDICT: REJECTED, điểm < 50) nếu phát hiện Agent:
   * Bịa đặt đường link ảo (như link cdn/fbcdn không có thực, hoặc link mẫu bịa đặt ~01abc..., saas-dashboard-dev... trong file .csv và .md). Mọi đường link bắt buộc phải xuất phát nguyên văn từ kết quả của công cụ (WEB_SEARCH, READ_URL, BROWSE_WEB).
   * Lười biếng đùn đẩy bắt người dùng tự thao tác bằng tay thay vì tự động hóa.
@@ -926,7 +929,7 @@ class AgentOrchestrator {
             const requestBody = {
                 contents: [{
                     role: 'user',
-                    parts: [{ text: typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2) }]
+                    parts: [{ text: (payload?.context?.optimalStrategy ? `⚡ [CHIẾN LƯỢC TỐI ƯU ĐÃ CHỨNG MINH - TIẾT KIỆM TOKEN]:\n- Bài học kinh nghiệm: ${payload.context.optimalStrategy.bestRoute}\n- Áp dụng trực tiếp giải pháp trên để tránh thử sai gây tốn token.\n\n` : '') + (typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2)) }]
                 }],
                 systemInstruction: {
                     parts: [{ text: agent.systemPrompt }]

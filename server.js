@@ -12,6 +12,8 @@ const { AsyncMutex } = require('./utils/mutex');
 const { RateLimiter } = require('./utils/rateLimiter');
 const { createAuthMiddleware } = require('./middleware/auth');
 const { compactAccessibilityTree, executeBrowserActions, extractContextualText } = require('./utils/browserActions');
+const { UniversalSocialScraper } = require('./utils/UniversalSocialScraper');
+const universalSocialScraper = new UniversalSocialScraper();
 
 // Mutex toàn cục cho file experiences.json (tránh concurrent write corruption)
 const experiencesMutex = new AsyncMutex();
@@ -100,6 +102,8 @@ const EXPERIENCES_MD = path.join(MEMORY_DIR, 'EXPERIENCES.md');
 
 // Khởi tạo Persistent Cookie Vault (Lưu trữ và tái sử dụng cookie vĩnh viễn)
 const { CookieVault } = require('./agents/CookieVault');
+const { BackgroundTaskManager } = require('./agents/BackgroundTaskManager');
+const backgroundTaskManager = new BackgroundTaskManager(BASE_DIR);
 const cookieVault = new CookieVault(BASE_DIR);
 
 // Thư mục gốc trên Desktop chuyên chứa toàn bộ sản phẩm do AI Agent tạo ra
@@ -1004,15 +1008,19 @@ app.get('/api/workspace-info', (req, res) => {
 
 // Parse thành executable + argv; không bao giờ chuyển chuỗi người dùng vào shell.
 function parseSafeCommand(command) {
-    if (typeof command !== 'string' || !command.trim() || command.length > 500) return null;
+    if (typeof command !== "string" || !command.trim() || command.length > 2000) return null;
     const value = command.trim();
-    // Shell metacharacters, command substitution and control operators are never accepted.
-    if (/[&|<>`$;\n\r]|\$\(|\b(?:cmd|powershell|pwsh|sh|bash)\b/i.test(value)) return null;
+    // Chặn newline, null byte, backticks, subshell $(...), và các shell binary
+    if (/[\r\n\0`]|\$\([\s\S]*?\)|\b(?:cmd\.exe|powershell(?:\.exe)?|pwsh(?:\.exe)?|sh\b|bash\b)/i.test(value)) return null;
 
     const parts = value.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g);
     if (!parts || parts.length === 0) return null;
-    const args = parts.map(part => part.replace(/^(["'])|(["'])$/g, ''));
+    const args = parts.map(part => part.replace(/^(["'])|(["'])$/g, ""));
     const executable = args.shift().toLowerCase();
+    // Nếu không phải yt-dlp, cấm tuyệt đối các toán tử nối lệnh shell
+    if (executable !== "yt-dlp" && executable !== "yt-dlp.exe") {
+        if (/[&|<>$;`]/.test(value)) return null;
+    }
     const scriptArg = args[0] || '';
     const safePathOrRelative = input => {
         if (typeof input !== 'string' || !input || input.length > 300) return false;
@@ -1039,7 +1047,7 @@ function parseSafeCommand(command) {
         return { file: executable === 'py' ? 'py' : executable, args, display: value };
     }
     if (executable === 'yt-dlp' || executable === 'yt-dlp.exe') {
-        const safeYtArg = a => typeof a === 'string' && a.length <= 500 && !/[;&|`$<>]/.test(a);
+        const safeYtArg = a => typeof a === 'string' && a.length <= 1000 && !/[\r\n\0`]/.test(a);
         if (args.every(safeYtArg)) {
             return { file: 'yt-dlp', args, display: value };
         }
@@ -1550,7 +1558,12 @@ app.post('/api/fetch-webpage', async (req, res) => {
                     const truncated = cleanContent.length > 7000;
                     cleanContent = cleanContent.slice(0, 7000);
 
-                    let deepLinkAppendix = "";
+                    let socialAppendix = "";
+        if (socialData && (socialData.caption || socialData.views || socialData.likes || socialData.comments_count || socialData.author)) {
+            socialAppendix = "\r\n\r\n" + universalSocialScraper.formatToMarkdown(socialData);
+        }
+
+        let deepLinkAppendix = "";
                     if (deepJobLinks.length > 0) {
                         deepLinkAppendix = `\n\n### 🎯 DANH SÁCH CÁC LINK BÀI TUYỂN DỤNG CỤ THỂ TRÍCH XUẤT ĐƯỢC TỪ TRANG NÀY:\n` +
                             deepJobLinks.slice(0, 10).map((j, i) => `${i + 1}. **[${j.title}](${j.url})**\n   - Link trực tiếp: \`${j.url}\``).join('\n');
@@ -3007,6 +3020,18 @@ app.post('/api/browse-web', async (req, res) => {
             };
         }, currentUrl);
 
+        // Bóc tách mạng xã hội toàn diện (Multi-Platform Universal Social Media Extraction)
+        let socialData = null;
+        const detectedPlatform = universalSocialScraper.detectPlatform(currentUrl);
+        if (detectedPlatform !== 'unknown' && detectedPlatform !== 'general_web') {
+            try {
+                const socialExtractFn = universalSocialScraper.getBrowserExtractionFunction();
+                socialData = await activePage.evaluate(socialExtractFn, currentUrl, detectedPlatform);
+            } catch (socErr) {
+                console.warn('⚠️ Lỗi trích xuất UniversalSocialScraper:', socErr.message);
+            }
+        }
+
         await browser.close();
         browser = null;
 
@@ -3014,6 +3039,11 @@ app.post('/api/browse-web', async (req, res) => {
         let cleanText = (extraction.bodyText || '').replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n\n').trim();
         const truncated = cleanText.length > 7000;
         cleanText = cleanText.slice(0, 7000);
+
+        let socialAppendix = "";
+        if (socialData && (socialData.caption || socialData.views || socialData.likes || socialData.comments_count || socialData.author)) {
+            socialAppendix = "\r\n\r\n" + universalSocialScraper.formatToMarkdown(socialData);
+        }
 
         let deepLinkAppendix = "";
         if (extraction.links && extraction.links.length > 0) {
@@ -3031,7 +3061,8 @@ app.post('/api/browse-web', async (req, res) => {
             success: true,
             title: title,
             url: currentUrl,
-            content: cleanText + (truncated ? '\n\n... [Nội dung đã được cắt ngắn] ...' : '') + deepLinkAppendix + deepMediaAppendix,
+            content: cleanText + (truncated ? '\n\n... [Nội dung đã được cắt ngắn] ...' : '') + socialAppendix + deepLinkAppendix + deepMediaAppendix,
+            socialData: socialData,
             accessibilitySnapshot: accessibilitySnapshot,
             actionsExecuted: actionLogs,
             lastExtracted: actionExtracted || (contextualMatch ? contextualMatch.followingText : null),
@@ -3055,6 +3086,324 @@ app.post('/api/browse-web', async (req, res) => {
 // =========================================================================
 // API: PERSISTENT COOKIE VAULT ENDPOINTS
 // =========================================================================
+
+// API: Bóc tách chuyên sâu mạng xã hội trực tiếp (Standalone Universal Social Scraper)
+app.post('/api/scrape-social', async (req, res) => {
+    const { url, headless } = req.body;
+    if (!url) return res.status(400).json({ success: false, error: 'Thiếu đường dẫn URL bài đăng mạng xã hội.' });
+
+    const platform = universalSocialScraper.detectPlatform(url);
+    const chromePath = getInstalledBrowserPath();
+
+    // 1. Thử cào nhanh bằng Fetch trước (nếu là trang tĩnh hoặc có OpenGraph)
+    try {
+        const fastResp = await fetch(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7'
+            }
+        });
+        if (fastResp.ok) {
+            const html = await fastResp.text();
+            const fastData = universalSocialScraper.parseHtmlContent(html, url);
+            if (fastData.title && (fastData.caption || fastData.views || fastData.likes)) {
+                return res.json({
+                    success: true,
+                    mode: 'fast_meta',
+                    data: fastData,
+                    markdown: universalSocialScraper.formatToMarkdown(fastData)
+                });
+            }
+        }
+    } catch (e) {}
+
+    // 2. Nếu fetch nhanh không đủ dữ liệu, dùng Puppeteer Stealth
+    if (!chromePath) {
+        return res.json({ success: false, error: 'Không tìm thấy trình duyệt Chrome để bóc tách động.' });
+    }
+
+    let browser = null;
+    try {
+        browser = await puppeteer.launch({
+            executablePath: chromePath,
+            headless: headless !== false,
+            userDataDir: CHROME_PROFILE_DIR,
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--window-size=1920,1080', '--lang=vi-VN,vi']
+        });
+        const page = await browser.newPage();
+        await setupStealthPage(page);
+        await autoInjectCookies(page, url);
+
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: 35000 });
+        await new Promise(r => setTimeout(r, 2000));
+
+        const extractFn = universalSocialScraper.getBrowserExtractionFunction();
+        const extracted = await page.evaluate(extractFn, url, platform);
+
+        await browser.close();
+        browser = null;
+
+        return res.json({
+            success: true,
+            mode: 'puppeteer_stealth',
+            data: extracted,
+            markdown: universalSocialScraper.formatToMarkdown(extracted)
+        });
+    } catch (err) {
+        if (browser) {
+            try { await browser.close(); } catch (e) {}
+        }
+        return res.json({ success: false, error: 'Lỗi bóc tách mạng xã hội: ' + err.message });
+    }
+});
+
+// API: Kiểm tra xác minh tuyên bố tiến trình ngầm (Anti-Phantom Daemon Gate)
+app.post('/api/verify-daemon-claim', (req, res) => {
+    const { claimText } = req.body;
+    const isClaiming = /tiến trình ngầm|chạy ngầm|đang tải ngầm|tải trong nền|background daemon/i.test(claimText || '');
+    const runningList = Array.from(activeDaemons.values()).filter(d => d.status === 'RUNNING');
+    
+    return res.json({
+        success: true,
+        claimed: isClaiming,
+        hasRunningDaemon: runningList.length > 0,
+        runningCount: runningList.length,
+        daemons: runningList.map(d => ({
+            id: d.id,
+            command: d.command,
+            pid: d.process ? d.process.pid : null,
+            uptimeSeconds: Math.floor((Date.now() - d.startTime) / 1000)
+        }))
+    });
+});
+
+
+// API: Tải video trực tiếp từ mọi mạng xã hội (Facebook Reels, TikTok, YouTube...)
+
+// =========================================================================
+// ANTIGRAVITY-STYLE BACKGROUND TASK ENGINE ENDPOINTS
+// =========================================================================
+app.get('/api/tasks/list', (req, res) => {
+    try {
+        const tasks = backgroundTaskManager.listTasks();
+        const active = backgroundTaskManager.getActiveTasks();
+        res.json({ success: true, tasks, activeCount: active.length });
+    } catch(e) {
+        res.json({ success: false, error: e.message });
+    }
+});
+
+app.get('/api/tasks/:id/status', (req, res) => {
+    const task = backgroundTaskManager.getTask(req.params.id);
+    if (!task) return res.status(404).json({ success: false, error: 'Task not found' });
+    const logs = backgroundTaskManager.getTaskLogs(req.params.id, 50);
+    res.json({ success: true, task, logs });
+});
+
+app.post('/api/tasks/:id/cancel', (req, res) => {
+    const result = backgroundTaskManager.cancelTask(req.params.id);
+    res.json(result);
+});
+
+app.post('/api/tasks/start-shorts-job', (req, res) => {
+    const { query, count = 50, maxDuration = 60 } = req.body;
+    const workerScript = path.join(BASE_DIR, 'workers', 'batch_shorts_downloader.js');
+    const todayDir = getTodayOutputDir();
+    const shortsDir = path.join(todayDir, 'shorts_50');
+    if (!fs.existsSync(shortsDir)) fs.mkdirSync(shortsDir, { recursive: true });
+
+    const task = backgroundTaskManager.createTask({
+        title: `Tải ${count} video Short/Reel (<${maxDuration}s): ${query || 'Khoa học vũ trụ'}`,
+        type: 'download_shorts',
+        scriptPath: workerScript,
+        args: [query || 'ytsearch100:khoa hoc vu tru shorts #shorts', String(count), String(maxDuration), shortsDir],
+        workDir: shortsDir,
+        metadata: { totalCount: count, maxDuration, shortsDir }
+    });
+
+    console.log('🚀 [TASK_ENGINE] Khởi chạy tiến trình ngầm:', task.id, task.title);
+
+    res.json({
+        success: true,
+        message: `Đã khởi chạy tiến trình ngầm ${task.id}! Bạn có thể tiếp tục làm việc khác mà không cần đợi.`,
+        task: {
+            id: task.id,
+            title: task.title,
+            status: task.status,
+            shortsDir
+        }
+    });
+});
+
+app.post('/api/tasks/start-task', (req, res) => {
+    const { title, command, scriptPath, args = [], workDir, metadata = {}, type = 'generic_worker', totalItems } = req.body;
+    if (!title) return res.status(400).json({ success: false, error: 'Thiếu tiêu đề tác vụ (title).' });
+
+    let finalWorkDir = workDir ? resolvePath(workDir) : getTodayOutputDir();
+    if (!fs.existsSync(finalWorkDir)) fs.mkdirSync(finalWorkDir, { recursive: true });
+
+    let resolvedScriptPath = null;
+    let finalArgs = Array.isArray(args) ? args : [];
+
+    if (scriptPath) {
+        resolvedScriptPath = resolvePath(scriptPath);
+        if (!fs.existsSync(resolvedScriptPath)) {
+            return res.status(400).json({ success: false, error: `Không tìm thấy file script: ${scriptPath}` });
+        }
+        const ext = path.extname(resolvedScriptPath).toLowerCase();
+        if (ext !== '.js' && ext !== '.py') {
+            return res.status(400).json({ success: false, error: 'Chỉ hỗ trợ chạy ngầm file script .js hoặc .py an toàn.' });
+        }
+    } else if (command) {
+        const parsed = parseSafeCommand(command);
+        if (!parsed) {
+            return res.status(400).json({ success: false, error: 'Lệnh không nằm trong schema an toàn, không được phép chạy ngầm.' });
+        }
+    } else {
+        return res.status(400).json({ success: false, error: 'Cần cung cấp scriptPath hoặc command an toàn để chạy ngầm.' });
+    }
+
+    const taskMeta = { ...metadata };
+    if (totalItems) taskMeta.totalCount = Number(totalItems);
+
+    const task = backgroundTaskManager.createTask({
+        title,
+        type,
+        scriptPath: resolvedScriptPath,
+        command,
+        args: finalArgs,
+        workDir: finalWorkDir,
+        metadata: taskMeta
+    });
+
+    console.log(`🚀 [TASK_ENGINE] Khởi chạy tiến trình ngầm tổng quát [${task.id}]: ${task.title}`);
+
+    res.json({
+        success: true,
+        message: `Đã khởi chạy tiến trình ngầm [${task.id}] thành công! Bạn có thể tiếp tục làm việc khác mà không cần đợi.`,
+        task: {
+            id: task.id,
+            title: task.title,
+            status: task.status,
+            workDir: finalWorkDir,
+            logFile: task.logFile
+        }
+    });
+});
+
+app.post('/api/tasks/manage-task', (req, res) => {
+    const { action = 'list', taskId } = req.body;
+    if (action === 'list') {
+        const tasks = backgroundTaskManager.listTasks();
+        const active = backgroundTaskManager.getActiveTasks();
+        return res.json({ success: true, tasks, activeCount: active.length });
+    }
+    if (!taskId) return res.status(400).json({ success: false, error: 'Thiếu taskId để thực hiện hành động ' + action });
+
+    if (action === 'status') {
+        const task = backgroundTaskManager.getTask(taskId);
+        if (!task) return res.status(404).json({ success: false, error: `Không tìm thấy task ${taskId}` });
+        return res.json({ success: true, task });
+    }
+    if (action === 'logs') {
+        const logs = backgroundTaskManager.getTaskLogs(taskId, 60);
+        return res.json({ success: true, taskId, logs });
+    }
+    if (action === 'cancel' || action === 'stop' || action === 'kill') {
+        const result = backgroundTaskManager.cancelTask(taskId);
+        return res.json(result);
+    }
+    return res.status(400).json({ success: false, error: `Hành động ${action} không hợp lệ. Chỉ chấp nhận: list, status, logs, cancel.` });
+});
+
+app.post('/api/download-video', async (req, res) => {
+    let { url, urls, batchUrls, outputFileName } = req.body;
+    let targetInput = url || urls || batchUrls;
+    if (!targetInput) return res.status(400).json({ success: false, error: 'Thiếu đường dẫn URL video hoặc danh sách URL cần tải.' });
+
+    const workDir = getTodayOutputDir();
+    if (!fs.existsSync(workDir)) fs.mkdirSync(workDir, { recursive: true });
+
+    // File cookies Facebook nếu có
+    const fbCookiePath = path.join(BASE_DIR, 'memory', 'cookies', 'facebook.com.txt');
+    const hasFbCookie = fs.existsSync(fbCookiePath);
+
+    const args = ['--no-warnings', '--no-playlist', '--concurrent-fragments', '5'];
+    if (hasFbCookie) {
+        args.push('--cookies', fbCookiePath);
+    }
+
+    // Đặt template tên file xuất
+    if (outputFileName && !Array.isArray(targetInput)) {
+        const safeName = path.basename(outputFileName);
+        args.push('-o', path.join(workDir, safeName));
+    } else {
+        args.push('-o', path.join(workDir, '%(title).60s_%(id)s.%(ext)s'));
+    }
+
+    // Ghi nhận các file hiện có trước khi tải
+    const existingFiles = new Set(fs.readdirSync(workDir).filter(f => f.endsWith('.mp4') || f.endsWith('.mkv') || f.endsWith('.webm')));
+
+    // Kiểm tra đầu vào: Là tệp danh sách link (.txt) hay danh sách mảng / chuỗi URL
+    if (typeof targetInput === 'string' && (targetInput.endsWith('.txt') || targetInput.includes('reel_list.txt')) && fs.existsSync(targetInput.trim())) {
+        args.push('-a', targetInput.trim());
+        console.log('🎬 [DOWNLOAD_VIDEO] Tải hàng loạt từ tệp danh sách:', targetInput.trim());
+    } else {
+        let urlList = [];
+        if (Array.isArray(targetInput)) {
+            urlList = targetInput;
+        } else if (typeof targetInput === 'string') {
+            urlList = targetInput.split(/[\r\n,]+/).map(u => u.trim()).filter(Boolean);
+        }
+
+        // Làm sạch URL (bỏ query rác mibextid)
+        urlList = urlList.map(u => u.replace(/[?&]mibextid=[^&]+/i, '').replace(/[?&]rdid=[^&]+/i, '').trim()).filter(Boolean);
+        if (urlList.length === 0) {
+            return res.status(400).json({ success: false, error: 'Không tìm thấy URL hợp lệ để tải.' });
+        }
+
+        console.log(`🎬 [DOWNLOAD_VIDEO] Đang tải ${urlList.length} video...`);
+        args.push(...urlList);
+    }
+
+    const child = spawn('yt-dlp', args, { cwd: workDir, shell: false, windowsHide: true });
+    let stdout = '', stderr = '';
+
+    child.stdout.on('data', d => stdout += d.toString());
+    child.stderr.on('data', d => stderr += d.toString());
+
+    child.on('close', code => {
+        const outText = stdout + (stderr ? '\n' + stderr : '');
+        // Quét tất cả file mới sinh ra
+        const currentFiles = fs.readdirSync(workDir).filter(f => f.endsWith('.mp4') || f.endsWith('.mkv') || f.endsWith('.webm'));
+        const newFiles = currentFiles.filter(f => !existingFiles.has(f)).map(f => ({
+            name: f,
+            path: path.join(workDir, f),
+            size: fs.statSync(path.join(workDir, f)).size,
+            mtime: fs.statSync(path.join(workDir, f)).mtimeMs
+        })).sort((a, b) => b.mtime - a.mtime);
+
+        if (newFiles.length > 0 || code === 0) {
+            console.log(`✅ [DOWNLOAD_VIDEO] Hoàn thành tải: ${newFiles.length} file mới.`);
+            return res.json({
+                success: true,
+                message: `Đã tải thành công ${newFiles.length} video về: ${workDir}`,
+                downloadedCount: newFiles.length,
+                files: newFiles,
+                file: newFiles[0] || null,
+                output: outText.slice(-400)
+            });
+        } else {
+            console.warn('❌ [DOWNLOAD_VIDEO] Tải thất bại:', outText.slice(-300));
+            return res.json({
+                success: false,
+                error: 'Lỗi tải video từ yt-dlp: ' + (stderr || stdout).slice(-300),
+                output: outText
+            });
+        }
+    });
+});
+
 app.get('/api/cookie-vault', (req, res) => {
     try {
         const vault = cookieVault.getVault();
@@ -5308,6 +5657,7 @@ app.post('/api/v2/execute', async (req, res) => {
 
         res.json({
             success: result.success,
+            mode: result.mode || 'standard',
             result: result.result,
             qualityScore: result.qualityScore,
             critique: result.critique,

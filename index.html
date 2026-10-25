@@ -1921,6 +1921,35 @@
             padding: 2px 4px;
         }
         .toast-btn-close:hover { color: #f4f4f5; }
+    
+        /* SMART CHAT URL HIGHLIGHTING PILL */
+        .smart-chat-url {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(14, 165, 233, 0.15) !important;
+            border: 1px solid rgba(56, 189, 248, 0.45) !important;
+            color: #38bdf8 !important;
+            font-weight: 600 !important;
+            padding: 2px 8px !important;
+            margin: 0 2px !important;
+            border-radius: 6px !important;
+            text-decoration: none !important;
+            word-break: break-all !important;
+            transition: all 0.2s ease !important;
+            box-shadow: 0 0 8px rgba(56, 189, 248, 0.15) !important;
+        }
+        .smart-chat-url:hover {
+            background: rgba(14, 165, 233, 0.3) !important;
+            border-color: #38bdf8 !important;
+            color: #7dd3fc !important;
+            text-decoration: underline !important;
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.45) !important;
+        }
+        .smart-chat-url .url-icon {
+            font-size: 0.8rem;
+        }
+
     </style>
 </head>
 <body>
@@ -2387,6 +2416,17 @@
     function renderMarkdownWithMath(element, text) {
         if (!element) return;
         element.innerHTML = marked.parse(text || "");
+        element.querySelectorAll('a').forEach(a => {
+            if (!a.classList.contains('smart-chat-url') && !a.classList.contains('btn-preview-link')) {
+                a.classList.add('smart-chat-url');
+                if (!a.querySelector('.url-icon')) {
+                    const icon = document.createElement('span');
+                    icon.className = 'url-icon';
+                    icon.textContent = '🔗 ';
+                    a.prepend(icon);
+                }
+            }
+        });
         makeFilesClickable(element);
 
         // Tự động nhận diện đường dẫn chi tiết (Deep Links) và tối ưu hóa hiển thị
@@ -3214,6 +3254,71 @@
     const NATIVE_TOOLS = [{
         functionDeclarations: [
             {
+                            {
+                name: "SCRAPE_SOCIAL_MEDIA",
+                description: "BÓC TÁCH DỮ LIỆU ĐA MẠNG XÃ HỘI (Universal Social Media Scraper): Bóc tách chuẩn xác Caption/Mô tả, Lượt xem (Views), Lượt thích (Likes), Số bình luận (Comments), Tác giả và Ngày đăng cho 10+ mạng xã hội (Facebook Reels/Posts, TikTok, YouTube Shorts/Videos, Instagram, X/Twitter, Reddit, Threads, LinkedIn, Pinterest, Bluesky).",
+                parameters: {
+                    type: "OBJECT",
+                    properties: {
+                        url: { type: "STRING", description: "Đường dẫn URL bài viết hoặc video cần bóc tách" },
+                        headless: { type: "BOOLEAN", description: "Mặc định true (chạy ngầm)" }
+                    },
+                    required: ["url"]
+                }
+            },
+            {
+                name: "START_BACKGROUND_TASK",
+                description: "KHỞI CHẠY TIẾN TRÌNH CHẠY NGẦM ĐA NĂNG (Antigravity Universal Task Runner): Cho phép chạy ngầm bất kỳ công việc dài hạn nào (cào dữ liệu hàng trăm website, xử lý dữ liệu lớn, chạy script Node.js/Python, huấn luyện, backtest, render, convert file hàng loạt...). Trả về ngay Task ID trong duoi 400ms, KHONG LAM TREO GIAO DIEN CHAT. Giao diện tự động hiển thị thanh tiến độ % thời gian thực và phát thông báo khi hoàn thành.",
+                parameters: {
+                    type: "OBJECT",
+                    properties: {
+                        title: { type: "STRING", description: "Tiêu đề mô tả công việc (ví dụ: 'Cào 200 bài viết tuyển dụng', 'Phân tích file CSV 50,000 dòng')" },
+                        scriptPath: { type: "STRING", description: "Đường dẫn file script (.js hoặc .py) để chạy ngầm (AI có thể dùng SAVE_FILE tạo script này trước rồi truyền vào đây)" },
+                        command: { type: "STRING", description: "Lệnh thực thi an toàn nếu không dùng scriptPath (ví dụ: 'node workers/scraper.js', 'python analyze.py')" },
+                        args: { type: "ARRAY", items: { type: "STRING" }, description: "Các tham số dòng lệnh truyền vào script (tùy chọn)" },
+                        workDir: { type: "STRING", description: "Thư mục làm việc (mặc định là thư mục sản phẩm ngày hôm nay)" },
+                        totalItems: { type: "NUMBER", description: "Tổng số mục tiêu cần hoàn thành để tính % tiến độ (ví dụ: 100, 500)" }
+                    },
+                    required: ["title"]
+                }
+            },
+            {
+                name: "MANAGE_BACKGROUND_TASK",
+                description: "QUẢN LÝ TIẾN TRÌNH CHẠY NGẦM (Antigravity Task Manager): Tra cứu danh sách task đang chạy, kiểm tra tiến độ %, xem log hoặc dừng khẩn cấp (kill PID) tiến trình ngầm.",
+                parameters: {
+                    type: "OBJECT",
+                    properties: {
+                        action: { type: "STRING", description: "Hành động: 'list' (danh sách), 'status' (kiểm tra tiến độ), 'logs' (xem log), 'cancel' (dừng khẩn cấp)" },
+                        taskId: { type: "STRING", description: "Mã định danh task (ví dụ: 'task_1792921293598_catd7')" }
+                    },
+                    required: ["action"]
+                }
+            },
+            {
+                name: "START_BACKGROUND_SHORTS_TASK",
+                description: "KHỞI CHẠY TIẾN TRÌNH NGẦM TẢI SHORTS/REELS (Antigravity-Style): Tải hàng loạt 50-100 video ngắn (<1 phút) ngầm dưới hệ điều hành Windows. Trả về Task ID ngay lập tức mà KHÔNG LÀM TREO GIAO DIỆN CHAT, tự động cập nhật thanh tiến độ và thông báo khi hoàn thành.",
+                parameters: {
+                    type: "OBJECT",
+                    properties: {
+                        query: { type: "STRING", description: "Từ khóa hoặc URL nguồn (mặc định: 'khoa hoc vu tru shorts')" },
+                        count: { type: "NUMBER", description: "Số lượng video cần tải (mặc định: 50)" },
+                        maxDuration: { type: "NUMBER", description: "Thời lượng tối đa mỗi video tính bằng giây (mặc định: 60)" }
+                    }
+                }
+            },
+            {
+                name: "DOWNLOAD_VIDEO",
+                description: "TẢI VIDEO ĐA NỀN TẢNG (Facebook Reels, TikTok, YouTube...): Hỗ trợ tải 1 video hoặc HÀNG LOẠT video (truyền 1 link, mảng nhiều link, hoặc đường dẫn file .txt chứa danh sách link như reel_list.txt). Hệ thống tự động gắn cookie Facebook và lưu toàn bộ file .mp4 thực tế về ổ đĩa ngày hôm nay.",
+                parameters: {
+                    type: "OBJECT",
+                    properties: {
+                        url: { type: "STRING", description: "Đường dẫn URL video hoặc reel cần tải" },
+                        outputFileName: { type: "STRING", description: "Tên file mong muốn (ví dụ: video_1.mp4, hoặc để trống)" }
+                    },
+                    required: ["url"]
+                }
+            },
+            {
                 name: "SAVE_FILE",
                 description: "Tạo mới hoặc ghi đè file (CSV, MD, HTML, TXT, JSON, Python, JS...). HỆ THỐNG LIVE PREVIEW HỖ TRỢ XEM TRỰC TIẾP CẢ FILE .CSV (Bảng tính Excel) VÀ .MD (Tài liệu báo cáo)! Quy tắc chọn định dạng chuẩn:\n1. BẮT BUỘC dùng '.csv' (Excel): Cho danh sách việc làm/job freelance, danh sách leads, data khách hàng, bảng giá theo cột (Tiêu đề, Link, Giá, Kỹ năng, Liên hệ).\n2. BẮT BUỘC dùng '.md' (Markdown): Cho báo cáo phân tích chuyên sâu, tài liệu nghiên cứu, kịch bản chào hàng (Cold Outreach / Proposal templates), luận án.\n3. Dùng '.html': Khi làm Dashboard điều khiển tương tác, slide thuyết trình tương tác, HOẶC THIẾT KẾ CV, POSTER, BANNER QUẢNG CÁO (kết hợp Tailwind CSS CDN & Google Fonts để sau đó gọi tool EXPORT_DESIGN xuất sang PDF in ấn hoặc PNG sắc nét).\n4. Dùng '.txt' hoặc '.json': Cho cấu hình, kịch bản ngắn, prompt hoặc data thô.",
                 parameters: {
@@ -3677,6 +3782,20 @@ Bạn sở hữu năng lực điều phối nhân sự, phân bổ quyền hạn
        + Bước 1: Gọi 'FORM_SPECIALIST_TEAM' để thành lập Hội đồng Nghiên cứu Khoa học (bao gồm Chuyên gia Kiến trúc/Đề xuất, Chuyên viên Tra cứu Học thuật cấp quyền 'ACADEMIC_SEARCH' & 'VERIFY_SOURCE_METADATA', và Thẩm định viên Độc lập cấp quyền 'AUDIT_CITATION_ENTAILMENT' & 'ENFORCE_QUALITY_GATE').
        + Bước 2: Gọi 'CONDUCT_DEBATE' để kích hoạt tranh biện hội đồng bàn tròn HOẶC gọi 'ACADEMIC_SEARCH'/'WEB_SEARCH' để truy xuất tài liệu khoa học gốc!
      * ⚠️ NẾU BẠN CHỈ TỰ VIẾT BÁO CÁO BẰNG TEXT MÀ KHÔNG GỌI TOOL NÀO, HỆ THỐNG SẼ COI ĐÓ LÀ LỖI BỎ QUA CÔNG CỤ VÀ LÀM VIỆC CẨU THẢ!
+
+
+
+[QUY TẮC TẢI SỐ LƯỢNG LỚN (50 - 100 VIDEO SHORTS / REELS)]:
+- Khi CEO yêu cầu tải số lượng lớn video ngắn (ví dụ: 50 video shorts, 100 reels < 1 phút):
+  1. BẮT BUỘC GỌI NGAY CÔNG CỤ 'START_BACKGROUND_SHORTS_TASK' với query và count (ví dụ: count=50, maxDuration=60)!
+  2. Công cụ này lập tức khởi chạy tiến trình ngầm, giải phóng khung chat và bảo vệ tài khoản chống bị quét IP.
+  3. TUYỆT ĐỐI KHÔNG cố gắng tải tuần tự từng video trong khung chat vì sẽ làm nghẽn giao diện của CEO!
+
+[QUY TẮC TẢI VIDEO & REELS TỰ HÀNH]:
+- Khi CEO yêu cầu tải video hoặc Reels:
+  1. HỖ TRỢ TẢI HÀNG LOẠT: Công cụ 'DOWNLOAD_VIDEO' nhận URL đơn lẻ, HOẶC đường dẫn file danh sách link (ví dụ: 'C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\reel_list.txt'), HOẶC mảng các link video! Hãy truyền file danh sách hoặc danh sách link vào 'DOWNLOAD_VIDEO' để tải toàn bộ video cùng lúc!
+  2. TUYỆT ĐỐI KHÔNG NÓI 'Tôi kích hoạt tải ngay' MÀ KHÔNG GỌI TOOL! Bạn PHẢI phát lệnh gọi tool 'DOWNLOAD_VIDEO' ngay trong cùng bước đó. Nói suông mà không gọi tool sẽ làm dừng phiên chạy của CEO!
+  3. Hoàn thành việc lưu trữ thực tế đủ số lượng file .mp4 trên đĩa cứng là tiêu chí số 1!
 
 [QUY TẮC LẬP TRÌNH & CHỈNH SỬA MÃ NGUỒN CHUYÊN NGHIỆP]:
 1. CHỈNH SỬA MÃ NGUỒN AN TOÀN (SURGICAL EDITING):
@@ -4322,6 +4441,15 @@ Gatekeeper đã thẩm định và xác nhận đây là chủ đề GIÁ TRỊ 
     }
 
     // Thêm tin nhắn vào kênh và tự động đồng bộ sang Phòng Họp Toàn Thể
+    
+    function highlightUrlsInHtml(html) {
+        if (!html || typeof html !== 'string') return html;
+        const urlRegex = /(?<!href=["']|src=["'])(https?:\/\/[^\s<>'"]+)/gi;
+        return html.replace(urlRegex, (match) => {
+            return `<a href="${match}" target="_blank" rel="noopener noreferrer" class="smart-chat-url"><span class="url-icon">🔗</span> ${match}</a>`;
+        });
+    }
+
     function appendCorporateMessage(channelId, senderObj, text, className = "") {
         const avatar = senderObj.avatar || "👤";
         const senderName = senderObj.name || "THÀNH VIÊN";
@@ -4333,7 +4461,7 @@ Gatekeeper đã thẩm định và xác nhận đây là chủ đề GIÁ TRỊ 
             <div class="avatar" style="border-color: ${color}; color: ${color};">${avatar}</div>
             <div class="message-content-box">
                 <div class="sender-name" style="color: ${color};">${senderName}</div>
-                <div class="message-content">${text}</div>
+                <div class="message-content">${highlightUrlsInHtml(text)}</div>
             </div>
         `;
 
@@ -6496,7 +6624,7 @@ NHIỆM VỤ ĐỐI THOẠI, TIẾP THU & HOÀN THIỆN KIỆT TÁC 9.0+ ĐẾN 
         const estTokens = Math.ceil(totalChars / 3.8);
 
         // Kích hoạt khi token vượt 5,000 HOẶC lịch sử quá 14 tin nhắn
-        if (estTokens < 5000 && chatHistory.length < 14) return;
+        if (estTokens < 35000 && chatHistory.length < 25) return;
 
         appendMessage("SYS", "SYSTEM", `<span style="color:var(--accent-yellow)">[ 🧠 Background Task: Phát hiện ngữ cảnh đạt ~${estTokens.toLocaleString()} tokens (${chatHistory.length} tin nhắn). Đang tinh gọn bộ nhớ... ]</span>`, null, "system-message");
 
@@ -6597,10 +6725,13 @@ YÊU CẦU: Giữ nguyên tên file, tên biến, thông số kỹ thuật. Bỏ
 
         // Cập nhật lại lịch sử với bản tóm tắt cấu trúc
         const beforeChars = totalChars;
+        const initialUserGoal = chatHistory.find(m => m.role === 'user' && !m.parts?.[0]?.functionResponse) || chatHistory[0];
+        const filteredRecent = recentChats.filter(m => m !== initialUserGoal);
         chatHistory = [
+            initialUserGoal,
             { role: "user", parts: [{ text: `[BẢN ĐỒ NGỮ CẢNH DỰ ÁN & LỊCH SỬ TINH GỌN]:\n${summaryText}` }] },
-            { role: "model", parts: [{ text: "Đã nạp toàn bộ bản đồ ngữ cảnh dự án. Mời Operator tiếp tục chỉ thị!" }] },
-            ...recentChats
+            { role: "model", parts: [{ text: "Đã nạp toàn bộ bản đồ ngữ cảnh dự án. Tôi tiếp tục thực thi mục tiêu của CEO!" }] },
+            ...filteredRecent
         ];
 
         const afterChars = chatHistory.reduce((sum, msg) => {
@@ -7034,7 +7165,7 @@ Báo cáo gồm:
         sendBtn.disabled = true;
         let continueLoop = true;
         let loopSteps = 0;
-        const MAX_STEPS = 12; // Giới hạn tối đa 12 bước tự hành cho mỗi lượt để chống lặp vô tận
+        const MAX_STEPS = 20; // Giới hạn tối đa 12 bước tự hành cho mỗi lượt để chống lặp vô tận
 
         while (continueLoop && loopSteps < MAX_STEPS && isTaskRunning) {
             continueLoop = false;
@@ -7563,7 +7694,7 @@ Báo cáo gồm:
                                         response: {
                                             success: isOk,
                                             exitCode: data.exitCode,
-                                            output: termOut
+                                            output: (termOut && termOut.length > 4000) ? (termOut.slice(0, 3000) + '\n... [Đã cắt bớt đầu ra terminal quá dài] ...\n' + termOut.slice(-800)) : termOut
                                         }
                                     }
                                 }]
@@ -7706,6 +7837,135 @@ Báo cáo gồm:
                                     }
                                 }
                             }]
+                        });
+                        continueLoop = true;
+                        continue;
+                    }
+
+                    
+                    // TOOL: SCRAPE_SOCIAL_MEDIA (Bóc tách đa mạng xã hội)
+                    else if (toolName === "SCRAPE_SOCIAL_MEDIA") {
+                        const startTime = performance.now();
+                        msgContent.innerHTML += `<div class="tool-card tool-browse"><div class="tool-card-header">📊 [SOCIAL SCRAPER] Đang bóc tách dữ liệu: <b>${escapeHtml(args.url || '')}</b></div></div>`;
+                        const res = await fetch('http://localhost:3000/api/scrape-social', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(args)
+                        });
+                        const resultData = await res.json();
+                        const duration = ((performance.now() - startTime) / 1000).toFixed(2) + 's';
+                        if (resultData.success) {
+                            msgContent.innerHTML += `<div class="tool-card" style="border-left: 3px solid #38bdf8; background: rgba(56, 189, 248, 0.05); padding: 10px; margin-top: 8px; border-radius: 6px;">
+                                <div style="font-weight: bold; color: #38bdf8;">✓ Đã trích xuất thành công [${(resultData.data?.platform || 'Social').toUpperCase()}] (⏱️ ${duration})</div>
+                                <div style="font-size: 0.85rem; margin-top: 6px;">${marked.parse(resultData.markdown || '')}</div>
+                            </div>`;
+                        } else {
+                            msgContent.innerHTML += `<div style="color: #ef4444; font-size: 0.85rem; margin-top: 6px;">❌ Lỗi bóc tách: ${escapeHtml(resultData.error || 'Thất bại')}</div>`;
+                        }
+                        chatHistory.push({
+                            role: "user",
+                            parts: [{ functionResponse: { name: toolName, response: resultData } }]
+                        });
+                        continueLoop = true;
+                        continue;
+                    }
+
+                    
+                    
+                    // TOOL: START_BACKGROUND_TASK (Tiến trình ngầm đa năng Antigravity Task Runner)
+                    else if (toolName === "START_BACKGROUND_TASK") {
+                        const startTime = performance.now();
+                        const taskTitle = args.title || 'Tác vụ chạy ngầm';
+                        msgContent.innerHTML += `<div class="tool-card tool-file"><div class="tool-card-header">⚡ [TASK ENGINE] Đang khởi chạy tiến trình ngầm: <b>${escapeHtml(taskTitle)}</b></div></div>`;
+                        const res = await fetch('http://localhost:3000/api/tasks/start-task', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(args)
+                        });
+                        const resultData = await res.json();
+                        const duration = ((performance.now() - startTime) / 1000).toFixed(2) + 's';
+                        if (resultData.success) {
+                            msgContent.innerHTML += `<div class="tool-card tool-file" style="border-left: 3px solid #38bdf8; background: rgba(56, 189, 248, 0.08); padding: 10px; margin-top: 8px; border-radius: 6px;">
+                                <div style="font-weight: bold; color: #38bdf8;">🚀 Tiến trình ngầm đã kích hoạt: ${escapeHtml(resultData.task?.id || '')}</div>
+                                <div style="font-size: 0.85rem; color: #cbd5e1; margin-top: 4px;">📂 Thư mục làm việc: <code>${escapeHtml(resultData.task?.workDir || '')}</code></div>
+                                <div style="font-size: 0.8rem; color: #10b981; margin-top: 4px;">💡 Khung chat đã được giải phóng hoàn toàn! Task panel sẽ cập nhật tiến độ liên tục và thông báo khi hoàn thành.</div>
+                            </div>`;
+                            if (typeof triggerTaskMonitorPoll === 'function') triggerTaskMonitorPoll();
+                        } else {
+                            msgContent.innerHTML += `<div style="color: #ef4444; font-size: 0.85rem; margin-top: 6px;">❌ ${escapeHtml(resultData.error || 'Lỗi khởi chạy task ngầm')}</div>`;
+                        }
+                        chatHistory.push({
+                            role: "user",
+                            parts: [{ functionResponse: { name: toolName, response: resultData } }]
+                        });
+                        continueLoop = true;
+                        continue;
+                    }
+
+                    // TOOL: MANAGE_BACKGROUND_TASK (Tra cứu / dừng task ngầm)
+                    else if (toolName === "MANAGE_BACKGROUND_TASK") {
+                        const startTime = performance.now();
+                        const res = await fetch('http://localhost:3000/api/tasks/manage-task', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(args)
+                        });
+                        const resultData = await res.json();
+                        chatHistory.push({
+                            role: "user",
+                            parts: [{ functionResponse: { name: toolName, response: resultData } }]
+                        });
+                        continueLoop = true;
+                        continue;
+                    }
+
+                    // TOOL: START_BACKGROUND_SHORTS_TASK (Tiến trình ngầm tải 50-100 shorts)
+                    else if (toolName === "START_BACKGROUND_SHORTS_TASK") {
+                        const startTime = performance.now();
+                        msgContent.innerHTML += `<div class="tool-card tool-file"><div class="tool-card-header">⚡ [TASK ENGINE] Đang khởi chạy tiến trình ngầm: <b>${escapeHtml(args.query || 'Shorts/Reels')} (${args.count || 50} video)</b></div></div>`;
+                        const res = await fetch('http://localhost:3000/api/tasks/start-shorts-job', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(args)
+                        });
+                        const resultData = await res.json();
+                        const duration = ((performance.now() - startTime) / 1000).toFixed(2) + 's';
+                        if (resultData.success) {
+                            msgContent.innerHTML += `<div class="tool-card tool-file" style="border-left: 3px solid #38bdf8; background: rgba(56, 189, 248, 0.08); padding: 10px; margin-top: 8px; border-radius: 6px;">
+                                <div style="font-weight: bold; color: #38bdf8;">🚀 Tiến trình ngầm đã kích hoạt: ${escapeHtml(resultData.task?.id || '')}</div>
+                                <div style="font-size: 0.85rem; color: #cbd5e1; margin-top: 4px;">📂 Thư mục xuất: <code>${escapeHtml(resultData.task?.shortsDir || '')}</code></div>
+                                <div style="font-size: 0.8rem; color: #10b981; margin-top: 4px;">💡 Khung chat đã được giải phóng hoàn toàn! Tiến độ sẽ tự động hiển thị trên thanh công cụ và thông báo chuông khi xong.</div>
+                            </div>`;
+                            if (typeof triggerTaskMonitorPoll === 'function') triggerTaskMonitorPoll();
+                        } else {
+                            msgContent.innerHTML += `<div style="color: #ef4444; font-size: 0.85rem; margin-top: 6px;">❌ ${escapeHtml(resultData.error || 'Lỗi khởi chạy task ngầm')}</div>`;
+                        }
+                        chatHistory.push({
+                            role: "user",
+                            parts: [{ functionResponse: { name: toolName, response: resultData } }]
+                        });
+                        continueLoop = true;
+                        continue;
+                    }
+
+                    // TOOL: DOWNLOAD_VIDEO (Tải video chuyên dụng)
+                    else if (toolName === "DOWNLOAD_VIDEO") {
+                        const startTime = performance.now();
+                        msgContent.innerHTML += `<div class="tool-card tool-file"><div class="tool-card-header">📥 [DOWNLOAD_VIDEO] Đang tải video về máy: <b>${escapeHtml(args.url || '')}</b></div></div>`;
+                        const res = await fetch('http://localhost:3000/api/download-video', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(args)
+                        });
+                        const resultData = await res.json();
+                        const duration = ((performance.now() - startTime) / 1000).toFixed(2) + 's';
+                        if (resultData.success) {
+                            msgContent.innerHTML += `<div class="tool-card tool-file" style="border-left: 3px solid #10b981; background: rgba(16, 185, 129, 0.08); padding: 10px; margin-top: 8px; border-radius: 6px;">
+                                <div style="font-weight: bold; color: #10b981;">✅ ${escapeHtml(resultData.message || 'Tải video thành công')} (⏱️ ${duration})</div>
+                                <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">📁 Tệp: <code>${escapeHtml(resultData.file?.name || '')}</code> (${((resultData.file?.size || 0)/1024/1024).toFixed(1)} MB)</div>
+                            </div>`;
+                            showFloatingArtifactToast(resultData.file?.path, resultData.file?.name);
+                        } else {
+                            msgContent.innerHTML += `<div style="color: #ef4444; font-size: 0.85rem; margin-top: 6px;">❌ ${escapeHtml(resultData.error || 'Lỗi tải video')}</div>`;
+                        }
+                        chatHistory.push({
+                            role: "user",
+                            parts: [{ functionResponse: { name: toolName, response: resultData } }]
                         });
                         continueLoop = true;
                         continue;
@@ -8508,6 +8768,45 @@ Báo cáo gồm:
                     }
                 }
 
+                
+                // ANTI-PHANTOM & ANTI-HALLUCINATION GATE: Chặn đứng hoàn toàn việc AI nói suông đang chạy ngầm
+                // AUTO-ACTION-NUDGE: Chặn đứng triệt để thói quen "nói suông / hứa hẹn" của AI mà không phát lệnh gọi tool
+                const isPromisingActionWithoutTool = /kích hoạt.*ngay|tiến hành.*ngay|bắt đầu.*ngay|sẽ tải|tải hàng loạt|đang tải|chuẩn bị tải|tiến hành tải|bắt tay vào|thực hiện ngay|tiến hành thực hiện|sẽ tiến hành|sẽ bắt đầu|tôi bắt đầu|tôi thực hiện|tôi tải|tôi sẽ/i.test(botReply);
+                if (isPromisingActionWithoutTool && !continueLoop && loopSteps < MAX_STEPS && isTaskRunning) {
+                    console.warn('⚠️ [AUTO-ACTION-NUDGE] Phát hiện AI nói suông hứa hẹn hành động mà không gọi tool! Tự động thúc đẩy gọi tool tải.');
+                    chatHistory.push({
+                        role: "user",
+                        parts: [{
+                            text: "[CHỈ THỊ THỰC THI TỨC THÌ TỪ CEO]: Bạn vừa nói 'Tôi kích hoạt / sẽ tiến hành' nhưng bạn MỚI CHỈ PHẢN HỒI BẰNG VĂN BẢN MÀ CHƯA HỀ PHÁT LỆNH GỌI TOOL NÀO! Tuyệt đối không được dừng lại ở lời nói. BẮT BUỘC NGAY BÂY GIỜ PHẢI PHÁT LỆNH GỌI TOOL: Gọi ngay DOWNLOAD_VIDEO (truyền file danh sách reel_list.txt hoặc danh sách URL) hoặc RUN_CMD để tải thật toàn bộ các video về đĩa cứng!"
+                        }]
+                    });
+                    continueLoop = true;
+                    continue;
+                }
+
+                const claimsBackground = /tiến trình ngầm|chạy ngầm|đang tải ngầm|tải trong nền|background daemon/i.test(botReply);
+                if (claimsBackground && !continueLoop && loopSteps < MAX_STEPS && isTaskRunning) {
+                    try {
+                        const dRes = await fetch('http://localhost:3000/api/verify-daemon-claim', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ claimText: botReply })
+                        });
+                        const dData = await dRes.json();
+                        if (!dData.hasRunningDaemon) {
+                            console.warn('⚠️ [ANTI-HALLUCINATION GATE] Phát hiện ảo giác hành động: không có daemon nào đang chạy!');
+                            chatHistory.push({
+                                role: "user",
+                                parts: [{
+                                    text: "⚠️ [CẢNH BÁO CHỐNG ẢO GIÁC HỆ THỐNG]: Bạn vừa tuyên bố 'đang chạy tiến trình ngầm' nhưng hệ thống kiểm tra thực tế thấy KHÔNG CÓ TIẾN TRÌNH NGẦM NÀO ĐANG CHẠY (runningCount = 0). Tuyệt đối không được nói suông hoặc hứa hẹn ảo! BẮT BUỘC BÂY GIỜ PHẢI: Viết script Node.js / Python tải các mục còn lại và gọi MANAGE_DAEMON để khởi chạy thật, HOẶC gọi tool xử lý hoàn thành toàn bộ mục tiêu ngay lập tức!"
+                                }]
+                            });
+                            continueLoop = true;
+                            continue;
+                        }
+                    } catch (e) {}
+                }
+
                 // AUTO-NUDGE: Nếu Phó Giám Đốc chỉ lên kế hoạch/nói suông
                 if (!continueLoop && loopSteps < 4 && isTaskRunning) {
                     const isTalkingAboutFormingOrDelegating = /triệu tập|thành lập|phòng chiến lược|phòng ban|giao việc|cho \d+ phòng chạy|sẽ cho.*chạy|bước 1/i.test(botReply);
@@ -8795,5 +9094,67 @@ document.addEventListener('keydown', e => {
     }, 900);
 })();
 </script>
+
+    <!-- ANTIGRAVITY LIVE BACKGROUND TASK RUNNER WIDGET -->
+    <div id="antigravity-task-panel" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: none; background: #0f172a; border: 1px solid #38bdf8; border-radius: 10px; padding: 12px 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); max-width: 380px; font-family: inherit;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: bold; color: #38bdf8;">
+                <span class="pulse-dot" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #38bdf8; box-shadow: 0 0 8px #38bdf8;"></span>
+                <span id="ag-task-title">TIẾN TRÌNH CHẠY NGẦM</span>
+            </div>
+            <button onclick="document.getElementById('antigravity-task-panel').style.display='none'" style="background: none; border: none; color: #64748b; cursor: pointer; font-size: 1rem;">✕</button>
+        </div>
+        <div id="ag-task-desc" style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 6px;">Đang xử lý tác vụ...</div>
+        <div style="width: 100%; height: 6px; background: #1e293b; border-radius: 3px; overflow: hidden; margin-bottom: 6px;">
+            <div id="ag-task-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #38bdf8, #10b981); transition: width 0.3s ease;"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #cbd5e1;">
+            <span id="ag-task-status-text">0/50 video (0%)</span>
+            <span id="ag-task-time">00:00</span>
+        </div>
+    </div>
+
+    <script>
+    let activeTaskPollingInterval = null;
+    let completedTaskIds = new Set();
+
+    async function triggerTaskMonitorPoll() {
+        try {
+            const res = await fetch('http://localhost:3000/api/tasks/list');
+            const data = await res.json();
+            if (!data.success) return;
+
+            const activeTasks = (data.tasks || []).filter(t => t.status === 'RUNNING' || t.status === 'QUEUED');
+            const panel = document.getElementById('antigravity-task-panel');
+
+            if (activeTasks.length > 0) {
+                const current = activeTasks[0];
+                if (panel) {
+                    panel.style.display = 'block';
+                    document.getElementById('ag-task-title').innerText = '⚡ ' + current.title.slice(0, 32);
+                    document.getElementById('ag-task-desc').innerText = current.progress?.message || 'Đang thực thi tác vụ nền...';
+                    const percent = current.progress?.percent || 0;
+                    document.getElementById('ag-task-progress-bar').style.width = percent + '%';
+                    document.getElementById('ag-task-status-text').innerText = `${current.progress?.current || 0}/${current.progress?.total || 50} video (${percent}%)`;
+                }
+            } else {
+                // Kiểm tra xem có task nào vừa COMPLETED không
+                const completedTasks = (data.tasks || []).filter(t => t.status === 'COMPLETED');
+                for (const t of completedTasks) {
+                    if (!completedTaskIds.has(t.id)) {
+                        completedTaskIds.add(t.id);
+                        if (panel) panel.style.display = 'none';
+                        showFloatingArtifactToast(t.metadata?.shortsDir, '50 Video Shorts Hoàn Thành');
+                        appendMessage("VP", "PHÓ GIÁM ĐỐC", `🎉 <b>[BÁO CÁO TIẾN TRÌNH NGẦM HOÀN TẤT]</b>: Thưa Chủ Tịch, tiến trình <code>${t.id}</code> đã tải hoàn tất toàn bộ 50 video Short/Reel (<1 phút) về thư mục <code>${t.metadata?.shortsDir || ''}</code>!`, null, "bot-message");
+                    }
+                }
+            }
+        } catch(e) {}
+    }
+
+    // Tự động thăm dò task mỗi 3.5 giây
+    setInterval(triggerTaskMonitorPoll, 3500);
+    </script>
+
 </body>
 </html>

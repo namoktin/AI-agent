@@ -55,8 +55,8 @@ class GeminiGrounding {
         this.apiKey = geminiApiKey;
         this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
         this.models = {
-            flash: 'gemini-2.0-flash-exp',
-            pro: 'gemini-1.5-pro'
+            flash: 'gemini-3.5-flash',
+            pro: 'gemini-3.5-flash'
         };
     }
 

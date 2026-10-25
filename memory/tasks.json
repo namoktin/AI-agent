@@ -1,0 +1,437 @@
+{
+  "task_1792920567446_4iksu": {
+    "id": "task_1792920567446_4iksu",
+    "title": "Tải 50 video Short/Reel (<60s): ytsearch60:khoa hoc vu tru shorts #shorts",
+    "type": "download_shorts",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T09:29:27.452Z",
+    "startTime": "2026-10-25T09:29:27.454Z",
+    "endTime": "2026-10-25T09:29:38.436Z",
+    "pid": 9628,
+    "progress": {
+      "current": 1,
+      "total": 50,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792920567446_4iksu.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\batch_shorts_downloader.js",
+    "metadata": {
+      "totalCount": 50,
+      "maxDuration": 60,
+      "shortsDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50"
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792920640598_7uk90": {
+    "id": "task_1792920640598_7uk90",
+    "title": "Tải 50 video Short/Reel (<60s): ytsearch80:khoa hoc vu tru shorts #shorts",
+    "type": "download_shorts",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T09:30:40.599Z",
+    "startTime": "2026-10-25T09:30:40.600Z",
+    "endTime": "2026-10-25T09:30:49.329Z",
+    "pid": 1568,
+    "progress": {
+      "current": 1,
+      "total": 50,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792920640598_7uk90.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\batch_shorts_downloader.js",
+    "metadata": {
+      "totalCount": 50,
+      "maxDuration": 60,
+      "shortsDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50"
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792920760076_gub7c": {
+    "id": "task_1792920760076_gub7c",
+    "title": "Tải 50 video Short/Reel (<60s): https://www.youtube.com/@TEDEd/shorts",
+    "type": "download_shorts",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T09:32:40.077Z",
+    "startTime": "2026-10-25T09:32:40.078Z",
+    "endTime": "2026-10-25T09:34:07.189Z",
+    "pid": 2304,
+    "progress": {
+      "current": 24,
+      "total": 50,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792920760076_gub7c.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\batch_shorts_downloader.js",
+    "metadata": {
+      "totalCount": 50,
+      "maxDuration": 60,
+      "shortsDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50"
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792920878321_i96ye": {
+    "id": "task_1792920878321_i96ye",
+    "title": "Tải 50 video Short/Reel (<60s): https://www.youtube.com/@Kurzgesagt/shorts",
+    "type": "download_shorts",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T09:34:38.322Z",
+    "startTime": "2026-10-25T09:34:38.324Z",
+    "endTime": "2026-10-25T09:37:01.795Z",
+    "pid": 2000,
+    "progress": {
+      "current": 32,
+      "total": 50,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792920878321_i96ye.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\batch_shorts_downloader.js",
+    "metadata": {
+      "totalCount": 50,
+      "maxDuration": 60,
+      "shortsDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50"
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792921293598_catd7": {
+    "id": "task_1792921293598_catd7",
+    "title": "Tải 25 video Short/Reel (<60s): https://www.youtube.com/@veritasium/shorts",
+    "type": "download_shorts",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T09:41:33.600Z",
+    "startTime": "2026-10-25T09:41:33.601Z",
+    "endTime": "2026-10-25T09:46:08.746Z",
+    "pid": 9464,
+    "progress": {
+      "current": 55,
+      "total": 25,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792921293598_catd7.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\batch_shorts_downloader.js",
+    "metadata": {
+      "totalCount": 25,
+      "maxDuration": 60,
+      "shortsDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50"
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792922232948_baj5p": {
+    "id": "task_1792922232948_baj5p",
+    "title": "Phân tích & Xử lý 10 lô dữ liệu lớn",
+    "type": "data_processing",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T09:57:12.955Z",
+    "startTime": "2026-10-25T09:57:12.957Z",
+    "endTime": "2026-10-25T09:57:16.272Z",
+    "pid": 4980,
+    "progress": {
+      "current": 10,
+      "total": 10,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792922232948_baj5p.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\test_data_processor.js",
+    "metadata": {
+      "totalCount": 10
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923061623_m5kfr": {
+    "id": "task_1792923061623_m5kfr",
+    "title": "Cào dữ liệu 15 tin tức công nghệ AI (Web Scraping Batch)",
+    "type": "web_scraping",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:01.624Z",
+    "startTime": "2026-10-25T10:11:01.626Z",
+    "endTime": "2026-10-25T10:11:04.042Z",
+    "pid": 4500,
+    "progress": {
+      "current": 15,
+      "total": 15,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923061623_m5kfr.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task1_web_scraper.js",
+    "metadata": {
+      "totalCount": 15
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923064292_sxpsb": {
+    "id": "task_1792923064292_sxpsb",
+    "title": "Xử lý dữ liệu lớn 5,000 giao dịch tài chính (Big Data ETL)",
+    "type": "big_data",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:04.293Z",
+    "startTime": "2026-10-25T10:11:04.294Z",
+    "endTime": "2026-10-25T10:11:05.525Z",
+    "pid": 8404,
+    "progress": {
+      "current": 10,
+      "total": 10,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923064292_sxpsb.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task2_big_data_processor.js",
+    "metadata": {
+      "totalCount": 10
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923065597_6px2i": {
+    "id": "task_1792923065597_6px2i",
+    "title": "Mô phỏng Monte Carlo 10,000 kịch bản rủi ro đầu tư (Simulation)",
+    "type": "simulation",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:05.598Z",
+    "startTime": "2026-10-25T10:11:05.600Z",
+    "endTime": "2026-10-25T10:11:07.147Z",
+    "pid": 9436,
+    "progress": {
+      "current": 10,
+      "total": 10,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923065597_6px2i.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task3_monte_carlo.js",
+    "metadata": {
+      "totalCount": 10
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923067300_6rzxt": {
+    "id": "task_1792923067300_6rzxt",
+    "title": "Trích xuất thực thể thông minh Named Entity Recognition (NLP)",
+    "type": "nlp_ner",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:07.303Z",
+    "startTime": "2026-10-25T10:11:07.304Z",
+    "endTime": "2026-10-25T10:11:08.354Z",
+    "pid": 8584,
+    "progress": {
+      "current": 8,
+      "total": 8,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923067300_6rzxt.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task4_entity_extractor.js",
+    "metadata": {
+      "totalCount": 8
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923068561_df164": {
+    "id": "task_1792923068561_df164",
+    "title": "Kiểm tra sức khỏe đồng thời 10 endpoint mạng (Link Health Audit)",
+    "type": "network_audit",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:08.562Z",
+    "startTime": "2026-10-25T10:11:08.563Z",
+    "endTime": "2026-10-25T10:11:13.980Z",
+    "pid": 10152,
+    "progress": {
+      "current": 10,
+      "total": 10,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923068561_df164.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task5_link_health_auditor.js",
+    "metadata": {
+      "totalCount": 10
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923074266_zphzd": {
+    "id": "task_1792923074266_zphzd",
+    "title": "Thuật toán phân cụm K-Means bằng Python (Python Data Science)",
+    "type": "python_science",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:14.267Z",
+    "startTime": "2026-10-25T10:11:14.268Z",
+    "endTime": "2026-10-25T10:11:15.746Z",
+    "pid": 9932,
+    "progress": {
+      "current": 10,
+      "total": 10,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923074266_zphzd.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task6_kmeans_clustering.py",
+    "metadata": {
+      "totalCount": 10
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923075986_3hbb4": {
+    "id": "task_1792923075986_3hbb4",
+    "title": "Dựng Dashboard HTML tương tác và biểu đồ SVG (Dashboard Generator)",
+    "type": "html_dashboard",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:15.987Z",
+    "startTime": "2026-10-25T10:11:15.989Z",
+    "endTime": "2026-10-25T10:11:16.670Z",
+    "pid": 1828,
+    "progress": {
+      "current": 5,
+      "total": 5,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923075986_3hbb4.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task7_dashboard_generator.js",
+    "metadata": {
+      "totalCount": 5
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923076855_ck7jc": {
+    "id": "task_1792923076855_ck7jc",
+    "title": "Tính toán mã băm SHA256 xác thực toàn vẹn tệp (Integrity Checksum)",
+    "type": "security_checksum",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:16.855Z",
+    "startTime": "2026-10-25T10:11:16.857Z",
+    "endTime": "2026-10-25T10:11:18.096Z",
+    "pid": 9924,
+    "progress": {
+      "current": 8,
+      "total": 8,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923076855_ck7jc.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task8_checksum_archiver.js",
+    "metadata": {
+      "totalCount": 5
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923078269_5yeph": {
+    "id": "task_1792923078269_5yeph",
+    "title": "Thử nghiệm áp lực chạy song song 2 luồng ngầm A & B (Concurrent Stress)",
+    "type": "concurrency_test",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:18.270Z",
+    "startTime": "2026-10-25T10:11:18.272Z",
+    "endTime": "2026-10-25T10:11:20.076Z",
+    "pid": 8096,
+    "progress": {
+      "current": 8,
+      "total": 8,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923078269_5yeph.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task9_concurrent_a.js",
+    "metadata": {
+      "totalCount": 8
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923078301_lxos3": {
+    "id": "task_1792923078301_lxos3",
+    "title": "Thử nghiệm áp lực chạy song song 2 luồng ngầm A & B (Concurrent Stress) [Luồng B]",
+    "type": "concurrency_test",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:18.333Z",
+    "startTime": "2026-10-25T10:11:18.334Z",
+    "endTime": "2026-10-25T10:11:20.152Z",
+    "pid": 240,
+    "progress": {
+      "current": 8,
+      "total": 8,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923078301_lxos3.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task9_concurrent_b.js",
+    "metadata": {
+      "totalCount": 8
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923080797_u9t3a": {
+    "id": "task_1792923080797_u9t3a",
+    "title": "Thẩm định quy trình xử lý đa phương tiện (Media Batch Pipeline)",
+    "type": "media_pipeline",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:20.798Z",
+    "startTime": "2026-10-25T10:11:20.800Z",
+    "endTime": "2026-10-25T10:11:21.566Z",
+    "pid": 1836,
+    "progress": {
+      "current": 4,
+      "total": 4,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923080797_u9t3a.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task10_media_batch.js",
+    "metadata": {
+      "totalCount": 4
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  }
+}

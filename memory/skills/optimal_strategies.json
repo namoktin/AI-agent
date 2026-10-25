@@ -1,0 +1,57 @@
+{
+  "facebook_reels": {
+    "pattern": "facebook.com",
+    "keywords": [
+      "facebook",
+      "fb",
+      "reel",
+      "xemlacuon"
+    ],
+    "bestRoute": "Sử dụng BROWSE_WEB kèm extractReels: true hoặc SCRAPE_SOCIAL_MEDIA để trích xuất cả caption, view count, author và canonical reel url. Nếu tải batch, tạo script Node.js / Python tải tuần tự thay vì gọi lệnh thô.",
+    "tokensSaved": 2400
+  },
+  "tiktok_video": {
+    "pattern": "tiktok.com",
+    "keywords": [
+      "tiktok",
+      "video tiktok",
+      "tik tok"
+    ],
+    "bestRoute": "Dùng SCRAPE_SOCIAL_MEDIA hoặc BROWSE_WEB trích xuất trực tiếp selector [data-e2e='browse-video-desc'], like-count và comment-count qua UniversalSocialScraper.",
+    "tokensSaved": 1800
+  },
+  "youtube_shorts": {
+    "pattern": "youtube.com",
+    "keywords": [
+      "youtube",
+      "shorts",
+      "yt",
+      "youtu.be"
+    ],
+    "bestRoute": "Dùng SCRAPE_SOCIAL_MEDIA bóc tách JSON-LD Schema.org VideoObject và thẻ ytd-watch-metadata để lấy chuẩn xác 100% view, like, author.",
+    "tokensSaved": 1900
+  },
+  "batch_daemon": {
+    "pattern": "tiến trình ngầm",
+    "keywords": [
+      "tiến trình ngầm",
+      "chạy ngầm",
+      "daemon",
+      "tải ngầm"
+    ],
+    "bestRoute": "BẮT BUỘC viết file script Node.js hoặc Python vào thư mục chỉ định, sau đó gọi MANAGE_DAEMON action='start' với command='node <script>.js'. KHÔNG gọi yt-dlp trực tiếp vào MANAGE_DAEMON.",
+    "tokensSaved": 2500
+  },
+  "facebook_reels_download": {
+    "pattern": "facebook",
+    "keywords": [
+      "tải",
+      "download",
+      "reel",
+      "video",
+      "facebook"
+    ],
+    "bestRoute": "GỌI TRỰC TIẾP tool DOWNLOAD_VIDEO với URL hoặc đường dẫn file reel_list.txt (C:/Users/Nam/Desktop/gemini/2026-10-25/reel_list.txt) để tải toàn bộ video về máy. TUYỆT ĐỐI PHẢI PHÁT LỆNH GỌI TOOL DOWNLOAD_VIDEO NGAY, không chỉ trả lời bằng văn bản.",
+    "tokensSaved": 4000
+  }
+}

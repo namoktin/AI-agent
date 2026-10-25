@@ -90,7 +90,8 @@ class ToolExecutor {
             heavy: [
                 'BROWSE_WEB',
                 'BROWSER_ACTION',
-                'GENERATE_IMAGE'
+                'GENERATE_IMAGE',
+                'DOWNLOAD_VIDEO'
             ]
         };
     }
@@ -298,6 +299,8 @@ class ToolExecutor {
             'READ_URL': '/api/fetch-webpage',
             'FETCH_WEBPAGE': '/api/fetch-webpage',
             'BROWSE_WEB': '/api/browse-web',
+            'SCRAPE_SOCIAL_MEDIA': '/api/scrape-social',
+            'DOWNLOAD_VIDEO': '/api/download-video',
             'BROWSER_ACTION': '/api/browse-web',
             'SEARCH_EXPERIENCE': '/api/search-experiences',
             'SEARCH_EXPERIENCES': '/api/search-experiences',
@@ -305,7 +308,10 @@ class ToolExecutor {
             'UPDATE_EXPERIENCE': '/api/update-experience',
             'RUN_CODE': '/api/run-code',
             'RUN_CMD': '/api/run-cmd',
-            'GENERATE_IMAGE': '/api/generate-image'
+            'GENERATE_IMAGE': '/api/generate-image',
+            'START_BACKGROUND_TASK': '/api/tasks/start-task',
+            'START_BACKGROUND_SHORTS_TASK': '/api/tasks/start-shorts-job',
+            'MANAGE_BACKGROUND_TASK': '/api/tasks/manage-task'
         };
 
         return mapping[toolName] || `/api/${toolName.toLowerCase().replace(/_/g, '-')}`;
@@ -410,6 +416,42 @@ class ToolExecutor {
                         url: {
                             type: 'STRING',
                             description: 'Đường dẫn website cần đọc (bắt đầu bằng https://)'
+                        }
+                    },
+                    required: ['url']
+                }
+            },
+            {
+                name: 'DOWNLOAD_VIDEO',
+                description: 'Tải video trực tiếp từ các nền tảng mạng xã hội (Facebook Reels, TikTok, YouTube...). Tự động áp dụng CookieVault Facebook và lưu file .mp4 vào thư mục gemini hôm nay.',
+                parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                        url: {
+                            type: 'STRING',
+                            description: 'Đường dẫn URL của video hoặc Reel cần tải'
+                        },
+                        outputFileName: {
+                            type: 'STRING',
+                            description: 'Tên file mp4 mong muốn lưu (ví dụ: reel_download.mp4, hoặc để trống)'
+                        }
+                    },
+                    required: ['url']
+                }
+            },
+            {
+                name: 'SCRAPE_SOCIAL_MEDIA',
+                description: 'Bóc tách dữ liệu đa mạng xã hội chuyên sâu: lấy chuẩn xác Caption, Lượt xem, Lượt thích, Bình luận, Tác giả cho 10+ mạng xã hội (Facebook, TikTok, YouTube, Instagram, X/Twitter, Reddit, Threads, LinkedIn, Pinterest, Bluesky).',
+                parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                        url: {
+                            type: 'STRING',
+                            description: 'Đường dẫn URL bài viết/video mạng xã hội cần bóc tách'
+                        },
+                        headless: {
+                            type: 'BOOLEAN',
+                            description: 'Chạy ngầm (mặc định true)'
                         }
                     },
                     required: ['url']
