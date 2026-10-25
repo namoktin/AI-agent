@@ -90,26 +90,57 @@ class GeminiGrounding {
                         generationConfig: {
                             temperature: temperature,
                             maxOutputTokens: 8192
-                        },
-                        // Grounding configuration
-                        groundingConfig: {
-                            retrieveConfig: {
-                                dynamicRetrievalConfig: {
-                                    mode: 'MODE_DYNAMIC',
-                                    dynamicThreshold: dynamicThreshold
-                                }
-                            }
                         }
                     })
                 }
             );
 
-            if (!response.ok) {
-                const error = await response.text();
+            let finalRes = response;
+            if (!response.ok && (response.status === 429 || response.status === 503)) {
+                console.warn(`[GeminiGrounding] Model ${modelName} gặp ${response.status}, thử fallback sang gemini-3.5-flash-lite...`);
+                finalRes = await fetch(
+                    `${this.baseUrl}/models/gemini-3.5-flash-lite:generateContent?key=${this.apiKey}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{
+                                role: 'user',
+                                parts: [{ text: prompt }]
+                            }],
+                            tools: [{
+                                googleSearch: {}
+                            }],
+                            generationConfig: {
+                                temperature: temperature,
+                                maxOutputTokens: 8192
+                            }
+                        })
+                    }
+                );
+            }
+
+            if (!finalRes.ok && (finalRes.status === 429 || finalRes.status === 503)) {
+                console.warn(`[GeminiGrounding] Google Search grounding quota chạm giới hạn. Fallback sang sinh nội dung trực tiếp (Un-grounded)...`);
+                finalRes = await fetch(
+                    `${this.baseUrl}/models/${modelName}:generateContent?key=${this.apiKey}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                            generationConfig: { temperature, maxOutputTokens: 8192 }
+                        })
+                    }
+                );
+            }
+
+            if (!finalRes.ok) {
+                const error = await finalRes.text();
                 throw new Error(`Grounding API error: ${error}`);
             }
 
-            const data = await response.json();
+            const data = await finalRes.json();
 
             // Extract response and grounding metadata
             const candidate = data.candidates?.[0];

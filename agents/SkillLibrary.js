@@ -41,8 +41,8 @@ class SkillLibrary {
                 },
                 "batch_daemon": {
                     "pattern": "tiến trình ngầm",
-                    "keywords": ["tiến trình ngầm", "chạy ngầm", "daemon", "tải ngầm"],
-                    "bestRoute": "BẮT BUỘC viết file script Node.js hoặc Python vào thư mục chỉ định, sau đó gọi MANAGE_DAEMON action='start' với command='node <script>.js'. KHÔNG gọi yt-dlp trực tiếp vào MANAGE_DAEMON.",
+                    "keywords": ["tiến trình ngầm", "chạy ngầm", "daemon", "tải ngầm", "background task"],
+                    "bestRoute": "BẮT BUỘC viết file script Node.js hoặc Python vào thư mục chỉ định, sau đó gọi START_BACKGROUND_TASK với scriptPath hoặc command để chạy ngầm không gây nghẽn chat. Dùng MANAGE_BACKGROUND_TASK action='status' để theo dõi tiến độ.",
                     "tokensSaved": 2500
                 }
             };

@@ -377,6 +377,13 @@ class AgentOrchestrator {
             context.matchedSkill = matchingSkill;
         }
 
+        // 2.1 ZERO-TRIAL OPTIMAL STRATEGY: Tra cứu chiến lược tối ưu đã chứng minh để tiết kiệm token
+        const optimalStrategy = this.skillLibrary.getOptimalStrategy(userRequest);
+        if (optimalStrategy) {
+            this.log(`⚡ [OptimalStrategyCache] Zero-Trial Route detected for [${optimalStrategy.key}]: Tiết kiệm ~${optimalStrategy.tokensSaved || 1500} tokens`);
+            context.optimalStrategy = optimalStrategy;
+        }
+
         // 3. FAST MODE BYPASS: Nếu là câu hỏi nhanh/đơn giản, xử lý ngay qua 1 Agent để tiết kiệm 80% quota & latency
         if (mode === 'fast') {
             this.log('⚡ Running in FAST mode (bypass heavy orchestration overhead)');
@@ -980,19 +987,24 @@ class AgentOrchestrator {
 
             // Tự động fallback tức thì nếu model chính bị 429 hoặc 503
             if (!response.ok && (response.status === 429 || response.status === 503)) {
+                this.modelRouter.recordQuotaError(modelName, response.status);
                 const altModel = this.modelRouter.getFallbackModel(modelName, attempt + 1);
-                this.log(`⚠️ Model [${modelName}] gặp HTTP ${response.status}, hoán đổi tức thì sang [${altModel}]...`);
-                await new Promise(r => setTimeout(r, 1000));
-                modelName = altModel;
-                response = await fetch(
-                    `${this.baseUrl}/models/${modelName}:generateContent?key=${this.apiKey}`,
-                    {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(requestBody),
-                        signal: AbortSignal.timeout(this.config.timeout || 45000)
-                    }
-                );
+                if (altModel) {
+                    this.log(`⚠️ Model [${modelName}] gặp HTTP ${response.status}, hoán đổi tức thì sang [${altModel}]...`);
+                    await new Promise(r => setTimeout(r, 1000));
+                    modelName = altModel;
+                    response = await fetch(
+                        `${this.baseUrl}/models/${modelName}:generateContent?key=${this.apiKey}`,
+                        {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(requestBody),
+                            signal: AbortSignal.timeout(this.config.timeout || 45000)
+                        }
+                    );
+                } else {
+                    this.log(`🚨 [CircuitBreaker] Tất cả model đều đã chạm quota 429. Dừng chuyển model lặp vô ích.`);
+                }
             }
 
             if (!response.ok) {
@@ -1002,6 +1014,9 @@ class AgentOrchestrator {
 
             const data = await response.json();
             const latency = Date.now() - startTime;
+            if (this.modelRouter && typeof this.modelRouter.recordUsage === 'function') {
+                this.modelRouter.recordUsage((data.usageMetadata?.totalTokenCount) || 1200, modelName);
+            }
 
             let currentCandidate = data.candidates?.[0];
             if (!currentCandidate || !currentCandidate.content) {
@@ -1063,18 +1078,21 @@ class AgentOrchestrator {
                 );
 
                 if (!followUpRes.ok && (followUpRes.status === 429 || followUpRes.status === 503)) {
+                    this.modelRouter.recordQuotaError(modelName, followUpRes.status);
                     const fallbackModel = this.modelRouter.getFallbackModel(modelName, toolIterationCount + 1);
-                    this.log(`⚠️ Tool follow-up gặp ${followUpRes.status}, tự động xoay model sang [${fallbackModel}]...`);
-                    await new Promise(r => setTimeout(r, 1000));
-                    followUpRes = await fetch(
-                        `${this.baseUrl}/models/${fallbackModel}:generateContent?key=${this.apiKey}`,
-                        {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(followUpBody),
-                            signal: AbortSignal.timeout(this.config.timeout || 45000)
-                        }
-                    );
+                    if (fallbackModel) {
+                        this.log(`⚠️ Tool follow-up gặp ${followUpRes.status}, tự động xoay model sang [${fallbackModel}]...`);
+                        await new Promise(r => setTimeout(r, 1000));
+                        followUpRes = await fetch(
+                            `${this.baseUrl}/models/${fallbackModel}:generateContent?key=${this.apiKey}`,
+                            {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(followUpBody),
+                                signal: AbortSignal.timeout(this.config.timeout || 45000)
+                            }
+                        );
+                    }
                 }
 
                 if (!followUpRes.ok) {

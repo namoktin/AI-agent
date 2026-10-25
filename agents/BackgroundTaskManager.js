@@ -19,6 +19,57 @@ class BackgroundTaskManager {
             fs.mkdirSync(this.logsDir, { recursive: true });
         }
         this.tasks = this.loadTasks();
+        this.reconcileInterruptedTasks();
+    }
+
+    isPidAlive(pid) {
+        if (!pid || typeof pid !== 'number') return false;
+        try {
+            process.kill(pid, 0);
+            return true;
+        } catch (e) {
+            return e.code === 'EPERM';
+        }
+    }
+
+    reconcileInterruptedTasks() {
+        let changed = false;
+        for (const [taskId, task] of Object.entries(this.tasks)) {
+            // 1. Phục hồi và đánh dấu các task bị gián đoạn do server khởi động lại
+            if (task.status === 'RUNNING' || task.status === 'QUEUED') {
+                const alive = this.isPidAlive(task.pid);
+                if (!alive) {
+                    task.status = 'INTERRUPTED';
+                    task.endTime = task.endTime || new Date().toISOString();
+                    task.error = 'Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)';
+                    if (task.progress) {
+                        task.progress.message = 'Bị gián đoạn do khởi động lại server';
+                    }
+                    try {
+                        if (task.logFile && fs.existsSync(task.logFile)) {
+                            fs.appendFileSync(task.logFile, `[${new Date().toLocaleTimeString('vi-VN')}] ⚠️ Tiến trình bị gián đoạn do máy chủ khởi động lại.\n`, 'utf8');
+                        }
+                    } catch (e) {}
+                    changed = true;
+                } else {
+                    task.status = 'RUNNING_DETACHED';
+                    changed = true;
+                }
+            }
+
+            // 2. Tự động chuẩn hóa dữ liệu cũ: Chỉ báo 100% nếu thực sự đạt đủ số lượng mục tiêu
+            const total = task.progress?.total || 0;
+            const current = task.progress?.current || 0;
+            if (task.status === 'COMPLETED' && total > 0 && current < total) {
+                task.status = 'PARTIAL_COMPLETED';
+                task.progress.percent = Math.round((current / total) * 100);
+                task.progress.message = `Tiến trình kết thúc: Đạt ${current}/${total} mục tiêu (${task.progress.percent}%)`;
+                changed = true;
+            }
+        }
+        if (changed) {
+            this.saveTasks();
+        }
     }
 
     loadTasks() {
@@ -167,10 +218,21 @@ class BackgroundTaskManager {
 
             if (task.status !== 'CANCELLED') {
                 if (code === 0) {
-                    task.status = 'COMPLETED';
-                    task.progress.percent = 100;
-                    task.progress.message = 'Hoàn thành 100%';
-                    appendLog(`✅ Tiến trình ngầm kết thúc thành công (Exit code: 0)`);
+                    const total = task.progress?.total || 0;
+                    const current = task.progress?.current || 0;
+                    
+                    // Phân biệt: Hoàn thành tiến trình vs Hoàn thành mục tiêu nghiệp vụ
+                    if (total > 0 && current < total) {
+                        task.status = 'PARTIAL_COMPLETED';
+                        task.progress.percent = Math.round((current / total) * 100);
+                        task.progress.message = `Tiến trình kết thúc: Đạt ${current}/${total} mục tiêu (${task.progress.percent}%)`;
+                        appendLog(`⚠️ Tiến trình ngầm kết thúc nhưng chỉ đạt một phần mục tiêu: ${current}/${total} (${task.progress.percent}%) (Exit code: 0)`);
+                    } else {
+                        task.status = 'COMPLETED';
+                        task.progress.percent = 100;
+                        task.progress.message = total > 0 ? `Hoàn thành 100% (${current}/${total})` : 'Hoàn thành 100%';
+                        appendLog(`✅ Tiến trình ngầm hoàn thành mục tiêu (Exit code: 0)`);
+                    }
                 } else {
                     task.status = 'FAILED';
                     task.error = `Tiến trình kết thúc với mã lỗi: ${code}`;

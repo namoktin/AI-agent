@@ -3,7 +3,7 @@
     "id": "task_1792920567446_4iksu",
     "title": "Tải 50 video Short/Reel (<60s): ytsearch60:khoa hoc vu tru shorts #shorts",
     "type": "download_shorts",
-    "status": "COMPLETED",
+    "status": "PARTIAL_COMPLETED",
     "createdAt": "2026-10-25T09:29:27.452Z",
     "startTime": "2026-10-25T09:29:27.454Z",
     "endTime": "2026-10-25T09:29:38.436Z",
@@ -11,8 +11,8 @@
     "progress": {
       "current": 1,
       "total": 50,
-      "percent": 100,
-      "message": "Hoàn thành 100%"
+      "percent": 2,
+      "message": "Tiến trình kết thúc: Đạt 1/50 mục tiêu (2%)"
     },
     "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792920567446_4iksu.log",
     "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50",
@@ -30,7 +30,7 @@
     "id": "task_1792920640598_7uk90",
     "title": "Tải 50 video Short/Reel (<60s): ytsearch80:khoa hoc vu tru shorts #shorts",
     "type": "download_shorts",
-    "status": "COMPLETED",
+    "status": "PARTIAL_COMPLETED",
     "createdAt": "2026-10-25T09:30:40.599Z",
     "startTime": "2026-10-25T09:30:40.600Z",
     "endTime": "2026-10-25T09:30:49.329Z",
@@ -38,8 +38,8 @@
     "progress": {
       "current": 1,
       "total": 50,
-      "percent": 100,
-      "message": "Hoàn thành 100%"
+      "percent": 2,
+      "message": "Tiến trình kết thúc: Đạt 1/50 mục tiêu (2%)"
     },
     "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792920640598_7uk90.log",
     "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50",
@@ -57,7 +57,7 @@
     "id": "task_1792920760076_gub7c",
     "title": "Tải 50 video Short/Reel (<60s): https://www.youtube.com/@TEDEd/shorts",
     "type": "download_shorts",
-    "status": "COMPLETED",
+    "status": "PARTIAL_COMPLETED",
     "createdAt": "2026-10-25T09:32:40.077Z",
     "startTime": "2026-10-25T09:32:40.078Z",
     "endTime": "2026-10-25T09:34:07.189Z",
@@ -65,8 +65,8 @@
     "progress": {
       "current": 24,
       "total": 50,
-      "percent": 100,
-      "message": "Hoàn thành 100%"
+      "percent": 48,
+      "message": "Tiến trình kết thúc: Đạt 24/50 mục tiêu (48%)"
     },
     "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792920760076_gub7c.log",
     "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50",
@@ -84,7 +84,7 @@
     "id": "task_1792920878321_i96ye",
     "title": "Tải 50 video Short/Reel (<60s): https://www.youtube.com/@Kurzgesagt/shorts",
     "type": "download_shorts",
-    "status": "COMPLETED",
+    "status": "PARTIAL_COMPLETED",
     "createdAt": "2026-10-25T09:34:38.322Z",
     "startTime": "2026-10-25T09:34:38.324Z",
     "endTime": "2026-10-25T09:37:01.795Z",
@@ -92,8 +92,8 @@
     "progress": {
       "current": 32,
       "total": 50,
-      "percent": 100,
-      "message": "Hoàn thành 100%"
+      "percent": 64,
+      "message": "Tiến trình kết thúc: Đạt 32/50 mục tiêu (64%)"
     },
     "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792920878321_i96ye.log",
     "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50",
@@ -433,5 +433,83 @@
     "result": null,
     "error": null,
     "exitCode": 0
+  },
+  "test_dead_pid_1792925796563": {
+    "id": "test_dead_pid_1792925796563",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-25T10:56:36.564Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "task_1792925824997_jpwls": {
+    "id": "task_1792925824997_jpwls",
+    "title": "Live Test Full Completion",
+    "type": "generic",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:57:05.000Z",
+    "startTime": "2026-10-25T10:57:05.004Z",
+    "endTime": "2026-10-25T10:57:05.254Z",
+    "pid": 6056,
+    "progress": {
+      "current": 5,
+      "total": 5,
+      "percent": 100,
+      "message": "Hoàn thành 100% (5/5)"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792925824997_jpwls.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\AI agent",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\scratch_full_task.js",
+    "metadata": {
+      "totalCount": 5
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792925825449_aq6bt": {
+    "id": "task_1792925825449_aq6bt",
+    "title": "Live Test Partial Completion",
+    "type": "generic",
+    "status": "PARTIAL_COMPLETED",
+    "createdAt": "2026-10-25T10:57:05.450Z",
+    "startTime": "2026-10-25T10:57:05.451Z",
+    "endTime": "2026-10-25T10:57:05.637Z",
+    "pid": 10000,
+    "progress": {
+      "current": 2,
+      "total": 5,
+      "percent": 40,
+      "message": "Tiến trình kết thúc: Đạt 2/5 mục tiêu (40%)"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792925825449_aq6bt.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\AI agent",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\scratch_partial_task.js",
+    "metadata": {
+      "totalCount": 5
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "test_dead_pid_1792925884914": {
+    "id": "test_dead_pid_1792925884914",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-25T10:58:04.915Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
   }
 }
