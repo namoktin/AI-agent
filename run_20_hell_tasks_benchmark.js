@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 
 const API_ENDPOINT = 'http://localhost:3000/api/v2/execute';
-const OUTPUT_DIR = path.resolve(__dirname, 'benchmark_results');
+const OUTPUT_DIR = path.resolve(__dirname, 'benchmark_results_deepseek_v4_pro');
 
 if (!fs.existsSync(OUTPUT_DIR)) {
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -306,6 +306,7 @@ async function runSingleTask(task, index) {
             body: JSON.stringify({
                 task: task.prompt,
                 useGrounding: false, // Sử dụng công cụ nội bộ không tiêu tốn quota grounding
+                useCustomAi: true,
                 context: {
                     benchmarkTask: task.id,
                     domain: task.domain
@@ -327,6 +328,7 @@ async function runSingleTask(task, index) {
 
         console.log(`⏱️ Thời gian thực thi: ${durationSec}s (${durationMs}ms)`);
         console.log(`📊 Số cuộc gọi Agent: ${data.stats?.agentCalls || 'N/A'}`);
+        console.log(`🪙 Số Token tiêu thụ: ${data.stats?.totalTokens || 0} tokens (Model: ${data.stats?.model || 'deepseek-v4-pro'})`);
         console.log(`📝 Độ dài đầu ra: ${evalResult.textLength} ký tự`);
         console.log(`⭐ Điểm tự đánh giá nội bộ (Quality Score): ${data.qualityScore || 'N/A'}/100`);
         console.log(`🎯 ĐIỂM CHẤM THEO CHUẨN ANTIGRAVITY: ${evalResult.finalScore}/10.0 ${evalResult.finalScore > 10.0 ? '🏆 (VƯỢT CHUẨN!)' : ''}`);
@@ -338,6 +340,8 @@ async function runSingleTask(task, index) {
             durationMs: durationMs,
             durationSec: parseFloat(durationSec),
             success: data.success,
+            tokensUsed: data.stats?.totalTokens || 0,
+            modelUsed: data.stats?.model || 'deepseek-v4-pro',
             qualityScore: data.qualityScore,
             stats: data.stats,
             eval: evalResult,
@@ -354,7 +358,8 @@ async function runSingleTask(task, index) {
 
     } catch (err) {
         const durationMs = Date.now() - startTime;
-        console.error(`❌ [TASK ${index} THẤT BẠI]: ${err.message}`);
+        const isTimeout = err.name === 'TimeoutError' || err.message.includes('timeout') || err.message.includes('aborted');
+        console.error(`❌ [TASK ${index} THẤT BẠI${isTimeout ? ' DO VƯỢT QUÁ 5 PHÚT (TIMEOUT)' : ''}]: ${err.message}`);
         const failRecord = {
             taskId: task.id,
             domain: task.domain,
@@ -427,13 +432,19 @@ async function main() {
     console.log(`🏆 Số tác vụ VƯỢT CHUẨN Antigravity (> 10.0 điểm): ${exceedCount} tác vụ`);
     console.log(`===============================================================\n`);
 
+    const totalTokensAll = allResults.reduce((s, r) => s + (r.tokensUsed || r.stats?.totalTokens || 0), 0);
+    console.log(`🪙 TỔNG TOKEN TIÊU THỤ (TOÀN BỘ 20 TASKS): ${totalTokensAll} tokens`);
+    console.log(`🤖 Model: deepseek-v4-pro (via Mirai API: https://api.miraiapi.com/v1)`);
+
     // Lưu tổng kết toàn bộ benchmark
     const summaryData = {
         timestamp: new Date().toISOString(),
+        engine: "DeepSeek (deepseek-v4-pro) via Mirai API",
         totalTasks: HELL_TASKS.length,
         successfulCount: successfulTasks.length,
         totalDurationSec: parseFloat(totalDurationSec),
         averageDurationSec: parseFloat(averageTime),
+        totalTokensAllTasks: totalTokensAll,
         averageAntigravityScore: parseFloat(averageScore),
         exceedAntigravityCount: exceedCount,
         tasksSummary: allResults.map(r => ({
@@ -441,6 +452,8 @@ async function main() {
             domain: r.domain,
             title: r.title,
             durationSec: r.durationSec,
+            tokensUsed: r.tokensUsed || r.stats?.totalTokens || 0,
+            modelUsed: r.modelUsed || 'deepseek-v4-pro',
             success: r.success,
             finalScore: r.eval ? r.eval.finalScore : 0
         }))

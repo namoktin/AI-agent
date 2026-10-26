@@ -66,10 +66,11 @@ class ModelRouter {
             }
         }
 
-        // Tự động giải phóng các slot đang bay bị treo (stale inflight slots > 45s) để chống nghẽn vĩnh viễn
-        const staleThreshold = now - 45000;
+        // Tự động giải phóng các slot đang bay bị treo (stale inflight slots) vượt quá maxDuration của request (Fix Lỗi C)
         for (const [sId, sInfo] of this.activeSlots.entries()) {
-            if (sInfo.timestamp < staleThreshold) {
+            const slotLifetime = sInfo.maxDuration || 90000;
+            if (now - sInfo.timestamp > slotLifetime) {
+                console.warn(`⏳ [ModelRouter] Giải phóng slot treo [${sId}] sau ${Math.round((now - sInfo.timestamp)/1000)}s (> ${Math.round(slotLifetime/1000)}s)`);
                 this.cancelDispatchSlot(sId);
             }
         }
@@ -102,14 +103,15 @@ class ModelRouter {
     }
 
     /**
-     * Pre-reserve slot and budget in counters upon slot grant (Fix for Lỗi 3)
+     * Pre-reserve slot and budget in counters upon slot grant (Fix for Lỗi 3 & Lỗi C)
      */
-    _reserveSlot(slotId, model, estimatedTokens = 1200) {
+    _reserveSlot(slotId, model, estimatedTokens = 1200, maxDuration = 90000) {
         const now = Date.now();
         this.activeSlots.set(slotId, {
             timestamp: now,
             model,
-            estimatedTokens
+            estimatedTokens,
+            maxDuration: Math.max(maxDuration || 90000, 90000)
         });
         this.inflightRequests = this.activeSlots.size;
 
@@ -172,7 +174,8 @@ class ModelRouter {
             estimatedTokens = 1200,
             model = this.defaultModel,
             priority = 1,
-            timeout = 10000
+            timeout = 10000,
+            maxDuration = 90000
         } = options;
 
         const startTime = Date.now();
@@ -186,12 +189,13 @@ class ModelRouter {
                 model,
                 priority,
                 startTime,
+                maxDuration,
                 timeoutTimer: null
             };
 
             // Immediate slot allocation if under limits
             if (this._canDispatchNow(estimatedTokens)) {
-                this._reserveSlot(slotId, model, estimatedTokens);
+                this._reserveSlot(slotId, model, estimatedTokens, maxDuration);
                 return resolve({ granted: true, waitedMs: 0, immediate: true, slotId });
             }
 
@@ -204,7 +208,7 @@ class ModelRouter {
                 const viableFallback = this.getFallbackModel(model, 1);
                 if (viableFallback && this.isModelAvailable(viableFallback) && this._canDispatchNow(estimatedTokens)) {
                     console.log(`🔄 [QuotaScheduler V2] Queue wait completed: Điều tuyến sang model khả dụng [${viableFallback}]`);
-                    this._reserveSlot(slotId, viableFallback, estimatedTokens);
+                    this._reserveSlot(slotId, viableFallback, estimatedTokens, maxDuration);
                     return resolve({ granted: true, waitedMs: Date.now() - startTime, model: viableFallback, slotId });
                 }
 
@@ -241,7 +245,7 @@ class ModelRouter {
             if (this._canDispatchNow(nextItem.estimatedTokens)) {
                 this.dispatchQueue.shift();
                 if (nextItem.timeoutTimer) clearTimeout(nextItem.timeoutTimer);
-                this._reserveSlot(nextItem.slotId, nextItem.model, nextItem.estimatedTokens);
+                this._reserveSlot(nextItem.slotId, nextItem.model, nextItem.estimatedTokens, nextItem.maxDuration);
                 nextItem.resolve({ granted: true, waitedMs: Date.now() - nextItem.startTime, immediate: false, slotId: nextItem.slotId });
             } else {
                 this._scheduleNextDrain();

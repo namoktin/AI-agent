@@ -155,25 +155,17 @@ class AdaptivePlanner {
                     tasks: [
                         {
                             id: 'T001',
-                            description: `Thu thập thông tin và phân tích dữ liệu cho: ${userRequest}`,
+                            description: `Thu thập thông tin, nghiên cứu thị trường và phân tích dữ liệu cho: ${userRequest}`,
                             assignedTo: 'researcher',
                             priority: 1,
                             parallelizable: true
                         },
                         {
                             id: 'T002',
-                            description: `Triển khai giải pháp chi tiết hoặc nội dung kỹ thuật cho: ${userRequest}`,
+                            description: `Triển khai giải pháp kỹ thuật, code/script và nội dung hoàn chỉnh cho: ${userRequest}`,
                             assignedTo: 'developer',
-                            priority: 2,
+                            priority: 1,
                             parallelizable: true
-                        },
-                        {
-                            id: 'T003',
-                            description: `Thẩm định chất lượng, rà soát lỗ hổng và tối ưu kết quả`,
-                            assignedTo: 'critic',
-                            dependencies: ['T001', 'T002'],
-                            priority: 3,
-                            parallelizable: false
                         }
                     ],
                     skipConsensus: false,

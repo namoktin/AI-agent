@@ -181,7 +181,7 @@ class StateGraph extends EventEmitter {
         return this;
     }
 
-    addConditionalLoop(fromNodeId, toNodeId, conditionFn, maxLoops = 3) {
+    addConditionalLoop(fromNodeId, toNodeId, conditionFn, maxLoops = 3, conditionId = null) {
         if (!this.nodes.has(fromNodeId) || !this.nodes.has(toNodeId)) {
             throw new Error(`StateGraph: Invalid loop endpoints: ${fromNodeId} -> ${toNodeId}`);
         }
@@ -189,6 +189,7 @@ class StateGraph extends EventEmitter {
             from: fromNodeId,
             to: toNodeId,
             condition: conditionFn,
+            conditionId: conditionId || `${fromNodeId}->${toNodeId}`,
             maxLoops,
             currentLoops: 0
         });
@@ -499,38 +500,44 @@ class StateGraph extends EventEmitter {
                 // Check conditional loops: should we loop back?
                 const loop = this.conditionalLoops.find(l => l.from === node.id);
                 if (loop) {
-                    let shouldLoop = false;
-                    try {
-                        shouldLoop = Boolean(loop.condition(result, this.state));
-                    } catch (e) {}
+                    if (loop.unresolvedCondition || typeof loop.condition !== 'function') {
+                        // Fix Lỗi B: Không tự ý thay bằng điều kiện lặp mù quáng nếu thiếu hàm gốc!
+                        this.executionLog.push(`⚠️ [StateGraph] Loop [${loop.from} -> ${loop.to}] skipped: condition function not found in loopConditions registry.`);
+                        this.emit('LOOP_CONDITION_UNRESOLVED', { from: loop.from, to: loop.to, conditionId: loop.conditionId });
+                    } else {
+                        let shouldLoop = false;
+                        try {
+                            shouldLoop = Boolean(loop.condition(result, this.state));
+                        } catch (e) {}
 
-                    if (shouldLoop) {
-                        if (loop.currentLoops >= loop.maxLoops) {
-                            this.executionLog.push(`Loop guard reached: Node [${node.id}] exceeded max allowed loops (${loop.maxLoops})`);
-                            this.emit('LOOP_GUARD_REACHED', { nodeId: node.id, maxLoops: loop.maxLoops });
-                        } else {
-                            loop.currentLoops++;
-                            node.loopIteration++;
-                            this.executionLog.push(`[${node.id}] conditional loop triggered (${loop.currentLoops}/${loop.maxLoops}) -> ${loop.to}`);
-                            this.emit('NODE_CONDITIONAL_LOOP', {
-                                from: node.id,
-                                to: loop.to,
-                                iteration: loop.currentLoops,
-                                maxLoops: loop.maxLoops
-                            });
+                        if (shouldLoop) {
+                            if (loop.currentLoops >= loop.maxLoops) {
+                                this.executionLog.push(`Loop guard reached: Node [${node.id}] exceeded max allowed loops (${loop.maxLoops})`);
+                                this.emit('LOOP_GUARD_REACHED', { nodeId: node.id, maxLoops: loop.maxLoops });
+                            } else {
+                                loop.currentLoops++;
+                                node.loopIteration++;
+                                this.executionLog.push(`[${node.id}] conditional loop triggered (${loop.currentLoops}/${loop.maxLoops}) -> ${loop.to}`);
+                                this.emit('NODE_CONDITIONAL_LOOP', {
+                                    from: node.id,
+                                    to: loop.to,
+                                    iteration: loop.currentLoops,
+                                    maxLoops: loop.maxLoops
+                                });
 
-                            // Đặt lại cả targetNode và node hiện tại về PENDING để vòng lặp chạy lại sạch sẽ, không bị kẹt status 'RUNNING' (Fix Lỗi E)
-                            node.status = 'PENDING';
-                            node.executedSuccessfully = false;
-                            this.completedNodes.delete(node.id);
+                                // Đặt lại cả targetNode và node hiện tại về PENDING để vòng lặp chạy lại sạch sẽ, không bị kẹt status 'RUNNING' (Fix Lỗi E)
+                                node.status = 'PENDING';
+                                node.executedSuccessfully = false;
+                                this.completedNodes.delete(node.id);
 
-                            const targetNode = this.nodes.get(loop.to);
-                            if (targetNode) {
-                                targetNode.status = 'PENDING';
-                                targetNode.executedSuccessfully = false;
-                                this.completedNodes.delete(loop.to);
+                                const targetNode = this.nodes.get(loop.to);
+                                if (targetNode) {
+                                    targetNode.status = 'PENDING';
+                                    targetNode.executedSuccessfully = false;
+                                    this.completedNodes.delete(loop.to);
+                                }
+                                return;
                             }
-                            return;
                         }
                     }
                 }
@@ -719,6 +726,7 @@ class StateGraph extends EventEmitter {
             conditionalLoops: this.conditionalLoops.map(l => ({
                 from: l.from,
                 to: l.to,
+                conditionId: l.conditionId || `${l.from}->${l.to}`,
                 maxLoops: l.maxLoops,
                 currentLoops: l.currentLoops
             })),
@@ -751,8 +759,10 @@ class StateGraph extends EventEmitter {
                 node.loopIteration = typeof nData.loopIteration === 'number' ? nData.loopIteration : node.loopIteration;
                 node.tokensUsed = typeof nData.tokensUsed === 'number' ? nData.tokensUsed : node.tokensUsed;
                 node.executedSuccessfully = Boolean(nData.executedSuccessfully);
-                if (config.nodeActions && typeof config.nodeActions[node.id] === 'function') {
-                    node.action = config.nodeActions[node.id];
+                const actionFn = (config.nodeActions && config.nodeActions[node.id])
+                    || (config.nodeExecutors && config.nodeExecutors[node.id]);
+                if (typeof actionFn === 'function') {
+                    node.action = actionFn;
                 }
                 graph.nodes.set(node.id, node);
             }
@@ -765,19 +775,23 @@ class StateGraph extends EventEmitter {
             }
         }
 
-        // Restore conditional loops (Fix Lỗi C)
+        // Restore conditional loops (Fix Lỗi B: Bảo toàn điều kiện gốc, không tự chế điều kiện lặp mù quáng)
         if (Array.isArray(data.conditionalLoops)) {
             for (const l of data.conditionalLoops) {
                 const condKey = `${l.from}->${l.to}`;
-                const condFn = (config.loopConditions && config.loopConditions[condKey])
+                const condFn = (config.loopConditions && l.conditionId && config.loopConditions[l.conditionId])
+                    || (config.loopConditions && config.loopConditions[condKey])
                     || (config.loopConditions && config.loopConditions[l.from])
-                    || (() => l.currentLoops < l.maxLoops);
+                    || null;
+
                 graph.conditionalLoops.push({
                     from: l.from,
                     to: l.to,
+                    conditionId: l.conditionId || condKey,
                     maxLoops: l.maxLoops || 3,
                     currentLoops: l.currentLoops || 0,
-                    condition: condFn
+                    condition: condFn,
+                    unresolvedCondition: !condFn
                 });
             }
         }

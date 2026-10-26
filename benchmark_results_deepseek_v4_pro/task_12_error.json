@@ -1,0 +1,12 @@
+{
+  "taskId": 12,
+  "domain": "Dữ liệu trên X về Nông nghiệp Sạch",
+  "title": "Phân tích Dữ liệu Thảo luận trên X về Nông nghiệp Sạch & Tái sinh (Regenerative Agriculture)",
+  "durationMs": 300008,
+  "durationSec": 300,
+  "success": false,
+  "error": "The operation was aborted due to timeout",
+  "eval": {
+    "finalScore": 0
+  }
+}

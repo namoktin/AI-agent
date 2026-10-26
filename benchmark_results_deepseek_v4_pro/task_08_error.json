@@ -1,0 +1,12 @@
+{
+  "taskId": 8,
+  "domain": "Dự báo Tương lai Thế giới 2026-2040",
+  "title": "Kỷ nguyên Hậu AGI, Năng lượng Hạt nhân SMRs và Cuộc Cách mạng Robot Hình người",
+  "durationMs": 300054,
+  "durationSec": 300.1,
+  "success": false,
+  "error": "The operation was aborted due to timeout",
+  "eval": {
+    "finalScore": 0
+  }
+}
