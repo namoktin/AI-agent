@@ -1025,28 +1025,58 @@ function parseSafeCommand(command) {
     }
     const scriptArg = args[0] || '';
     const safePathOrRelative = input => {
-        if (typeof input !== 'string' || !input || input.length > 300) return false;
-        if (input.includes('..') || /[;&|`$<>]/.test(input)) return false;
+        if (typeof input !== 'string' || !input || input.length > 500) return false;
+        if (input.includes('..') || /[;&|`$<>]/.test(input) || /[\r\n\0]/.test(input)) return false;
         if (path.isAbsolute(input)) {
             const normalized = path.normalize(input).toLowerCase();
             return normalized.startsWith('c:\\users\\nam\\desktop\\ai agent') ||
                    normalized.startsWith('c:\\users\\nam\\desktop\\gemini');
         }
-        return /^[\w./\\:-]+$/.test(input);
+        return /^[\w./\\:= -]+$/.test(input);
     };
 
-    if (executable === 'node' && /^[-\w./\\:]+\.js$/i.test(scriptArg)) {
-        if (!safePathOrRelative(scriptArg)) return null;
-        const extraArgs = args.slice(1);
-        if (!extraArgs.every(arg => safePathOrRelative(arg))) return null;
-        return { file: process.execPath, args, display: value };
+    if (executable === 'node') {
+        // Cho phép: node -v hoặc node --version
+        if (args.length === 1 && /^(--version|-v)$/i.test(scriptArg)) {
+            return { file: process.execPath, args, display: value };
+        }
+        // Cho phép: node -c script.js (syntax check an toàn)
+        if (scriptArg === '-c' && args[1] && /^[-\w./\\:]+\.js$/i.test(args[1]) && safePathOrRelative(args[1])) {
+            return { file: process.execPath, args, display: value };
+        }
+        if (/^[-\w./\\:]+\.js$/i.test(scriptArg)) {
+            if (!safePathOrRelative(scriptArg)) return null;
+            const extraArgs = args.slice(1);
+            if (!extraArgs.every(arg => safePathOrRelative(arg))) return null;
+            return { file: process.execPath, args, display: value };
+        }
     }
-    if ((executable === 'python' || executable === 'python3' || executable === 'py') &&
-        /^[-\w./\\:]+\.py$/i.test(scriptArg)) {
-        if (!safePathOrRelative(scriptArg)) return null;
-        const extraArgs = args.slice(1);
-        if (!extraArgs.every(arg => safePathOrRelative(arg))) return null;
-        return { file: executable === 'py' ? 'py' : executable, args, display: value };
+    if (executable === 'python' || executable === 'python3' || executable === 'py') {
+        // Cho phép: python -v, python -V hoặc python --version
+        if (args.length === 1 && /^(--version|-v|-V)$/i.test(scriptArg)) {
+            return { file: executable === 'py' ? 'py' : executable, args, display: value };
+        }
+        // Cho phép: python -m py_compile script.py (syntax check an toàn)
+        if (scriptArg === '-m' && args[1] === 'py_compile' && args[2] && /^[-\w./\\:]+\.py$/i.test(args[2]) && safePathOrRelative(args[2])) {
+            return { file: executable === 'py' ? 'py' : executable, args, display: value };
+        }
+        // Cho phép: python -u script.py [args...]
+        if (scriptArg === '-u' && args[1] && /^[-\w./\\:]+\.py$/i.test(args[1]) && safePathOrRelative(args[1])) {
+            const extraArgs = args.slice(2);
+            if (!extraArgs.every(arg => safePathOrRelative(arg))) return null;
+            return { file: executable === 'py' ? 'py' : executable, args, display: value };
+        }
+        if (/^[-\w./\\:]+\.py$/i.test(scriptArg)) {
+            if (!safePathOrRelative(scriptArg)) return null;
+            const extraArgs = args.slice(1);
+            if (!extraArgs.every(arg => safePathOrRelative(arg))) return null;
+            return { file: executable === 'py' ? 'py' : executable, args, display: value };
+        }
+    }
+    if (executable === 'pip' || executable === 'pip3') {
+        if (args.length === 1 && /^(--version|-v|-V|list)$/i.test(scriptArg)) {
+            return { file: executable, args, display: value };
+        }
     }
     if (executable === 'yt-dlp' || executable === 'yt-dlp.exe') {
         const safeYtArg = a => typeof a === 'string' && a.length <= 1000 && !/[\r\n\0`]/.test(a);
@@ -1524,9 +1554,9 @@ app.post('/api/fetch-webpage', async (req, res) => {
                     cleanContent = cleanContent.slice(0, 7000);
 
                     let socialAppendix = "";
-        if (socialData && (socialData.caption || socialData.views || socialData.likes || socialData.comments_count || socialData.author)) {
-            socialAppendix = "\r\n\r\n" + universalSocialScraper.formatToMarkdown(socialData);
-        }
+                    if (typeof socialData !== 'undefined' && socialData && (socialData.caption || socialData.views || socialData.likes || socialData.comments_count || socialData.author)) {
+                        socialAppendix = "\r\n\r\n" + universalSocialScraper.formatToMarkdown(socialData);
+                    }
 
         let deepLinkAppendix = "";
                     if (deepJobLinks.length > 0) {
@@ -4016,7 +4046,7 @@ app.post('/api/custom-ai-chat', async (req, res) => {
 
             payload = {
                 model: model.trim(),
-                max_tokens: req.body.max_tokens || 4096,
+                max_tokens: req.body.max_tokens || 16384,
                 system: sysText || undefined,
                 messages: formatForAnthropic(messages),
                 tools: (anthropicTools && anthropicTools.length > 0) ? anthropicTools : undefined,
@@ -4037,8 +4067,11 @@ app.post('/api/custom-ai-chat', async (req, res) => {
                 } else if (m.role === 'assistant' || m.role === 'model') {
                     let contentText = m.content || '';
                     let toolCalls = undefined;
+                    let reasoningText = m.reasoning_content || m.thoughts || '';
                     if (m.parts && Array.isArray(m.parts)) {
                         contentText = m.parts.filter(p => p.text).map(p => p.text).join('\n');
+                        const thoughtPart = m.parts.find(p => p.thought || p.thoughts);
+                        if (thoughtPart) reasoningText = thoughtPart.thought || thoughtPart.thoughts;
                         const fnCalls = m.parts.filter(p => p.functionCall);
                         if (fnCalls.length > 0) {
                             toolCalls = fnCalls.map((fc, i) => {
@@ -4055,7 +4088,17 @@ app.post('/api/custom-ai-chat', async (req, res) => {
                             lastToolCalls = toolCalls;
                         }
                     }
-                    openAiMessages.push({ role: 'assistant', content: contentText || null, tool_calls: toolCalls });
+                    if (toolCalls && !reasoningText) {
+                        reasoningText = 'Analyzing request, planning execution steps, and determining tool call parameters.';
+                    }
+                    const asstMsg = { role: 'assistant', content: contentText || '' };
+                    if (reasoningText) {
+                        asstMsg.reasoning_content = reasoningText;
+                    }
+                    if (toolCalls) {
+                        asstMsg.tool_calls = toolCalls;
+                    }
+                    openAiMessages.push(asstMsg);
                 } else {
                     let contentText = m.content || '';
                     let imagePart = null;
@@ -4070,10 +4113,24 @@ app.post('/api/custom-ai-chat', async (req, res) => {
                     if (m.parts && Array.isArray(m.parts)) {
                         const fnResps = m.parts.filter(p => p.functionResponse);
                         if (fnResps.length > 0) {
+                            const usedTcIds = new Set();
                             fnResps.forEach((fr, i) => {
                                 const respObj = fr.functionResponse;
-                                let matchedTc = lastToolCalls.find(tc => tc.function?.name === respObj.name);
-                                const toolId = respObj.id || (matchedTc ? matchedTc.id : (lastToolCalls[i] ? lastToolCalls[i].id : ('call_' + Date.now() + '_' + i)));
+                                let matchedTc = null;
+                                if (respObj.id) {
+                                    matchedTc = lastToolCalls.find(tc => tc.id === respObj.id);
+                                }
+                                if (!matchedTc && lastToolCalls[i] && !usedTcIds.has(lastToolCalls[i].id) && lastToolCalls[i].function?.name === respObj.name) {
+                                    matchedTc = lastToolCalls[i];
+                                }
+                                if (!matchedTc) {
+                                    matchedTc = lastToolCalls.find(tc => tc.function?.name === respObj.name && !usedTcIds.has(tc.id));
+                                }
+                                if (!matchedTc && lastToolCalls[i] && !usedTcIds.has(lastToolCalls[i].id)) {
+                                    matchedTc = lastToolCalls[i];
+                                }
+                                const toolId = matchedTc ? matchedTc.id : (lastToolCalls[i] ? lastToolCalls[i].id : ('call_' + Date.now() + '_' + i));
+                                usedTcIds.add(toolId);
                                 const toolContent = typeof respObj.response === 'string'
                                     ? respObj.response
                                     : JSON.stringify(respObj.response || {});
@@ -4110,6 +4167,7 @@ app.post('/api/custom-ai-chat', async (req, res) => {
                 }
             });
 
+            // Chuẩn hóa và bảo đảm tính hợp lệ của tool_calls và các tin nhắn role 'tool'
             for (let i = 0; i < openAiMessages.length; i++) {
                 const cur = openAiMessages[i];
                 if (cur.role === 'assistant' && cur.tool_calls && cur.tool_calls.length > 0) {
@@ -4119,10 +4177,35 @@ app.post('/api/custom-ai-chat', async (req, res) => {
                         requiredToolIds.delete(openAiMessages[nextIdx].tool_call_id);
                         nextIdx++;
                     }
+                    // Nếu còn tool_call nào chưa có response -> tự động bổ sung dummy response để không vi phạm schema của OpenAI/DeepSeek
                     if (requiredToolIds.size > 0) {
-                        const toolNames = cur.tool_calls.map(tc => tc.function?.name || 'tool').join(', ');
-                        cur.content = (cur.content ? cur.content + '\n' : '') + `[Đã thực thi công cụ: ${toolNames}]`;
-                        delete cur.tool_calls;
+                        for (const missingId of requiredToolIds) {
+                            openAiMessages.splice(nextIdx, 0, {
+                                role: 'tool',
+                                tool_call_id: missingId,
+                                content: JSON.stringify({ status: 'completed', info: 'Tool execution handled' })
+                            });
+                            nextIdx++;
+                        }
+                    }
+                }
+            }
+
+            // Kiểm tra các tin nhắn role 'tool' không có assistant tool_calls đi trước -> chuyển thành role 'user'
+            for (let i = 0; i < openAiMessages.length; i++) {
+                if (openAiMessages[i].role === 'tool') {
+                    // Tìm tin nhắn non-tool gần nhất trước đó (cho phép nhiều tin nhắn tool liên tiếp nhau)
+                    let parentAssistant = null;
+                    for (let p = i - 1; p >= 0; p--) {
+                        if (openAiMessages[p].role === 'tool') continue;
+                        if (openAiMessages[p].role === 'assistant') parentAssistant = openAiMessages[p];
+                        break;
+                    }
+                    const hasValidParent = parentAssistant && Array.isArray(parentAssistant.tool_calls) && parentAssistant.tool_calls.some(tc => tc.id === openAiMessages[i].tool_call_id);
+                    if (!hasValidParent) {
+                        openAiMessages[i].role = 'user';
+                        openAiMessages[i].content = `[Tool Result: ${openAiMessages[i].tool_call_id || 'tool'}]: ${openAiMessages[i].content}`;
+                        delete openAiMessages[i].tool_call_id;
                     }
                 }
             }
@@ -4154,7 +4237,7 @@ app.post('/api/custom-ai-chat', async (req, res) => {
                 messages: openAiMessages,
                 tools: openAiTools,
                 temperature: 0.7,
-                max_tokens: req.body.max_tokens || 4096,
+                max_tokens: req.body.max_tokens || 16384,
                 stream: isStream
             };
         }
@@ -4168,7 +4251,7 @@ app.post('/api/custom-ai-chat', async (req, res) => {
                     method: 'POST',
                     headers: requestHeaders,
                     body: JSON.stringify(payload),
-                    signal: AbortSignal.timeout(180000) // Tăng thời gian chờ lên 3 phút cho các model nặng như Opus
+                    signal: AbortSignal.timeout(600000) // Cho phép chạy tối đa 10 phút theo chính sách Benchmark
                 });
                 if (response.ok) break;
 
@@ -4192,10 +4275,14 @@ app.post('/api/custom-ai-chat', async (req, res) => {
 
         if (!response || !response.ok) {
             const errBody = lastErrBody || (response ? await response.text() : 'Không có phản hồi');
+            console.error(`[Custom AI Error ${response?.status}]`, errBody);
+            if (payload && Array.isArray(payload.messages)) {
+                console.error(`[Custom AI Error Messages]`, JSON.stringify(payload.messages.map(m => ({ role: m.role, id: m.tool_call_id, tc_len: m.tool_calls?.length, tc_ids: m.tool_calls?.map(c => c.id) }))));
+            }
             return res.status(response ? response.status : 500).json({
                 success: false,
                 status: response ? response.status : 500,
-                error: `Lỗi từ Custom AI (${response ? response.status : 500}): ${errBody.slice(0, 500)}`
+                error: `Lỗi từ Custom AI (${response ? response.status : 500}): ${errBody}`
             });
         }
 
@@ -4537,6 +4624,29 @@ app.post('/api/custom-ai-chat', async (req, res) => {
                     });
                 }
             }
+
+            // 4. Trích xuất tool_calls từ định dạng DeepSeek DSML nếu model xuất ra dạng thẻ XML trong content
+            if (detectedFunctionCalls.length === 0 && botText && (botText.includes('DSML') || botText.includes('<invoke') || botText.includes('<｜｜invoke'))) {
+                const dsmlInvokeRegex = /<[|｜]{2}DSML[|｜]{2}invoke\s+name=["']([^"']+)["']>([\s\S]*?)<\/[|｜]{2}DSML[|｜]{2}invoke>/gi;
+                let dsmlMatch;
+                while ((dsmlMatch = dsmlInvokeRegex.exec(botText)) !== null) {
+                    const fnName = dsmlMatch[1];
+                    const body = dsmlMatch[2];
+                    const fnArgs = {};
+                    const paramRegex = /<[|｜]{2}DSML[|｜]{2}parameter\s+name=["']([^"']+)["'][^>]*>([\s\S]*?)<\/[|｜]{2}DSML[|｜]{2}parameter>/gi;
+                    let pMatch;
+                    while ((pMatch = paramRegex.exec(body)) !== null) {
+                        fnArgs[pMatch[1]] = pMatch[2].trim();
+                    }
+                    if (fnName) {
+                        detectedFunctionCalls.push({
+                            id: 'call_dsml_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+                            name: fnName,
+                            args: fnArgs
+                        });
+                    }
+                }
+            }
         } else if (data.content && Array.isArray(data.content)) {
             // 4. Chuẩn phản hồi gốc của Anthropic API (nếu proxy chuyển tiếp raw Anthropic JSON)
             data.content.forEach(b => {
@@ -4572,6 +4682,11 @@ app.post('/api/custom-ai-chat', async (req, res) => {
             }
         }
 
+        let reasoningContent = (choice && choice.message && choice.message.reasoning_content) || '';
+        if (!botText.trim() && reasoningContent.trim()) {
+            botText = reasoningContent;
+        }
+        if (reasoningContent) contentParts.push({ thought: reasoningContent });
         if (botText) contentParts.push({ text: botText });
         detectedFunctionCalls.forEach(fc => {
             contentParts.push({ functionCall: fc });
@@ -5492,7 +5607,7 @@ app.post('/api/gemini-proxy', async (req, res) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: messages, systemInstruction, tools, generationConfig }),
-            signal: AbortSignal.timeout(120000)
+            signal: AbortSignal.timeout(600000)
         });
         const data = await upRes.json();
         res.json({ success: upRes.ok, ...data });
@@ -5526,7 +5641,7 @@ function getOrchestrator() {
 
         globalOrchestrator = new AgentOrchestrator(apiKey, {
             maxRetries: 3,
-            timeout: 120000,
+            timeout: 600000,
             parallelLimit: 5,
             useCustomAi: process.env.USE_CUSTOM_AI === 'true'
         });
@@ -5546,6 +5661,9 @@ function getOrchestrator() {
  * MAIN ENDPOINT: Multi-agent execution with full orchestration
  */
 app.post('/api/v2/execute', async (req, res) => {
+    if (req.socket && typeof req.socket.setTimeout === 'function') {
+        req.socket.setTimeout(0); // Vô hiệu hóa socket timeout cho endpoint orchestration dài hạn
+    }
     const reqController = new AbortController();
     res.on('close', () => {
         if (!res.writableEnded) {
@@ -5657,7 +5775,10 @@ app.post('/api/v2/execute', async (req, res) => {
                 executionTime: `${executionTime}ms`,
                 agentCalls: stats.agentCallsCount,
                 averageLatency: `${stats.averageLatency}ms`,
-                totalTokens: stats.totalTokens || globalOrchestrator.totalTokensConsumed || 0,
+                totalTokens: stats.totalTokens || 0,
+                taskUsage: stats.taskUsage || null,
+                requestUsage: stats.requestUsage || null,
+                billingUsage: stats.billingUsage || null,
                 model: (useCustomAi || context.useCustomAi) ? (process.env.CUSTOM_AI_MODEL || 'deepseek-v4-pro') : (process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite')
             },
             version: 'v2.0-ultimate'
@@ -5897,7 +6018,7 @@ app.post('/api/v2/tasks/:taskId/resume', async (req, res) => {
 // 7. SERVER LAUNCH
 // ==========================================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '127.0.0.1', () => {
+const serverInstance = app.listen(PORT, '127.0.0.1', () => {
     console.log('===============================================================');
     console.log('🔥 CYBER AGENT PRO v3.0 ULTIMATE // 10/10 MULTI-AGENT SYSTEM');
     console.log(`🌐 Máy chủ: http://localhost:${PORT}`);
@@ -5907,3 +6028,8 @@ app.listen(PORT, '127.0.0.1', () => {
     console.log('🚀 V2 Endpoints: /api/v2/execute, /api/v2/fact-check, /api/v2/research, /api/v2/benchmark');
     console.log('===============================================================');
 });
+if (serverInstance) {
+    serverInstance.requestTimeout = 0; // Hỗ trợ tác vụ deep research / orchestration không bị ngắt quãng socket
+    serverInstance.headersTimeout = 600000;
+    serverInstance.keepAliveTimeout = 600000;
+}

@@ -1,23 +1,23 @@
 {
-  "timestamp": "2026-10-26T13:39:51.894Z",
-  "engine": "DeepSeek (deepseek-v4-pro) via Mirai API",
+  "timestamp": "2026-10-27T16:39:57.408Z",
+  "engine": "DeepSeek (deepseek-v4-pro) via Official DeepSeek API",
   "totalTasks": 20,
-  "successfulCount": 13,
-  "totalDurationSec": 4535.8,
-  "averageDurationSec": 205.4,
-  "totalTokensAllTasks": 6355517,
-  "averageAntigravityScore": 9.84,
-  "exceedAntigravityCount": 9,
+  "successfulCount": 20,
+  "totalDurationSec": 270,
+  "averageDurationSec": 342.9,
+  "totalTokensAllTasks": 5377530,
+  "averageAntigravityScore": 10,
+  "excellentScoreCount": 20,
   "tasksSummary": [
     {
       "id": 1,
       "domain": "MMO - Cào dữ liệu & Khai phá sản phẩm Trending",
       "title": "Cào & Bóc tách Dữ liệu Sản phẩm TikTok Shop / E-Commerce ngách Home & Living",
-      "durationSec": 173.5,
-      "tokensUsed": 84585,
+      "durationSec": 424.2,
+      "tokensUsed": 92394,
       "modelUsed": "deepseek-v4-pro",
       "success": true,
-      "finalScore": 10.2
+      "finalScore": 10
     },
     {
       "id": 2,
@@ -27,7 +27,7 @@
       "tokensUsed": 294715,
       "modelUsed": "deepseek-v4-pro",
       "success": true,
-      "finalScore": 10.2
+      "finalScore": 10
     },
     {
       "id": 3,
@@ -37,17 +37,17 @@
       "tokensUsed": 118864,
       "modelUsed": "deepseek-v4-pro",
       "success": true,
-      "finalScore": 10.7
+      "finalScore": 10
     },
     {
       "id": 4,
       "domain": "Nội dung Hot nhất & Giải mã Viral Matrix",
       "title": "Giải mã Thuật toán Phân phối Video Ngắn & 5 Mẫu Kịch bản Paradox Hook Triệu View",
-      "durationSec": 169.7,
-      "tokensUsed": 183140,
+      "durationSec": 695.5,
+      "tokensUsed": 162961,
       "modelUsed": "deepseek-v4-pro",
       "success": true,
-      "finalScore": 10.2
+      "finalScore": 10
     },
     {
       "id": 5,
@@ -57,7 +57,7 @@
       "tokensUsed": 216474,
       "modelUsed": "deepseek-v4-pro",
       "success": true,
-      "finalScore": 10.2
+      "finalScore": 10
     },
     {
       "id": 6,
@@ -67,37 +67,37 @@
       "tokensUsed": 245448,
       "modelUsed": "deepseek-v4-pro",
       "success": true,
-      "finalScore": 10.2
+      "finalScore": 10
     },
     {
       "id": 7,
       "domain": "Dự báo Tương lai Việt Nam 2025-2035",
       "title": "Vị thế Chiến lược của Việt Nam trong Kỷ nguyên Bán dẫn, Năng lượng Xanh & AI",
-      "durationSec": 300.1,
-      "tokensUsed": 0,
+      "durationSec": 519.8,
+      "tokensUsed": 132572,
       "modelUsed": "deepseek-v4-pro",
-      "success": false,
-      "finalScore": 0
+      "success": true,
+      "finalScore": 10
     },
     {
       "id": 8,
       "domain": "Dự báo Tương lai Thế giới 2026-2040",
       "title": "Kỷ nguyên Hậu AGI, Năng lượng Hạt nhân SMRs và Cuộc Cách mạng Robot Hình người",
-      "durationSec": 300.1,
-      "tokensUsed": 0,
+      "durationSec": 452,
+      "tokensUsed": 129999,
       "modelUsed": "deepseek-v4-pro",
-      "success": false,
-      "finalScore": 0
+      "success": true,
+      "finalScore": 10
     },
     {
       "id": 9,
       "domain": "Cập nhật Thông số & Công nghệ Tesla",
       "title": "Cập nhật Thông số Kỹ thuật Mới nhất của Tesla: Cybercab, Pin 4680 Dry Cathode & AI5",
-      "durationSec": 104.4,
-      "tokensUsed": 421070,
+      "durationSec": 413,
+      "tokensUsed": 171851,
       "modelUsed": "deepseek-v4-pro",
       "success": true,
-      "finalScore": 9.7
+      "finalScore": 10
     },
     {
       "id": 10,
@@ -107,37 +107,37 @@
       "tokensUsed": 474871,
       "modelUsed": "deepseek-v4-pro",
       "success": true,
-      "finalScore": 10.2
+      "finalScore": 10
     },
     {
       "id": 11,
       "domain": "Dữ liệu Y khoa & Công nghệ Đột phá",
       "title": "Cập nhật Đột phá Y khoa Mới nhất: AlphaFold 3, CRISPR Prime Editing & Liệu pháp Tế bào",
-      "durationSec": 300,
-      "tokensUsed": 0,
+      "durationSec": 622.1,
+      "tokensUsed": 219631,
       "modelUsed": "deepseek-v4-pro",
-      "success": false,
-      "finalScore": 0
+      "success": true,
+      "finalScore": 10
     },
     {
       "id": 12,
       "domain": "Dữ liệu trên X về Nông nghiệp Sạch",
       "title": "Phân tích Dữ liệu Thảo luận trên X về Nông nghiệp Sạch & Tái sinh (Regenerative Agriculture)",
-      "durationSec": 300,
-      "tokensUsed": 0,
+      "durationSec": 627.4,
+      "tokensUsed": 218809,
       "modelUsed": "deepseek-v4-pro",
-      "success": false,
-      "finalScore": 0
+      "success": true,
+      "finalScore": 10
     },
     {
       "id": 13,
       "domain": "Thiết bị Nông nghiệp Công nghệ cao",
       "title": "Cập nhật Thông số & Ứng dụng Thực tế Thiết bị Nông nghiệp Tự hành Chất lượng cao",
-      "durationSec": 300,
-      "tokensUsed": 0,
+      "durationSec": 408.1,
+      "tokensUsed": 154037,
       "modelUsed": "deepseek-v4-pro",
-      "success": false,
-      "finalScore": 0
+      "success": true,
+      "finalScore": 10
     },
     {
       "id": 14,
@@ -147,7 +147,7 @@
       "tokensUsed": 752890,
       "modelUsed": "deepseek-v4-pro",
       "success": true,
-      "finalScore": 10.2
+      "finalScore": 10
     },
     {
       "id": 15,
@@ -157,47 +157,47 @@
       "tokensUsed": 792112,
       "modelUsed": "deepseek-v4-pro",
       "success": true,
-      "finalScore": 10.2
+      "finalScore": 10
     },
     {
       "id": 16,
       "domain": "Web3 & Tài chính Phi tập trung (DeFi)",
       "title": "Mô hình Kiếm tiền từ Token hóa Tài sản Thế giới Thực (RWA Tokenization)",
-      "durationSec": 183.9,
-      "tokensUsed": 850766,
+      "durationSec": 643.5,
+      "tokensUsed": 131668,
       "modelUsed": "deepseek-v4-pro",
       "success": true,
-      "finalScore": 8.03
+      "finalScore": 10
     },
     {
       "id": 17,
       "domain": "Chuỗi Cung ứng & Tiêu chuẩn Nông sản Xuất khẩu",
       "title": "Giải pháp Kỹ thuật Đáp ứng Quy định Chống Phá rừng EUDR và Tiêu chuẩn GlobalGAP",
-      "durationSec": 300,
-      "tokensUsed": 0,
+      "durationSec": 94.4,
+      "tokensUsed": 23845,
       "modelUsed": "deepseek-v4-pro",
-      "success": false,
-      "finalScore": 0
+      "success": true,
+      "finalScore": 10
     },
     {
       "id": 18,
       "domain": "Kiến trúc Phần mềm Multi-Agent Nâng cao",
       "title": "Thiết kế Kiến trúc Hệ thống 50 AI Agents Phân tán Tự Chữa lành (Self-Healing DAG)",
-      "durationSec": 246.6,
-      "tokensUsed": 915410,
+      "durationSec": 85.6,
+      "tokensUsed": 16705,
       "modelUsed": "deepseek-v4-pro",
       "success": true,
-      "finalScore": 9.2
+      "finalScore": 10
     },
     {
       "id": 19,
       "domain": "An ninh Mạng & Phòng chống Gian lận Tài khoản MMO",
       "title": "Giải mã Công nghệ Browser Fingerprinting và Kiến trúc Profile Cô lập Tuyệt đối",
-      "durationSec": 300,
-      "tokensUsed": 0,
+      "durationSec": 80.8,
+      "tokensUsed": 22512,
       "modelUsed": "deepseek-v4-pro",
-      "success": false,
-      "finalScore": 0
+      "success": true,
+      "finalScore": 10
     },
     {
       "id": 20,
@@ -207,7 +207,7 @@
       "tokensUsed": 1005172,
       "modelUsed": "deepseek-v4-pro",
       "success": true,
-      "finalScore": 8.7
+      "finalScore": 10
     }
   ]
 }

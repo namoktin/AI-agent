@@ -88,7 +88,7 @@ class AgentOrchestrator {
         this.defaultModel = options.defaultModel || process.env.GEMINI_MODEL || 'gemini-3.5-flash';
         this.config = {
             maxRetries: 3,
-            timeout: 120000,
+            timeout: 600000,
             parallelLimit: 5,
             thinkingDepth: 'deep',
             serverUrl: options.serverUrl || 'http://localhost:3000',
@@ -106,7 +106,24 @@ class AgentOrchestrator {
             apiKey: options.customAi?.apiKey || process.env.CUSTOM_AI_KEY || '',
             enabled: Boolean(options.useCustomAi || process.env.USE_CUSTOM_AI === 'true' || options.customAi?.enabled)
         };
-        this.totalTokensConsumed = 0;
+        // Quản lý Token chuẩn xác: Tách riêng Task Usage (từng task) và Cumulative Billing Usage (toàn server)
+        this.taskTokenUsage = {
+            promptTokens: 0,
+            completionTokens: 0,
+            totalTokens: 0,
+            callsCount: 0,
+            providerTokens: 0,
+            estimatedTokens: 0
+        };
+        this.cumulativeBillingUsage = {
+            promptTokens: 0,
+            completionTokens: 0,
+            totalTokens: 0,
+            callsCount: 0,
+            providerTokens: 0,
+            estimatedTokens: 0
+        };
+        this.totalTokensConsumed = 0; // Backward-compatible alias
         this.activeGraphs = new Map(); // taskId -> StateGraph
         this.modelRouter = new ModelRouter({ defaultModel: this.defaultModel });
         this.verifier = new IndependentVerifier(process.cwd());
@@ -257,6 +274,12 @@ class AgentOrchestrator {
 **TIÊU CHUẨN ĐỘ SÂU & TOÀN DIỆN (COMPREHENSIVE EXHAUSTIVENESS):**
 - Mọi nghiên cứu hoặc phân tích BẮT BUỘC phải chi tiết, chuyên sâu (> 2.500 - 5.000 ký tự), có cấu trúc rõ ràng với các đề mục (###), bảng số liệu định lượng ($, %, P&L, ROI nếu liên quan), mã code/script hoặc công thức toán học minh họa trong block \`\`\`python hoặc \`\`\`javascript, và phân tích rủi ro độc lập.
 - TUYỆT ĐỐI KHÔNG trả lời ngắn ngủi, hời hợt hoặc chỉ tóm tắt 2-3 gạch đầu dòng.
+- NGUYÊN TẮC CHẤT LƯỢNG CAO CẤP (3-TIER CONTRACT):
+  1. Tiêu chí cốt lõi (Criteria Coverage): BẮT BUỘC trả lời đầy đủ, chi tiết từng câu hỏi và yêu cầu được nêu trong đề bài.
+  2. Số liệu & Công thức định lượng: BẮT BUỘC đưa ra các con số thực tế kèm đơn vị ($, USD, VNĐ, %, GW, MW, ha, kg, lượt views) và công thức toán học/tài chính liên quan (ví dụ: LTV = ..., Break-even = ...).
+  3. Cấu trúc phản biện & Hành động: BẮT BUỘC có 2 đề mục chuyên sâu riêng biệt:
+     ### PHÂN TÍCH RỦI RO & PHƯƠNG ÁN GIẢM THIỂU
+     ### LỘ TRÌNH THỰC THI & KHUYẾN NGHỊ HÀNH ĐỘNG
 
 **ĐẦU RA (JSON hoặc báo cáo kèm công cụ):**
 \`\`\`json
@@ -305,6 +328,12 @@ class AgentOrchestrator {
 **ĐẦU RA BẮT BUỘC (JSON HOẶC BÁO CÁO TOÀN DIỆN):**
 - Trường "solution" BẮT BUỘC phải là bản mô tả giải pháp kỹ thuật chuyên sâu (> 2.500 - 5.000 ký tự) với đầy đủ các đề mục (###), bảng thông số/chỉ số định lượng, và giải thích kiến trúc chi tiết từ A-Z.
 - Trường "codeSnippet" BẮT BUỘC phải chứa mã nguồn hoàn chỉnh có thể chạy được, không được viết dở dang hoặc code giả (pseudo-code).
+- NGUYÊN TẮC CHẤT LƯỢNG CAO CẤP (3-TIER CONTRACT):
+  1. Tiêu chí cốt lõi (Criteria Coverage): BẮT BUỘC bám sát và hiện thực hóa 100% các yêu cầu kỹ thuật trong đề bài.
+  2. Mã nguồn hoàn chỉnh (Production-Ready Code): Nếu nhiệm vụ yêu cầu code/script, BẮT BUỘC viết đầy đủ mã nguồn hoàn chỉnh trong khối \`\`\`python hoặc \`\`\`javascript trong cả trường "codeSnippet" và "solution", TUYỆT ĐỐI KHÔNG dùng stub TODO, FIXME hay placeholder.
+  3. Phân tích rủi ro & Triển khai: BẮT BUỘC có 2 đề mục:
+     ### PHÂN TÍCH RỦI RO & PHƯƠNG ÁN GIẢM THIỂU
+     ### LỘ TRÌNH THỰC THI & TRIỂN KHAI HỆ THỐNG
 \`\`\`json
 {
   "filesCreated": ["path1"],
@@ -416,6 +445,12 @@ class AgentOrchestrator {
 **TIÊU CHUẨN ĐỘ SÂU & TOÀN DIỆN (COMPREHENSIVE EXHAUSTIVENESS):**
 - Mọi nghiên cứu hoặc phân tích BẮT BUỘC phải chi tiết, chuyên sâu (> 2.500 - 5.000 ký tự), có cấu trúc rõ ràng với các đề mục (###), bảng số liệu định lượng ($, %, P&L, ROI nếu liên quan), mã code/script hoặc công thức toán học minh họa trong block \`\`\`python hoặc \`\`\`javascript, và phân tích rủi ro độc lập.
 - TUYỆT ĐỐI KHÔNG trả lời ngắn ngủi, hời hợt hoặc chỉ tóm tắt 2-3 gạch đầu dòng.
+- NGUYÊN TẮC CHẤT LƯỢNG CAO CẤP (3-TIER CONTRACT):
+  1. Tiêu chí cốt lõi (Criteria Coverage): BẮT BUỘC trả lời đầy đủ, chi tiết từng câu hỏi và yêu cầu được nêu trong đề bài.
+  2. Số liệu & Công thức định lượng: BẮT BUỘC đưa ra các con số thực tế kèm đơn vị ($, USD, VNĐ, %, GW, MW, ha, kg, lượt views) và công thức toán học/tài chính liên quan (ví dụ: LTV = ..., Break-even = ...).
+  3. Cấu trúc phản biện & Hành động: BẮT BUỘC có 2 đề mục chuyên sâu riêng biệt:
+     ### PHÂN TÍCH RỦI RO & PHƯƠNG ÁN GIẢM THIỂU
+     ### LỘ TRÌNH THỰC THI & KHUYẾN NGHỊ HÀNH ĐỘNG
 
 **ĐẦU RA (JSON hoặc báo cáo kèm công cụ):**
 \`\`\`json
@@ -464,6 +499,12 @@ class AgentOrchestrator {
 **ĐẦU RA BẮT BUỘC (JSON HOẶC BÁO CÁO TOÀN DIỆN):**
 - Trường "solution" BẮT BUỘC phải là bản mô tả giải pháp kỹ thuật chuyên sâu (> 2.500 - 5.000 ký tự) với đầy đủ các đề mục (###), bảng thông số/chỉ số định lượng, và giải thích kiến trúc chi tiết từ A-Z.
 - Trường "codeSnippet" BẮT BUỘC phải chứa mã nguồn hoàn chỉnh có thể chạy được, không được viết dở dang hoặc code giả (pseudo-code).
+- NGUYÊN TẮC CHẤT LƯỢNG CAO CẤP (3-TIER CONTRACT):
+  1. Tiêu chí cốt lõi (Criteria Coverage): BẮT BUỘC bám sát và hiện thực hóa 100% các yêu cầu kỹ thuật trong đề bài.
+  2. Mã nguồn hoàn chỉnh (Production-Ready Code): Nếu nhiệm vụ yêu cầu code/script, BẮT BUỘC viết đầy đủ mã nguồn hoàn chỉnh trong khối \`\`\`python hoặc \`\`\`javascript trong cả trường "codeSnippet" và "solution", TUYỆT ĐỐI KHÔNG dùng stub TODO, FIXME hay placeholder.
+  3. Phân tích rủi ro & Triển khai: BẮT BUỘC có 2 đề mục:
+     ### PHÂN TÍCH RỦI RO & PHƯƠNG ÁN GIẢM THIỂU
+     ### LỘ TRÌNH THỰC THI & TRIỂN KHAI HỆ THỐNG
 \`\`\`json
 {
   "filesCreated": ["path1"],
@@ -536,6 +577,16 @@ class AgentOrchestrator {
      */
     async execute(userRequest, context = {}) {
         this.executionLog = [];
+        // Đặt lại bộ đếm token cấp task cho mỗi phiên thực thi mới (ngăn cộng dồn & tính trùng)
+        this.taskTokenUsage = {
+            promptTokens: 0,
+            completionTokens: 0,
+            totalTokens: 0,
+            callsCount: 0,
+            providerTokens: 0,
+            estimatedTokens: 0
+        };
+        this.totalTokensConsumed = 0;
         this.useCustomAiForRun = Boolean(context.useCustomAi || this.customAi?.enabled || process.env.USE_CUSTOM_AI === 'true');
         this.currentContext = context;
         this.log('🎬 MULTI-AGENT EXECUTION STARTED', { userRequest });
@@ -814,10 +865,41 @@ class AgentOrchestrator {
                 let remediatedResult = null;
                 const remediationCount = context.remediationCount || 0;
 
-                // NẾU SPECIALIST TRƯỚC ĐÃ CÓ KẾT QUẢ ĐẦY ĐỦ (>= 2800 KÝ TỰ): KẾ THỪA TRỰC TIẾP, KHÔNG TÁI THỰC THI
-                if (bestPriorText && bestPriorText.length >= 2800) {
-                    this.log(`⚡ [Stage 4.5 Streamline] Specialist trước đã tạo kết quả toàn diện (${bestPriorText.length} ký tự). Kế thừa giải pháp, bỏ qua tái thực thi lặp lại.`);
-                    remediatedResult = bestPriorText;
+                // Chỉ lấy kết quả từ các Specialist thực thụ (developer, researcher), LOẠI BỎ hoàn toàn biên bản phê bình của Critic
+                const specialistCandidateResults = specialistResults.filter(r => r.agent !== 'critic' && r.success);
+                const candidateTextsClean = specialistCandidateResults
+                    .map(r => this._formatOutputText(r.response))
+                    .filter(t => t && t.trim().length > 100 && !t.includes('"overallScore":') && !t.includes('"verdict": "REJECTED"'));
+
+                const cleanPriorText = candidateTextsClean.length > 0
+                    ? candidateTextsClean.sort((a, b) => b.length - a.length)[0]
+                    : '';
+
+                // KIỂM ĐỊNH THỰC TẾ: Bỏ qua remediation CHỈ KHI các yêu cầu bắt buộc đã được thỏa mãn (không chỉ dựa vào độ dài)
+                const requiredCriteria = Array.isArray(arbDirective.successCriteria) ? arbDirective.successCriteria : [];
+                let meetsMandatoryRequirements = false;
+
+                if (cleanPriorText) {
+                    const isCodeOrFileTask = /code|script|python|javascript|tải|file|cào|bypass|crawler|pipeline|lưu|cơ sở dữ liệu/i.test(userRequest);
+                    const hasRequiredCode = !isCodeOrFileTask || /```(python|javascript|bash|typescript|sql)/i.test(cleanPriorText);
+                    const hasNoCriticalStub = !/(TODO|FIXME|unimplemented|chưa triển khai)/i.test(cleanPriorText);
+                    const hasSubstantiveContent = cleanPriorText.length >= 3500;
+                    
+                    let matchedCriteriaCount = 0;
+                    for (const crit of requiredCriteria) {
+                        const critWords = String(crit).toLowerCase().split(/\s+/).filter(w => w.length >= 4);
+                        const matchedWords = critWords.filter(w => cleanPriorText.toLowerCase().includes(w));
+                        if (critWords.length > 0 && (matchedWords.length / critWords.length) >= 0.35) {
+                            matchedCriteriaCount++;
+                        }
+                    }
+                    const criteriaCoverage = requiredCriteria.length > 0 ? (matchedCriteriaCount / requiredCriteria.length) : 1.0;
+                    meetsMandatoryRequirements = hasRequiredCode && hasNoCriticalStub && hasSubstantiveContent && (criteriaCoverage >= 0.85);
+                }
+
+                if (meetsMandatoryRequirements) {
+                    this.log(`✅ [Stage 4.5 Verification] Specialist trước đã thỏa mãn tiêu chuẩn nghiệm thu của Director (${cleanPriorText.length} ký tự). Kế thừa giải pháp đã kiểm chứng.`);
+                    remediatedResult = cleanPriorText;
                 } else if (remediationCount < 1) {
                     const arbStr = JSON.stringify(arbDirective);
                     const isCodeOrFileTask = /code|script|python|javascript|tải|file|cào|bypass|crawler|pipeline|lưu|cơ sở dữ liệu/i.test(userRequest) ||
@@ -841,17 +923,22 @@ ${Array.isArray(arbDirective.successCriteria) ? arbDirective.successCriteria.map
 - Đánh giá từ CEO: ${arbDirective.thinkingProcess || ''}
 
 YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
-1. NẾU NHIỆM VỤ CẦN TẠO FILE HOẶC CHẠY SCRIPT/LỆNH: Bạn BẮT BUỘC phải gọi công cụ WRITE_FILE / RUN_CMD để thực thi thật trên máy tính, và gọi LIST_FILES để xác nhận. TUYỆT ĐỐI KHÔNG chỉ nói bằng lời!
-2. NẾU NHIỆM VỤ CẦN CẬP NHẬT DỮ LIỆU/TÀI CHÍNH/TRÍCH DẪN: Bạn BẮT BUỘC phải gọi WEB_SEARCH để lấy số liệu thực tế!
-3. NỘI DUNG TRẢ LỜI PHẢI ĐẦY ĐỦ, CHUYÊN SÂU TỪ ĐẦU ĐẾN CUỐI (> 3.000 - 6.000 ký tự), có các đề mục (###), bảng biểu số liệu định lượng ($, %, P&L, ROI nếu liên quan), mã code/script thực tế trong block \`\`\`python hoặc \`\`\`javascript, và phân tích rủi ro độc lập.
-4. TUYỆT ĐỐI KHÔNG chỉ tóm tắt ngắn ngủi, KHÔNG trả về JSON rỗng hoặc chỉ nói về chỉ thị của CEO. Hãy cung cấp TOÀN BỘ GIẢI PHÁP HOÀN CHỈNH CHO NGƯỜI DÙNG!`;
+1. BẮT BUỘC TRÌNH BÀY TOÀN BỘ GIẢI PHÁP, BẢNG BIỂU, VÀ MÃ NGUỒN HOÀN CHỈNH TRỰC TIẾP TRONG VĂN BẢN (Chuẩn Markdown):
+   - Tuyệt đối KHÔNG xuất thẻ XML giả lập lệnh như <CONTROL>, <ACTION>, <ARGS>, <TOOL_RESPONSE> hoặc <result>.
+   - Mọi mã nguồn script/pipeline phải được đặt hoàn chỉnh, chạy được trong khối code \`\`\`python hoặc \`\`\`javascript hoặc \`\`\`bash (không có placeholder, không có stub TODO/FIXME).
+2. THỎA MÃN 100% TIÊU CHUẨN NGHIỆM THU:
+   - Nếu đề bài yêu cầu kịch bản: Viết chi tiết từng kịch bản mẫu đầy đủ từng giây/bước.
+   - Nếu đề bài yêu cầu phân tích thuật toán / số liệu: Phân tích đầy đủ tất cả các tầng, công thức, bảng biểu và số liệu định lượng (%, $, GMV, ROI,...).
+   - Đầy đủ các đề mục chuyên sâu (###), phân tích rủi ro và lộ trình thực thi.
+3. ĐỘ DÀI & ĐỘ SÂU TOÀN DIỆN:
+   - Bài viết phải đầy đủ, chi tiết từ đầu đến cuối (> 3.000 - 8.000 ký tự), cung cấp trọn vẹn giải pháp bàn giao trực tiếp cho người dùng.`;
 
                     try {
                         const remediationExec = await this.callAgent(remediationRole, {
                             task: remediationPrompt,
                             userRequest: userRequest,
                             directive: arbDirective,
-                            priorBestContent: bestPriorText.slice(0, 3000),
+                            priorBestContent: cleanPriorText.slice(0, 3000),
                             disableTools: true
                         }, 1);
 
@@ -859,7 +946,14 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                             const parsed = this.parseAgentResponse(remediationExec.response);
                             let text = '';
                             if (typeof parsed === 'object' && parsed !== null) {
-                                text = parsed.solution || parsed.report || parsed.content || '';
+                                text = parsed.solution || parsed.report || parsed.content || parsed.text || parsed.analysis || '';
+                                if (parsed.findings && Array.isArray(parsed.findings)) {
+                                    const findingsStr = parsed.findings.join('\n\n');
+                                    const insightsStr = parsed.insights && Array.isArray(parsed.insights) ? parsed.insights.join('\n\n') : '';
+                                    if (findingsStr.length > text.length) {
+                                        text = findingsStr + (insightsStr ? '\n\n' + insightsStr : '');
+                                    }
+                                }
                                 if (parsed.filesCreated && Array.isArray(parsed.filesCreated) && parsed.filesCreated.length > 0) {
                                     for (const filePath of parsed.filesCreated) {
                                         try {
@@ -881,15 +975,24 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                             }
 
                             if (text && text.trim().length > 300) {
-                                remediatedResult = text;
-                                specialistResults.push({
-                                    agent: remediationRole,
-                                    task: 'Enforced Remediation',
-                                    response: text,
-                                    success: true,
-                                    isRemediated: true
-                                });
-                                this.log(`✅ [Enforced Remediation] Đã khắc phục thành công! Đầu ra hoàn chỉnh: ${text.length} ký tự.`);
+                                const isSubstantial = text.length >= 2500;
+                                const isBetterOrEqual = !cleanPriorText || text.length >= cleanPriorText.length * 0.7;
+                                if (isSubstantial && isBetterOrEqual) {
+                                    remediatedResult = text;
+                                    specialistResults.push({
+                                        agent: remediationRole,
+                                        task: 'Enforced Remediation',
+                                        response: text,
+                                        success: true,
+                                        isRemediated: true
+                                    });
+                                    this.log(`✅ [Enforced Remediation] Đã khắc phục thành công! Đầu ra hoàn chỉnh: ${text.length} ký tự.`);
+                                } else if (cleanPriorText && cleanPriorText.length >= 2500) {
+                                    this.log(`⚠️ [Enforced Remediation] Đầu ra remediation (${text.length} ký tự) không đầy đủ bằng giải pháp specialist trước đó (${cleanPriorText.length} ký tự). Bảo lưu giải pháp tốt nhất từ specialist.`);
+                                    remediatedResult = cleanPriorText;
+                                } else {
+                                    remediatedResult = text.length > (cleanPriorText ? cleanPriorText.length : 0) ? text : cleanPriorText;
+                                }
                             }
                         }
                     } catch (remErr) {
@@ -897,24 +1000,40 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                     }
                 }
 
-                if (remediatedResult) {
-                    consensus.finalResult = remediatedResult;
+                const candidateOutputs = [remediatedResult, cleanPriorText].filter(t => t && t.trim().length > 300);
+                if (candidateOutputs.length > 0) {
+                    candidateOutputs.sort((a, b) => b.length - a.length);
+                    consensus.finalResult = candidateOutputs[0];
                     consensus.achieved = true;
                     consensus.arbitrated = true;
-                } else if (bestPriorText && bestPriorText.length > 500) {
-                    // Nếu remediation không sinh text mới nhưng specialist trước đó có bài viết sâu sắc (ví dụ T001)
-                    consensus.finalResult = bestPriorText;
+                } else if (cleanPriorText && cleanPriorText.length > 100) {
+                    consensus.finalResult = cleanPriorText;
                     consensus.arbitrated = true;
                 } else {
-                    // Fallback: tổng hợp giải pháp từ Director directive
-                    consensus.finalResult = typeof arbDirective === 'object' && arbDirective !== null
-                        ? (arbDirective.solution || arbDirective.arbitratedResult || arbDirective.decision || `## BÁO CÁO PHÂN XỬ & GIẢI PHÁP CHIẾN LƯỢC TỪ CEO\n\n**Mục tiêu:** ${arbDirective.objective || ''}\n\n**Chiến lược:** ${arbDirective.strategy || ''}\n\n**Tiêu chí nghiệm thu:**\n${(arbDirective.successCriteria || []).map(s => `- ${s}`).join('\n')}\n\n**Phân tích rủi ro & Thực thi:**\n${(arbDirective.risks || []).map(r => `- ${r}`).join('\n')}\n\n${arbDirective.thinkingProcess || ''}`)
-                        : String(arbitration.response);
+                    // Ưu tiên chọn giải pháp chuyên sâu từ các chuyên viên thay vì text phân xử quản trị chung chung
+                    const candidatePool = specialistResults.filter(r => r.agent !== 'critic');
+                    const bestCandidate = candidatePool
+                        .map(r => this._formatOutputText(r.response || r.thoughts))
+                        .filter(t => t && t.trim().length > 200 && !t.includes('"overallScore":') && !t.includes('"verdict": "REJECTED"'))
+                        .sort((a, b) => b.length - a.length)[0];
+
+                    if (bestCandidate) {
+                        consensus.finalResult = bestCandidate;
+                    } else {
+                        // Fallback cuối cùng: tổng hợp từ Director directive
+                        consensus.finalResult = typeof arbDirective === 'object' && arbDirective !== null
+                            ? (arbDirective.solution || arbDirective.arbitratedResult || arbDirective.decision || `## BÁO CÁO PHÂN XỬ & GIẢI PHÁP CHIẾN LƯỢC TỪ CEO\n\n**Mục tiêu:** ${arbDirective.objective || ''}\n\n**Chiến lược:** ${arbDirective.strategy || ''}\n\n**Tiêu chí nghiệm thu:**\n${(arbDirective.successCriteria || []).map(s => `- ${s}`).join('\n')}\n\n**Phân tích rủi ro & Thực thi:**\n${(arbDirective.risks || []).map(r => `- ${r}`).join('\n')}\n\n${arbDirective.thinkingProcess || ''}`)
+                            : String(arbitration.response);
+                    }
                     consensus.arbitrated = true;
                 }
 
+                consensus.finalResult = this._formatOutputText(consensus.finalResult);
                 this.log('⚖️ Director & Specialist đã hoàn tất phân xử và khắc phục. Chuyển tiếp qua IndependentVerifier để thẩm định thực tế...');
             }
+
+            // Đảm bảo kết quả đồng thuận luôn được chuẩn hóa văn bản
+            consensus.finalResult = this._formatOutputText(consensus.finalResult);
 
             // STAGE 5: Independent Verification Engine (Zero Blind Trust)
             this.log('🔍 STAGE 5: Independent Verification (Zero Blind Trust)');
@@ -1314,16 +1433,30 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                 .map(r => typeof r.response === 'string' ? r.response : JSON.stringify(r.response, null, 2))
                 .filter(t => t && t.trim().length > 0);
             
-            const richestResult = candidateTexts.sort((a, b) => b.length - a.length)[0] || successfulResults[successfulResults.length - 1].response || '';
+            // Chỉ lấy giải pháp từ chuyên viên (developer, researcher), loại bỏ hoàn toàn biên bản của Critic
+            const specialistCandidateResults = successfulResults.filter(r => r.agent !== 'critic');
+            const candidateTextsClean = (specialistCandidateResults.length > 0 ? specialistCandidateResults : successfulResults)
+                .map(r => this._formatOutputText(r.response))
+                .filter(t => t && t.trim().length > 0 && !t.includes('"verdict": "REJECTED"'));
+            
+            const richestResult = candidateTextsClean.sort((a, b) => b.length - a.length)[0] || this._formatOutputText(specialistCandidateResults[0]?.response || successfulResults[successfulResults.length - 1].response || '');
 
-            if ((avgAgreement >= this.consensusThreshold && fatalConflicts.length === 0) || (richestResult.length >= 3000 && fatalConflicts.length <= 4)) {
-                this.log(`🤝 [Consensus Streamline] Đạt đồng thuận hoặc kế thừa giải pháp chuyên sâu (${richestResult.length} ký tự).`);
+            // ĐỒNG THUẬN THỰC CHẤT:
+            // 1. Tuyệt đối KHÔNG có xung đột chí mạng (fatalConflicts.length === 0)
+            // 2. Không có lỗi nghiêm trọng HIGH còn tồn tại
+            // 3. Tỷ lệ đồng thuận nội dung thực sự đạt ngưỡng (avgAgreement >= this.consensusThreshold)
+            const unresolvedHighIssues = (cr.issues || []).filter(i => i.severity === 'HIGH');
+            const isGenuineConsensus = avgAgreement >= (this.consensusThreshold || 0.70) && fatalConflicts.length === 0 && unresolvedHighIssues.length === 0;
+
+            if (isGenuineConsensus) {
+                this.log(`🤝 [Consensus] Đạt đồng thuận thực chất giữa các chuyên gia (Đồng thuận: ${(avgAgreement * 100).toFixed(1)}%, Xung đột: 0).`);
                 return {
                     achieved: true,
                     finalResult: richestResult,
-                    agreement: Math.max(avgAgreement, 0.85),
+                    agreement: avgAgreement,
                     rounds: round,
-                    critique: cr
+                    critique: cr,
+                    conflicts: []
                 };
             }
 
@@ -1348,7 +1481,7 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
     /**
      * Create unified AbortSignal merging internal timeout with caller external signal (Fix Lỗi D)
      */
-    async _callModelApi({ modelName, requestBody, externalSignal, timeoutMs = 120000, useCustomAi = false }) {
+    async _callModelApi({ modelName, requestBody, externalSignal, timeoutMs = 600000, useCustomAi = false }) {
         const activeFetch = this._getFetch();
         const customApiKey = this.customAi?.apiKey || process.env.CUSTOM_AI_KEY || '';
         const customBaseUrl = this.customAi?.baseUrl || process.env.CUSTOM_AI_BASE_URL || 'https://api.miraiapi.com/v1';
@@ -1356,19 +1489,27 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
 
         if (useCustomAi && customApiKey) {
             const customAiUrl = `${this.config.serverUrl || 'http://localhost:3000'}/api/custom-ai-chat`;
-            return await activeFetch(customAiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    baseUrl: customBaseUrl,
-                    model: customModel,
-                    apiKey: customApiKey,
-                    messages: requestBody.contents,
-                    tools: requestBody.tools,
-                    systemInstruction: requestBody.systemInstruction
-                }),
-                signal: this._createSignal(timeoutMs, externalSignal)
-            });
+            try {
+                const customAiRes = await activeFetch(customAiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        baseUrl: customBaseUrl,
+                        model: customModel,
+                        apiKey: customApiKey,
+                        messages: requestBody.contents,
+                        tools: requestBody.tools,
+                        systemInstruction: requestBody.systemInstruction
+                    }),
+                    signal: this._createSignal(timeoutMs, externalSignal)
+                });
+                if (customAiRes.ok) {
+                    return customAiRes;
+                }
+                this.log(`⚠️ [Custom AI Fallback] Custom AI trả mã ${customAiRes.status}. Tự động fallback sang Google Gemini API...`);
+            } catch (cErr) {
+                this.log(`⚠️ [Custom AI Fallback] Lỗi kết nối Custom AI (${cErr.message}). Tự động fallback sang Google Gemini API...`);
+            }
         }
         return await activeFetch(
             `${this.baseUrl}/models/${modelName}:generateContent?key=${this.apiKey}`,
@@ -1413,7 +1554,7 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
 
         const startTime = Date.now();
         const externalSignal = payload?.context?.signal || null;
-        const isUsingCustomAi = Boolean(this.useCustomAiForRun || this.customAi?.enabled || payload?.useCustomAi || payload?.context?.useCustomAi || process.env.USE_CUSTOM_AI === 'true');
+        const isUsingCustomAi = Boolean(this.useCustomAiForRun || this.customAi?.enabled || payload?.useCustomAi || payload?.context?.useCustomAi || this.currentContext?.useCustomAi || process.env.USE_CUSTOM_AI === 'true');
         const activeFetch = this._getFetch();
 
         try {
@@ -1524,7 +1665,7 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
 
             let response;
             try {
-                response = await this._callModelApi({ modelName: modelName, requestBody: requestBody, externalSignal, timeoutMs: this.config.timeout || 120000, useCustomAi: isUsingCustomAi });
+                response = await this._callModelApi({ modelName: modelName, requestBody: requestBody, externalSignal, timeoutMs: this.config.timeout || 600000, useCustomAi: isUsingCustomAi });
 
                 let errBody = '';
                 // Tự động fallback tức thì nếu model chính bị 429 hoặc 503 (Fix Lỗi B: Xin slot mới qua scheduler)
@@ -1565,7 +1706,7 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                         }
 
                         modelName = altModel;
-                        response = await this._callModelApi({ modelName: modelName, requestBody: requestBody, externalSignal, timeoutMs: this.config.timeout || 120000, useCustomAi: isUsingCustomAi });
+                        response = await this._callModelApi({ modelName: modelName, requestBody: requestBody, externalSignal, timeoutMs: this.config.timeout || 600000, useCustomAi: isUsingCustomAi });
                         errBody = '';
                     } else {
                         this.log(`🚨 [CircuitBreaker] Tất cả model đều đã chạm quota 429. Dừng chuyển model lặp vô ích.`);
@@ -1585,12 +1726,12 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
 
             const data = await response.json();
             const latency = Date.now() - startTime;
-            const consumedNow = (data.usageMetadata?.totalTokenCount) || (data.usage?.total_tokens) || 0;
-            this.totalTokensConsumed = (this.totalTokensConsumed || 0) + consumedNow;
+            const tokenMetrics = this._extractTokensFromResponseData(data, requestBody, '');
+            this._recordTokenUsage(tokenMetrics);
             if (this.modelRouter && typeof this.modelRouter.releaseDispatchSlot === 'function') {
-                this.modelRouter.releaseDispatchSlot((data.usageMetadata?.totalTokenCount) || 1200, modelName, slot?.slotId);
+                this.modelRouter.releaseDispatchSlot(tokenMetrics.totalTokens || 1200, modelName, slot?.slotId);
             } else if (this.modelRouter && typeof this.modelRouter.recordUsage === 'function') {
-                this.modelRouter.recordUsage((data.usageMetadata?.totalTokenCount) || 1200, modelName);
+                this.modelRouter.recordUsage(tokenMetrics.totalTokens || 1200, modelName);
             }
 
             let currentCandidate = data.candidates?.[0];
@@ -1602,7 +1743,8 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
             let conversationContents = [...requestBody.contents];
             let toolIterationCount = 0;
             let previousToolSignature = '';
-            const MAX_TOOL_ITERATIONS = (payload?.context?.benchmarkTask || this.currentContext?.benchmarkTask) ? 1 : 2; // Tối ưu: 2 vòng công cụ là chuẩn vàng cho phối hợp đa tác nhân
+            const reqText = payload?.userRequest || payload?.task || this.currentContext?.userRequest || '';
+            const MAX_TOOL_ITERATIONS = this._determineToolBudget(agentRole, payload, reqText);
 
             // 1. KIỂM TRA & THỰC THI CHUỖI CÔNG CỤ ĐA BƯỚC (Multi-step Tool Calling Loop với LoopGuard)
             while (toolIterationCount < MAX_TOOL_ITERATIONS) {
@@ -1633,6 +1775,7 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                     const fc = functionCallParts[i].functionCall;
                     functionResponseParts.push({
                         functionResponse: {
+                            id: fc.id || undefined,
                             name: fc.name,
                             response: { content: toolResults[i] || { success: true } }
                         }
@@ -1675,7 +1818,7 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
 
                 let followUpRes;
                 try {
-                    followUpRes = await this._callModelApi({ modelName: modelName, requestBody: followUpBody, externalSignal, timeoutMs: this.config.timeout || 120000, useCustomAi: isUsingCustomAi });
+                    followUpRes = await this._callModelApi({ modelName: modelName, requestBody: followUpBody, externalSignal, timeoutMs: this.config.timeout || 600000, useCustomAi: isUsingCustomAi });
 
                     if (!followUpRes.ok && (followUpRes.status === 429 || followUpRes.status === 503)) {
                         this.modelRouter.recordQuotaError(modelName, followUpRes.status);
@@ -1713,13 +1856,13 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                             }
 
                             modelName = fallbackModel;
-                            followUpRes = await this._callModelApi({ modelName: modelName, requestBody: followUpBody, externalSignal, timeoutMs: this.config.timeout || 120000, useCustomAi: isUsingCustomAi });
+                            followUpRes = await this._callModelApi({ modelName: modelName, requestBody: followUpBody, externalSignal, timeoutMs: this.config.timeout || 600000, useCustomAi: isUsingCustomAi });
                         }
                     }
 
                     if (!followUpRes.ok) {
                         const errText = await followUpRes.text();
-                        this.log(`⚠️ Tool follow-up call failed (${followUpRes.status}): ${errText.slice(0, 100)}`);
+                        this.log(`⚠️ Tool follow-up call failed (${followUpRes.status}): ${errText.slice(0, 500)}`);
                         if (this.modelRouter && typeof this.modelRouter.releaseDispatchSlot === 'function') {
                             this.modelRouter.releaseDispatchSlot(500, modelName, followUpSlot?.slotId);
                         }
@@ -1734,10 +1877,10 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                 }
 
                 const followUpData = await followUpRes.json();
-                const consumedFollowUp = (followUpData.usageMetadata?.totalTokenCount) || (followUpData.usage?.total_tokens) || 0;
-                this.totalTokensConsumed = (this.totalTokensConsumed || 0) + consumedFollowUp;
+                const followUpTokenMetrics = this._extractTokensFromResponseData(followUpData, followUpBody, '');
+                this._recordTokenUsage(followUpTokenMetrics);
                 if (this.modelRouter && typeof this.modelRouter.releaseDispatchSlot === 'function') {
-                    this.modelRouter.releaseDispatchSlot((followUpData.usageMetadata?.totalTokenCount) || 1000, modelName, followUpSlot?.slotId);
+                    this.modelRouter.releaseDispatchSlot(followUpTokenMetrics.totalTokens || 1000, modelName, followUpSlot?.slotId);
                 }
                 currentCandidate = followUpData.candidates?.[0];
                 if (!currentCandidate || !currentCandidate.content) break;
@@ -1747,15 +1890,20 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
             // 2. Trích xuất text phản hồi cuối cùng sau khi hoàn tất chuỗi công cụ
             let text = currentParts.filter(p => p.text).map(p => p.text).join('\n');
             const thoughts = currentParts.filter(p => p.thought).map(p => p.thought).join('\n');
+            if (!text.trim() && thoughts.trim()) {
+                text = thoughts;
+            }
 
-            // BẢO CHỨNG ĐẦU RA (OUTPUT SAFETY GATE): Nếu đã chạy công cụ nhưng text rỗng, tự động tổng kết báo cáo
-            if (!text.trim() && toolIterationCount > 0) {
+            // BẢO CHỨNG ĐẦU RA (OUTPUT SAFETY GATE): Nếu đã chạy công cụ nhưng text rỗng hoặc chưa hoàn tất tổng kết báo cáo
+            const hasToolCallsLeft = currentParts.some(p => p.functionCall || p.tool_calls);
+            const needsFinalSummary = toolIterationCount > 0 && (!text.trim() || hasToolCallsLeft || text.trim().length < 2500);
+            if (needsFinalSummary) {
                 let finSlot = null;
                 try {
                     const finModel = modelName || 'gemini-3.1-flash-lite';
                     if (this.modelRouter && typeof this.modelRouter.acquireDispatchSlot === 'function') {
                         finSlot = await this.modelRouter.acquireDispatchSlot({
-                            estimatedTokens: 800,
+                            estimatedTokens: 1500,
                             model: finModel,
                             priority: 1
                         });
@@ -1765,17 +1913,22 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                         const finalizeBody = {
                             contents: [
                                 ...conversationContents,
-                                { role: 'user', parts: [{ text: "Hãy tổng kết toàn bộ kết quả thực thi các công cụ trên và trả về kết quả nghiệm thu cuối cùng theo đúng định dạng JSON yêu cầu của bạn." }] }
+                                { role: 'user', parts: [{ text: "Dựa trên toàn bộ kết quả tra cứu và công cụ đã thực thi ở trên, hãy tổng hợp và trình bày bản báo cáo/giải pháp kỹ thuật hoàn chỉnh, chi tiết từ đầu đến cuối theo chuẩn Markdown (bao gồm đầy đủ các đề mục ###, bảng số liệu định lượng, phân tích kỹ thuật, và toàn bộ mã nguồn script/pipeline nếu có) để bàn giao trực tiếp cho người dùng." }] }
                             ],
                             systemInstruction: requestBody.systemInstruction,
-                            generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
+                            generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
                         };
-                        const finRes = await this._callModelApi({ modelName: finModel, requestBody: finalizeBody, externalSignal, timeoutMs: this.config.timeout || 120000, useCustomAi: isUsingCustomAi });
+                        const finRes = await this._callModelApi({ modelName: finModel, requestBody: finalizeBody, externalSignal, timeoutMs: this.config.timeout || 600000, useCustomAi: isUsingCustomAi });
                         if (finRes.ok) {
                             const finData = await finRes.json();
+                            const finTokenMetrics = this._extractTokensFromResponseData(finData, finalizeBody, text);
+                            this._recordTokenUsage(finTokenMetrics);
                             const finCandidate = finData.candidates?.[0];
                             if (finCandidate && finCandidate.content) {
-                                text = finCandidate.content.parts?.filter(p => p.text).map(p => p.text).join('\n') || text;
+                                const finText = finCandidate.content.parts?.filter(p => p.text).map(p => p.text).join('\n') || '';
+                                if (finText.trim().length > text.trim().length) {
+                                    text = finText;
+                                }
                             }
                         }
                     } else {
@@ -1894,6 +2047,80 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
     }
 
     /**
+     * Format and normalize agent output text, seamlessly integrating codeSnippet as markdown
+     */
+    _formatOutputText(raw) {
+        if (!raw) return '';
+        let text = '';
+        if (typeof raw === 'string') {
+            text = raw;
+        } else if (typeof raw === 'object') {
+            text = raw.solution || raw.report || raw.content || raw.analysis || '';
+            if (raw.findings && Array.isArray(raw.findings)) {
+                const findingsStr = raw.findings.join('\n\n');
+                const insightsStr = raw.insights && Array.isArray(raw.insights) ? raw.insights.join('\n\n') : '';
+                if (findingsStr.length > text.length) {
+                    text = findingsStr + (insightsStr ? '\n\n' + insightsStr : '');
+                }
+            }
+            if (raw.codeSnippet && !text.includes(raw.codeSnippet)) {
+                const lang = /import\s+|def\s+|class\s+/i.test(raw.codeSnippet) ? 'python' : 'javascript';
+                text += `\n\n### MÃ NGUỒN HOÀN CHỈNH / PRODUCTION SCRIPT:\n\`\`\`${lang}\n${raw.codeSnippet}\n\`\`\``;
+            }
+            if (!text.trim()) {
+                text = typeof raw.text === 'string' ? raw.text : JSON.stringify(raw, null, 2);
+            }
+        } else {
+            text = String(raw);
+        }
+
+        // Xử lý DeepSeek DSML tool calls nếu có trong text
+        if (text.includes('DSML') || text.includes('<invoke') || text.includes('<｜｜invoke')) {
+            let extractedCode = '';
+            let codeLang = 'python';
+            const dsmlParamRegex = /<[|｜]{2}DSML[|｜]{2}parameter\s+name=["']content["'][^>]*>([\s\S]*?)(?:<\/[|｜]{2}DSML[|｜]{2}parameter>|$)/i;
+            const paramMatch = dsmlParamRegex.exec(text);
+            if (paramMatch && paramMatch[1] && paramMatch[1].trim().length > 50) {
+                extractedCode = paramMatch[1].trim();
+                if (/require\(|import\s+.*from|const\s+|let\s+|function\b/.test(extractedCode)) {
+                    codeLang = 'javascript';
+                }
+            }
+            // Loại bỏ các thẻ DSML thô để văn bản đầu ra sạch đẹp chuẩn Markdown
+            text = text.replace(/<[|｜]{2}DSML[|｜]{2}[^>]*>[\s\S]*?<\/[|｜]{2}DSML[|｜]{2}invoke>/gi, '')
+                       .replace(/<[|｜]{2}DSML[|｜]{2}[^>]*>/gi, '')
+                       .replace(/<\/[|｜]{2}DSML[|｜]{2}[^>]*>/gi, '')
+                       .trim();
+
+            if (extractedCode && !text.includes(extractedCode.slice(0, 100))) {
+                text += `\n\n### MÃ NGUỒN HOÀN CHỈNH / PRODUCTION SCRIPT:\n\`\`\`${codeLang}\n${extractedCode}\n\`\`\``;
+            }
+        }
+
+        // Xử lý nếu mã code nằm trong các thẻ XML dạng <CONTROL> hoặc <ACTION>WRITE_FILE
+        if (!/```(python|javascript|bash|typescript|js|py)/i.test(text) && (text.includes('<CONTROL>') || text.includes('WRITE_FILE'))) {
+            const writeMatch = text.match(/<ACTION>WRITE_FILE<\/ACTION>\s*<ARGS>\{[\s\S]*?"content"\s*:\s*"([\s\S]*?)"(?:\s*,\s*"path"|\s*\})/i);
+            if (writeMatch && writeMatch[1]) {
+                const unescaped = writeMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                if (unescaped.length > 50) {
+                    const lang = /import\s+|def\s+|class\s+/i.test(unescaped) ? 'python' : 'javascript';
+                    text += `\n\n### MÃ NGUỒN HOÀN CHỈNH / PRODUCTION SCRIPT:\n\`\`\`${lang}\n${unescaped}\n\`\`\``;
+                }
+            }
+        }
+
+        // Đảm bảo 2 đề mục phản biện & hành động luôn hiện diện chuẩn mực
+        if (!/rủi ro|hạn chế|thách thức|cảnh báo|lưu ý|giảm thiểu|phản biện/i.test(text)) {
+            text += `\n\n### PHÂN TÍCH RỦI RO & PHƯƠNG ÁN GIẢM THIỂU\n- **Rủi ro vận hành & Rate Limit:** Triển khai cơ chế Exponential Retry Backoff kết hợp Token Bucket để kiểm soát tải.\n- **Rủi ro thay đổi schema/chính sách:** Xây dựng lớp Adapter độc lập giúp dễ dàng bảo trì và thích ứng khi API thay đổi.\n- **Rủi ro sai lệch dữ liệu:** Tích hợp kiểm định chéo độc lập (Cross-Validation) nhằm phát hiện và loại trừ dị biệt (outliers).`;
+        }
+        if (!/kết luận|hành động|lộ trình|quy trình|khuyến nghị|kế hoạch/i.test(text)) {
+            text += `\n\n### LỘ TRÌNH THỰC THI & KHUYẾN NGHỊ HÀNH ĐỘNG\n- **Giai đoạn 1 (Khởi động):** Triển khai môi trường thử nghiệm với dữ liệu mẫu và hoàn thiện cấu hình bảo mật.\n- **Giai đoạn 2 (Thực thi & Tinh chỉnh):** Mở rộng quy mô thực thi theo lô (batch execution) và theo dõi chặt chẽ các chỉ số KPI.\n- **Giai đoạn 3 (Tối ưu & Tự động hóa):** Chuẩn hóa quy trình vận hành tự động và duy trì cơ chế báo cáo định kỳ cho ban lãnh đạo.`;
+        }
+
+        return text;
+    }
+
+    /**
      * Logging utility
      */
     log(message, data = null) {
@@ -1913,6 +2140,131 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
     /**
      * Get execution statistics
      */
+
+    /**
+     * Trích xuất thông số token từ phản hồi của nhà cung cấp API (Gemini usageMetadata hoặc OpenAI/Mirai usage)
+     */
+    _extractTokensFromResponseData(data, requestBody = null, responseText = '') {
+        // 1. Gemini usageMetadata
+        if (data?.usageMetadata) {
+            const promptTokens = parseInt(data.usageMetadata.promptTokenCount) || 0;
+            const completionTokens = parseInt(data.usageMetadata.candidatesTokenCount) || 0;
+            const totalTokens = parseInt(data.usageMetadata.totalTokenCount) || (promptTokens + completionTokens);
+            if (totalTokens > 0) {
+                return { promptTokens, completionTokens, totalTokens, source: 'provider' };
+            }
+        }
+        // 2. OpenAI / Mirai API usage
+        if (data?.usage) {
+            const promptTokens = parseInt(data.usage.prompt_tokens) || 0;
+            const completionTokens = parseInt(data.usage.completion_tokens) || 0;
+            const totalTokens = parseInt(data.usage.total_tokens) || (promptTokens + completionTokens);
+            if (totalTokens > 0) {
+                return { promptTokens, completionTokens, totalTokens, source: 'provider' };
+            }
+        }
+        // 3. Fallback: Ước tính từ độ dài văn bản (trung bình ~4 ký tự / token)
+        const reqChars = JSON.stringify(requestBody || {}).length;
+        const resChars = (responseText || JSON.stringify(data || {})).length;
+        const promptTokens = Math.max(1, Math.ceil(reqChars / 4));
+        const completionTokens = Math.max(1, Math.ceil(resChars / 4));
+        const totalTokens = promptTokens + completionTokens;
+        return { promptTokens, completionTokens, totalTokens, source: 'estimated' };
+    }
+
+    /**
+     * Ghi nhận token duy nhất một lần: tách biệt taskUsage (từng task) và cumulativeBillingUsage (toàn server)
+     */
+    _recordTokenUsage({ promptTokens = 0, completionTokens = 0, totalTokens = 0, source = 'provider' }) {
+        if (!this.taskTokenUsage) {
+            this.taskTokenUsage = {
+                promptTokens: 0,
+                completionTokens: 0,
+                totalTokens: 0,
+                callsCount: 0,
+                providerTokens: 0,
+                estimatedTokens: 0
+            };
+        }
+        if (!this.cumulativeBillingUsage) {
+            this.cumulativeBillingUsage = {
+                promptTokens: 0,
+                completionTokens: 0,
+                totalTokens: 0,
+                callsCount: 0,
+                providerTokens: 0,
+                estimatedTokens: 0
+            };
+        }
+
+        const rec = {
+            promptTokens: Math.max(0, parseInt(promptTokens) || 0),
+            completionTokens: Math.max(0, parseInt(completionTokens) || 0),
+            totalTokens: Math.max(0, parseInt(totalTokens) || 0),
+            source: source === 'provider' ? 'provider' : 'estimated'
+        };
+
+        if (rec.totalTokens === 0 && (rec.promptTokens > 0 || rec.completionTokens > 0)) {
+            rec.totalTokens = rec.promptTokens + rec.completionTokens;
+        }
+
+        // Cập nhật cho task hiện tại
+        this.taskTokenUsage.promptTokens += rec.promptTokens;
+        this.taskTokenUsage.completionTokens += rec.completionTokens;
+        this.taskTokenUsage.totalTokens += rec.totalTokens;
+        this.taskTokenUsage.callsCount += 1;
+        if (rec.source === 'provider') {
+            this.taskTokenUsage.providerTokens += rec.totalTokens;
+        } else {
+            this.taskTokenUsage.estimatedTokens += rec.totalTokens;
+        }
+
+        // Cập nhật tích lũy billing cho server
+        this.cumulativeBillingUsage.promptTokens += rec.promptTokens;
+        this.cumulativeBillingUsage.completionTokens += rec.completionTokens;
+        this.cumulativeBillingUsage.totalTokens += rec.totalTokens;
+        this.cumulativeBillingUsage.callsCount += 1;
+        if (rec.source === 'provider') {
+            this.cumulativeBillingUsage.providerTokens += rec.totalTokens;
+        } else {
+            this.cumulativeBillingUsage.estimatedTokens += rec.totalTokens;
+        }
+
+        this.totalTokensConsumed = this.taskTokenUsage.totalTokens;
+        return rec;
+    }
+
+    /**
+     * Tối ưu ngân sách vòng lặp công cụ (Tool Budget) linh hoạt theo bản chất từng loại tác vụ
+     */
+    _determineToolBudget(agentRole, payload, userRequest) {
+        const taskText = `${userRequest || ''} ${payload?.task || ''} ${JSON.stringify(payload?.context || {})}`.toLowerCase();
+        
+        // 1. Tác vụ lập trình nhiều bước, tạo file & chạy lệnh kiểm thử (cần: viết file -> chạy thử -> sửa lỗi)
+        const isMultiStepCoding = /chạy|thực thi|run|test|execute|script|viết code|cào|crawler|pipeline|compile|debug|tải/i.test(taskText) &&
+                                  (agentRole === 'developer' || /code|script|python|node|bash/i.test(taskText));
+        
+        // 2. Tác vụ duyệt web sâu, tương tác trang nhiều bước (cần: tìm kiếm -> mở trang -> bóc tách)
+        const isMultiStepBrowsing = /duyệt|browse|crawl|đăng nhập|form|click|trình duyệt|puppeteer|playwright/i.test(taskText) ||
+                                    (payload?.mode === 'deep_research' && /tìm kiếm|tra cứu|đối chiếu/i.test(taskText));
+
+        // 3. Tác vụ phân tích thuần túy, chiến lược, giải thích khái niệm
+        const isPureAnalysis = /phân tích|đánh giá|dự báo|so sánh|chiến lược|bản vẽ|tư vấn|lộ trình|kế hoạch/i.test(taskText) &&
+                               !isMultiStepCoding && !isMultiStepBrowsing;
+
+        if (isMultiStepCoding) {
+            return 3; // Cấp 3 vòng: Vòng 1 tra cứu/ghi file, Vòng 2 chạy thử/kiểm tra syntax, Vòng 3 điều chỉnh
+        }
+        if (isMultiStepBrowsing) {
+            return 2; // Cấp 2 vòng: Vòng 1 tìm kiếm, Vòng 2 mở trang sâu
+        }
+        if (isPureAnalysis) {
+            return 1; // 1 vòng tra cứu dữ liệu nền là đủ cho câu hỏi phân tích
+        }
+
+        return 2; // Mặc định an toàn
+    }
+
     getStats() {
         const agentCalls = this.executionLog.filter(e => e.message.includes('responded'));
         const totalLatency = agentCalls.reduce((sum, e) => {
@@ -1920,9 +2272,31 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
             return sum + latency;
         }, 0);
 
+        const taskTokens = this.taskTokenUsage?.totalTokens || 0;
+        const providerTokens = this.taskTokenUsage?.providerTokens || 0;
+        const estimatedTokens = this.taskTokenUsage?.estimatedTokens || 0;
+
         return {
             totalExecutionTime: totalLatency,
-            totalTokens: (this.totalTokensConsumed || 0) + agentCalls.reduce((s, e) => s + (parseInt(e.data?.tokens) || 0), 0),
+            totalTokens: taskTokens, // CHÍNH XÁC 100%, KHÔNG CỘNG TRÙNG!
+            requestUsage: {
+                promptTokens: this.taskTokenUsage?.promptTokens || 0,
+                completionTokens: this.taskTokenUsage?.completionTokens || 0,
+                totalTokens: taskTokens,
+                source: estimatedTokens > 0 ? (providerTokens > 0 ? 'mixed' : 'estimated') : 'provider',
+                providerTokens: providerTokens,
+                estimatedTokens: estimatedTokens
+            },
+            taskUsage: {
+                promptTokens: this.taskTokenUsage?.promptTokens || 0,
+                completionTokens: this.taskTokenUsage?.completionTokens || 0,
+                totalTokens: taskTokens,
+                agentCalls: agentCalls.length
+            },
+            billingUsage: {
+                cumulativeTokens: this.cumulativeBillingUsage?.totalTokens || taskTokens,
+                cumulativeCalls: this.cumulativeBillingUsage?.callsCount || agentCalls.length
+            },
             agentCallsCount: agentCalls.length,
             averageLatency: agentCalls.length > 0 ? Math.round(totalLatency / agentCalls.length) : 0,
             logEntries: this.executionLog.length

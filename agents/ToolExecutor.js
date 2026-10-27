@@ -280,9 +280,9 @@ class ToolExecutor {
 
         const reqSignal = context?.signal
             ? (typeof AbortSignal.any === 'function'
-                ? AbortSignal.any([AbortSignal.timeout(120000), context.signal])
+                ? AbortSignal.any([AbortSignal.timeout(600000), context.signal])
                 : context.signal)
-            : AbortSignal.timeout(120000);
+            : AbortSignal.timeout(600000);
 
         const response = await fetch(`${this.serverUrl}${endpoint}`, {
             method: 'POST',

@@ -715,5 +715,19 @@
     },
     "endTime": "2026-10-25T18:33:15.801Z",
     "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793026453520": {
+    "id": "test_dead_pid_1793026453520",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-26T14:54:13.521Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
   }
 }

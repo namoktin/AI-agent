@@ -515,5 +515,33 @@
     "decision": "APPROVE",
     "feedback": "Duyệt sau khi server restart",
     "decidedAt": "2026-10-26T10:42:18.240Z"
+  },
+  "orchestrator_graph_1793026391728": {
+    "taskId": "orchestrator_graph_1793026391728",
+    "nodeId": "deploy_node",
+    "description": "Deploy code to server",
+    "actionType": "WRITE_CRITICAL",
+    "input": {},
+    "risks": [],
+    "createdAt": "2026-10-26T14:53:11.731Z",
+    "status": "APPROVED",
+    "success": true,
+    "decision": "APPROVE",
+    "feedback": "Chấp thuận triển khai",
+    "decidedAt": "2026-10-26T14:53:11.735Z"
+  },
+  "restart_test_1793026392386": {
+    "taskId": "restart_test_1793026392386",
+    "nodeId": "node_restart_action",
+    "description": "Action waiting approval across server restart",
+    "actionType": "WRITE_CRITICAL",
+    "input": {},
+    "risks": [],
+    "createdAt": "2026-10-26T14:53:12.390Z",
+    "status": "APPROVED",
+    "success": true,
+    "decision": "APPROVE",
+    "feedback": "Duyệt sau khi server restart",
+    "decidedAt": "2026-10-26T14:53:12.407Z"
   }
 }
