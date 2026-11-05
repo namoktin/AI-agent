@@ -1,0 +1,81 @@
+{
+  "taskId": 17,
+  "tier": "HE_THONG",
+  "platform": "Daemon Engine",
+  "title": "Quản trị Tiến trình Ngầm (Daemon Background Task Engine & Anti-Phantom Gate)",
+  "durationMs": 79405,
+  "score": 10,
+  "passed": true,
+  "verification": {
+    "passed": true,
+    "evidence": "Anti-Phantom Daemon Gate responsive: claimed=true, runningCount=0"
+  },
+  "tokens": 73737,
+  "resultPreview": "```json\n{\n  \"report\": \"### BÁO CÁO CHIẾN LƯỢC: THIẾT LẬP HỆ THỐNG QUẢN TRỊ TIẾN TRÌNH NỀN (DAEMON) TRÊN WINDOWS NATIVE\\n\\n#### 1. TỔNG QUAN CHIẾN LƯỢC\\nĐể giải quyết mâu thuẫn dữ liệu và đảm bảo tính toàn vẹn của hệ thống (Single Source of Truth - SSoT), chúng ta cần chuyển dịch từ việc thực thi rời rạc sang mô hình quản trị tiến trình có kiểm soát. Trên môi trường Windows Native, việc quản lý tiến trình Node.js đòi hỏi sự kết hợp giữa PowerShell (để quản lý vòng đời) và cơ chế đối chiếu PID (Pr",
+  "fullResponse": {
+    "success": true,
+    "mode": "standard",
+    "result": "```json\n{\n  \"report\": \"### BÁO CÁO CHIẾN LƯỢC: THIẾT LẬP HỆ THỐNG QUẢN TRỊ TIẾN TRÌNH NỀN (DAEMON) TRÊN WINDOWS NATIVE\\n\\n#### 1. TỔNG QUAN CHIẾN LƯỢC\\nĐể giải quyết mâu thuẫn dữ liệu và đảm bảo tính toàn vẹn của hệ thống (Single Source of Truth - SSoT), chúng ta cần chuyển dịch từ việc thực thi rời rạc sang mô hình quản trị tiến trình có kiểm soát. Trên môi trường Windows Native, việc quản lý tiến trình Node.js đòi hỏi sự kết hợp giữa PowerShell (để quản lý vòng đời) và cơ chế đối chiếu PID (Process ID) để xác thực trạng thái.\\n\\n#### 2. CƠ CHẾ ĐỐI CHIẾU CHÉO (CROSS-VALIDATION)\\nChúng ta thiết lập bộ lọc chiến lược dựa trên trọng số độ tin cậy:\\n- **Nguồn 1 (Primary):** PID từ hệ thống Windows (Get-Process).\\n- **Nguồn 2 (Secondary):** Trạng thái heartbeat từ tệp log hoặc bộ nhớ đệm (Cache).\\n- **Quy tắc:** Chỉ khi PID tồn tại và phản hồi heartbeat mới được xác nhận là RUNNING.\\n\\n#### 3. TRIỂN KHAI KỸ THUẬT (WINDOWS NATIVE)\\nSử dụng PowerShell làm lớp điều phối (Orchestrator) để đảm bảo tính tái lập.\\n\\n```powershell\\n# Script: daemon_manager.ps1\\n$daemonName = \\\"NodeDaemon\\\"\\n$cmd = \\\"node -e 'setInterval(()=>{}, 1000)'\\\"\\n\\n# 1. Khởi chạy tiến trình ngầm\\nfunction Start-Daemon {\\n    $process = Start-Process node -ArgumentList \\\"-e 'setInterval(()=>{}, 1000)'\\\" -PassThru -WindowStyle Hidden\\n    $process.Id | Out-File \\\".pid_store.txt\\\"\\n    Write-Host \\\"[INFO] Daemon started with PID: $($process.Id)\\\"\\n}\\n\\n# 2. Kiểm tra trạng thái (Verify-Daemon-Claim)\\nfunction Verify-Daemon-Claim {\\n    if (Test-Path \\\".pid_store.txt\\\") {\\n        $pid = Get-Content \\\".pid_store.txt\\\"\\n        $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue\\n        if ($proc -ne $null -and $proc.ProcessName -eq \\\"node\\\") {\\n            return $true, $pid\\n        }\\n    }\\n    return $false, $null\\n}\\n\\n# 3. Hủy tiến trình an toàn\\nfunction Stop-Daemon {\\n    $status, $pid = Verify-Daemon-Claim\\n    if ($status) {\\n        Stop-Process -Id $pid -Force\\n        Remove-Item \\\".pid_store.txt\\\"\\n        Write-Host \\\"[SUCCESS] Daemon $pid terminated.\\\"\\n    } else {\\n        Write-Host \\\"[WARN] No active daemon found.\\\"\\n    }\\n}\\n```\\n\\n#### 4. BẢNG PHÂN TÍCH HIỆU SUẤT & ĐỘ TIN CẬY\\n| Tiêu chí | Trọng số | Phương pháp đo lường | Mục tiêu (Target)\\n| :--- | :--- | :--- | :--- |\\n| Tốc độ phản hồi | 30% | ms (Latency) | < 50ms |\\n| Tỷ lệ lỗi (Conflict) | 40% | (Conflict/Total) | 0% |\\n| Khả năng phục hồi | 30% | Uptime % | 99.99% |\\n\\n#### 5. PHÂN TÍCH RỦI RO & PHƯƠNG ÁN GIẢM THIỂU\\n- **Rủi ro 1: Mất tệp PID.** Giải pháp: Tự động quét các tiến trình Node.js đang chạy nếu tệp `.pid_store.txt` bị mất (Re-sync).\\n- **Rủi ro 2: Xung đột PID (PID reuse).** Giải pháp: Lưu kèm Timestamp vào tệp log để đối chiếu thời gian khởi tạo tiến trình.\\n\\n#### 6. LỘ TRÌNH THỰC THI & KHUYẾN NGHỊ HÀNH ĐỘNG\\n1. **Giai đoạn 1 (Ngay lập tức):** Triển khai script `daemon_manager.ps1` vào thư mục gốc của hệ thống.\\n2. **Giai đoạn 2 (Tự động hóa):** Thiết lập Task Scheduler trên Windows để kiểm tra trạng thái mỗi 60 giây.\\n3. **Giai đoạn 3 (Tối ưu):** Chuyển đổi tệp `.pid_store.txt` sang định dạng JSON để tích hợp với các hệ thống giám sát tập trung (ELK Stack hoặc Prometheus).\\n\\nKhuyến nghị: Luôn sử dụng lệnh `Stop-Process -Force` kết hợp với kiểm tra `ProcessName` để tránh hủy nhầm tiến trình hệ thống khác.\",\n  \"findings\": [\n    \"Sử dụng PID là phương pháp xác thực đáng tin cậy nhất trên Windows Native.\",\n    \"Việc tách biệt logic quản lý (PowerShell) và logic thực thi (Node.js) giúp giảm thiểu sai lệch hệ thống.\",\n    \"Cơ chế 'Single Source of Truth' được đảm bảo thông qua tệp lưu trữ trạng thái cục bộ.\"\n  ],\n  \"sources\": [\n    {\n      \"url\": \"https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-process\",\n      \"title\": \"Microsoft Learn: Get-Process Documentation\",\n      \"credibility\": \"HIGH\"\n    },\n    {\n      \"url\": \"https://nodejs.org/api/process.html\",\n      \"title\": \"Node.js Process API Documentation\",\n      \"credibility\": \"HIGH\"\n    }\n  ],\n  \"insights\": [\n    \"Sự mâu thuẫn dữ liệu thường xuất phát từ việc thiếu đồng bộ giữa PID trong bộ nhớ và tệp lưu trữ.\",\n    \"Cấu trúc quản lý tiến trình nên ưu tiên tính nguyên tử (Atomic Operations) để tránh trạng thái treo (Zombie processes).\"\n  ],\n  \"confidence\": 0.95,\n  \"limitations\": \"Giải pháp tập trung vào môi trường Windows Native; cần điều chỉnh nếu triển khai trên Linux/Unix (cần thay thế PowerShell bằng Bash/Systemd).\"\n}\n```",
+    "qualityScore": 85,
+    "critique": {
+      "overallScore": 75,
+      "factualOverlap": 0.95,
+      "contentAgreement": 0.9,
+      "conflictingClaims": [],
+      "issues": [
+        {
+          "severity": "MEDIUM",
+          "category": "Security",
+          "description": "Script sử dụng tệp tin .pid_store.txt không có cơ chế khóa (file locking), dẫn đến nguy cơ Race Condition nếu nhiều tiến trình cùng truy cập hoặc ghi đè PID.",
+          "recommendation": "Sử dụng cơ chế kiểm tra sự tồn tại của tiến trình dựa trên tên hoặc một file lock chuyên dụng thay vì chỉ dựa vào file văn bản thô."
+        },
+        {
+          "severity": "LOW",
+          "category": "Performance",
+          "description": "Việc sử dụng 'node -e' với setInterval trống không phản ánh đúng tải thực tế của một daemon, có thể gây hiểu lầm về mức tiêu thụ tài nguyên.",
+          "recommendation": "Nên bổ sung cơ chế kiểm tra cổng (port listening) để xác thực daemon thực sự đang hoạt động thay vì chỉ kiểm tra PID."
+        },
+        {
+          "severity": "MEDIUM",
+          "category": "Accuracy",
+          "description": "Thiếu bước kiểm tra Execution Policy của PowerShell. Trên Windows 11 mặc định, việc chạy script .ps1 thường bị chặn nếu chưa cấu hình.",
+          "recommendation": "Bổ sung lệnh 'Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process' vào hướng dẫn triển khai."
+        }
+      ],
+      "strengths": [
+        "Cấu trúc báo cáo chuyên nghiệp, tuân thủ mô hình quản trị vòng đời tiến trình.",
+        "Sử dụng PowerShell native giúp giảm thiểu phụ thuộc vào phần mềm bên thứ ba.",
+        "Cơ chế đối chiếu PID chặt chẽ, đảm bảo không để lại tiến trình mồ côi (zombie process)."
+      ],
+      "verdict": "NEEDS_REVISION",
+      "thinkingProcess": "Tôi đã thẩm định báo cáo dựa trên các tiêu chí kỹ thuật Windows Native. Agent đã cung cấp mã nguồn PowerShell có tính thực thi cao. Tuy nhiên, báo cáo thiếu các bước kiểm tra môi trường (Execution Policy) và rủi ro về Race Condition khi quản lý file PID. Mặc dù logic quản lý tiến trình đúng, nhưng cần bổ sung các biện pháp bảo mật và tính bền vững để đạt chuẩn production-ready."
+    },
+    "grounding": null,
+    "stats": {
+      "executionTime": "79326ms",
+      "agentCalls": 7,
+      "averageLatency": "13645ms",
+      "totalTokens": 73737,
+      "taskUsage": {
+        "promptTokens": 67001,
+        "completionTokens": 6736,
+        "totalTokens": 73737,
+        "agentCalls": 7
+      },
+      "requestUsage": {
+        "promptTokens": 67001,
+        "completionTokens": 6736,
+        "totalTokens": 73737,
+        "source": "provider",
+        "providerTokens": 73737,
+        "estimatedTokens": 0
+      },
+      "billingUsage": {
+        "cumulativeTokens": 692920,
+        "cumulativeCalls": 191
+      },
+      "model": "gemini-3.1-flash-lite"
+    },
+    "version": "v2.0-ultimate"
+  }
+}

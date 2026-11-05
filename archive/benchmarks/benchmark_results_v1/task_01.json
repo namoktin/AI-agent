@@ -1,0 +1,24 @@
+{
+  "taskId": 1,
+  "domain": "MMO - Cào dữ liệu & Khai phá sản phẩm Trending",
+  "title": "Cào & Bóc tách Dữ liệu Sản phẩm TikTok Shop / E-Commerce ngách Home & Living",
+  "durationMs": 222865,
+  "durationSec": 222.9,
+  "success": true,
+  "qualityScore": 96,
+  "stats": {
+    "executionTime": "222031ms",
+    "agentCalls": 8,
+    "averageLatency": "24403ms"
+  },
+  "eval": {
+    "depthScore": 2.5,
+    "actionabilityScore": 1.5,
+    "reasoningScore": 2.5,
+    "bonus": 0.2,
+    "finalScore": 6.7,
+    "textLength": 1741
+  },
+  "sampleSnippet": "{\"objective\":\"Giải quyết xung đột giữa các kết quả thực thi (T001, T002, T003) và đưa ra phán quyết chiến lược cuối cùng cho quy trình khai thác dữ liệu MMO ngách Home & Living.\",\"strategy\":\"Xác nhận báo cáo từ Critic (T003) và kiểm tra lỗi ảo giác/bịa đặt từ Developer (T002). Tách biệt rõ ràng giữa tư vấn chiến lược kiến trúc (T001) và thực thi mã nguồn thực tế (nếu có sai lệch). Phê duyệt nội dung chiến lược và công thức tài chính từ T001, đồng thời yêu cầu làm sạch/chuẩn hóa lại phần thực thi...",
+  "fullResponse": "{\"objective\":\"Giải quyết xung đột giữa các kết quả thực thi (T001, T002, T003) và đưa ra phán quyết chiến lược cuối cùng cho quy trình khai thác dữ liệu MMO ngách Home & Living.\",\"strategy\":\"Xác nhận báo cáo từ Critic (T003) và kiểm tra lỗi ảo giác/bịa đặt từ Developer (T002). Tách biệt rõ ràng giữa tư vấn chiến lược kiến trúc (T001) và thực thi mã nguồn thực tế (nếu có sai lệch). Phê duyệt nội dung chiến lược và công thức tài chính từ T001, đồng thời yêu cầu làm sạch/chuẩn hóa lại phần thực thi file để đảm bảo tính minh bạch tuyệt đối.\",\"successCriteria\":[\"Loại bỏ các thông tin bịa đặt hoặc không được kiểm chứng thực tế từ kết quả của agent thực thi.\",\"Thống nhất cấu trúc dữ liệu sản phẩm Winning (đồng bộ hóa tiền tệ VNĐ và danh mục sản phẩm).\",\"Đảm bảo tiêu chuẩn vận hành an toàn trước các cơ chế chống bot của sàn thương mại điện tử.\"],\"risks\":[\"Rủi ro pháp lý và kỹ thuật khi cào dữ liệu (scraping) trực tiếp từ các sàn TMĐT lớn (Shopee, TikTok Shop).\",\"Rủi ro ảo giác (hallucination) từ các agent khi báo cáo trạng thái tạo file không thực tế.\"],\"priority\":\"HIGH\",\"thinkingProcess\":\"Dựa trên đầu vào từ hệ thống phân xử xung đột, agent Critic (T003) đã đưa ra điểm số 92/92 với verdict 'APPROVED', tuy nhiên phần conflicts lại chỉ ra việc T002 có thể bịa đặt việc tạo file và có sự lệch pha về đơn vị tiền tệ/danh sách sản phẩm. Với tư cách là CEO, tôi cần đưa ra phán quyết vĩ mô: 1) Chấp nhận phần kiến trúc kỹ thuật và chiến lược chống bot, công thức biên lợi nhuận ròng từ T001 vì tính logic và chuyên môn cao. 2) Ghi nhận cảnh báo về T002 và yêu cầu siết chặt kỷ luật kiểm chứng tệp tin. 3) Thống nhất danh mục 5 sản phẩm Home & Living theo đơn vị VNĐ làm chuẩn quy chiếu chiến lược kinh doanh tại thị trường Việt Nam.\"}"
+}

@@ -1,0 +1,24 @@
+{
+  "taskId": 10,
+  "domain": "Khai thác Dữ liệu X (Twitter) & Tài sản Tỷ phú",
+  "title": "Ai là Người Giàu nhất Thế giới trên X & Phân tích Biến động Tài sản Thời gian thực",
+  "durationMs": 57785,
+  "durationSec": 57.8,
+  "success": true,
+  "qualityScore": 92,
+  "stats": {
+    "executionTime": "57710ms",
+    "agentCalls": 7,
+    "averageLatency": "9516ms"
+  },
+  "eval": {
+    "depthScore": 2.5,
+    "actionabilityScore": 2.5,
+    "reasoningScore": 2.5,
+    "bonus": 0.2,
+    "finalScore": 7.7,
+    "textLength": 2206
+  },
+  "sampleSnippet": "```json\n{\n  \"findings\": [\n    \"Elon Musk tiếp tục duy trì vị thế là một trong những tỷ phú giàu nhất thế giới tính đến tháng 10/2026, với tài sản ròng biến động mạnh theo giá cổ phiếu Tesla (TSLA).\",\n    \"Cấu trúc tài sản của Musk tập trung chủ yếu vào cổ phần tại Tesla, tiếp theo là định giá tư nhân của SpaceX (nhờ các vòng gọi vốn và năng lực phóng tên lửa), xAI (đang tăng trưởng nóng nhờ tích hợp Grok vào hệ sinh thái Tesla/Optimus), và X Corp (được xem là tài sản chiến lược để kiểm soát luồn...",
+  "fullResponse": "```json\n{\n  \"findings\": [\n    \"Elon Musk tiếp tục duy trì vị thế là một trong những tỷ phú giàu nhất thế giới tính đến tháng 10/2026, với tài sản ròng biến động mạnh theo giá cổ phiếu Tesla (TSLA).\",\n    \"Cấu trúc tài sản của Musk tập trung chủ yếu vào cổ phần tại Tesla, tiếp theo là định giá tư nhân của SpaceX (nhờ các vòng gọi vốn và năng lực phóng tên lửa), xAI (đang tăng trưởng nóng nhờ tích hợp Grok vào hệ sinh thái Tesla/Optimus), và X Corp (được xem là tài sản chiến lược để kiểm soát luồng thông tin).\",\n    \"Các bài đăng trên @elonmusk có ảnh hưởng trực tiếp đến biến động ngắn hạn của TSLA và Dogecoin, tạo ra tâm lý 'FOMO' hoặc bán th��o trong giới đầu tư bán lẻ, mặc dù tác động dài hạn lên giá trị nội tại của công ty thường bị thị trường điều chỉnh lại.\",\n    \"Phong cách truyền thông: Musk (trực diện, gây tranh cãi, phá vỡ quy chuẩn), Jensen Huang (tầm nhìn kỹ thuật, truyền cảm hứng, tập trung vào hệ sinh thái AI), Sam Altman (chính sách, thận trọng, tập trung vào tương lai của AGI và an toàn AI).\"\n  ],\n  \"sources\": [\n    {\n      \"url\": \"https://en.wikipedia.org/wiki/Elon_Musk\",\n      \"title\": \"Elon Musk - Wikipedia Standard\",\n      \"credibility\": \"HIGH\"\n    },\n    {\n      \"url\": \"https://en.wikipedia.org/wiki/Tesla,_Inc.\",\n      \"title\": \"Tesla, Inc. - Wikipedia Standard\",\n      \"credibility\": \"HIGH\"\n    },\n    {\n      \"url\": \"https://en.wikipedia.org/wiki/Dogecoin\",\n      \"title\": \"Dogecoin - Wikipedia Standard\",\n      \"credibility\": \"HIGH\"\n    }\n  ],\n  \"insights\": [\n    \"Sự giàu có của Musk không chỉ nằm ở vốn hóa thị trường mà nằm ở khả năng điều phối các công ty công nghệ có tính cộng hưởng cao (Tesla + xAI + SpaceX).\",\n    \"Truyền thông của các lãnh đạo công nghệ hiện nay là một phần của chiến lược kinh doanh: Musk dùng X để tạo 'tiếng vang', Huang d��ng các sự kiện GTC để tạo 'niềm tin kỹ thuật', Altman dùng các diễn đàn chính sách để tạo 'tính chính danh' cho AI.\"\n  ],\n  \"confidence\": 0.85,\n  \"limitations\": \"Dữ liệu về tài sản ròng thời gian thực (Real-Time) thay đổi theo từng giây dựa trên giá cổ phiếu niêm yết. Định giá các công ty tư nhân như SpaceX và xAI là ước tính dựa trên các vòng gọi vốn gần nhất, không phải giá trị thanh khoản thực tế.\"\n}\n```"
+}

@@ -1,0 +1,172 @@
+{
+  "facebook_reels": {
+    "pattern": "facebook.com",
+    "keywords": [
+      "facebook",
+      "fb",
+      "reel",
+      "xemlacuon"
+    ],
+    "bestRoute": "Sử dụng BROWSE_WEB kèm extractReels: true hoặc SCRAPE_SOCIAL_MEDIA để trích xuất cả caption, view count, author và canonical reel url. Nếu tải batch, tạo script Node.js / Python tải tuần tự thay vì gọi lệnh thô.",
+    "tokensSaved": 2400,
+    "runsCount": 3,
+    "successCount": 3,
+    "successRate": 1,
+    "wilsonScore": 0.438,
+    "lastOutcomeAt": "2026-11-02T16:32:24.699Z"
+  },
+  "tiktok_video": {
+    "pattern": "tiktok.com",
+    "keywords": [
+      "tiktok",
+      "video tiktok",
+      "tik tok"
+    ],
+    "bestRoute": "Dùng SCRAPE_SOCIAL_MEDIA hoặc BROWSE_WEB trích xuất trực tiếp selector [data-e2e='browse-video-desc'], like-count và comment-count qua UniversalSocialScraper.",
+    "tokensSaved": 1800,
+    "runsCount": 12,
+    "successCount": 12,
+    "successRate": 1,
+    "lastOutcomeAt": "2026-10-27T15:06:12.896Z",
+    "wilsonScore": 0.757
+  },
+  "youtube_shorts": {
+    "pattern": "youtube.com",
+    "keywords": [
+      "youtube",
+      "shorts",
+      "yt",
+      "youtu.be"
+    ],
+    "bestRoute": "Dùng SCRAPE_SOCIAL_MEDIA bóc tách JSON-LD Schema.org VideoObject và thẻ ytd-watch-metadata để lấy chuẩn xác 100% view, like, author.",
+    "tokensSaved": 1900,
+    "runsCount": 5,
+    "successCount": 5,
+    "successRate": 1,
+    "lastOutcomeAt": "2026-11-01T08:16:16.794Z",
+    "wilsonScore": 0.566
+  },
+  "batch_daemon": {
+    "pattern": "tiến trình ngầm",
+    "keywords": [
+      "tiến trình ngầm",
+      "chạy ngầm",
+      "daemon",
+      "tải ngầm",
+      "background task"
+    ],
+    "bestRoute": "BẮT BUỘC viết file script Node.js hoặc Python vào thư mục chỉ định, sau đó gọi START_BACKGROUND_TASK với scriptPath hoặc command để chạy ngầm không gây nghẽn chat. Dùng MANAGE_BACKGROUND_TASK action='status' để theo dõi tiến độ.",
+    "tokensSaved": 2500,
+    "runsCount": 31,
+    "successCount": 31,
+    "successRate": 1,
+    "lastOutcomeAt": "2026-11-01T09:08:17.289Z",
+    "wilsonScore": 0.89
+  },
+  "facebook_reels_download": {
+    "pattern": "facebook.com/reel",
+    "keywords": [
+      "tải reel facebook",
+      "tải video facebook",
+      "download reel",
+      "download facebook reel"
+    ],
+    "bestRoute": "GỌI TRỰC TIẾP tool DOWNLOAD_VIDEO với URL hoặc đường dẫn file reel_list.txt (C:/Users/Nam/Desktop/gemini/2026-10-25/reel_list.txt) để tải toàn bộ video về máy. TUYỆT ĐỐI PHẢI PHÁT LỆNH GỌI TOOL DOWNLOAD_VIDEO NGAY, không chỉ trả lời bằng văn bản.",
+    "tokensSaved": 4000,
+    "runsCount": 11,
+    "successCount": 11,
+    "successRate": 1,
+    "lastOutcomeAt": "2026-10-25T15:08:50.608Z"
+  },
+  "elevenlabs_dubbing_quality": {
+    "pattern": "elevenlabs",
+    "keywords": [
+      "elevenlabs",
+      "lồng tiếng",
+      "dubbing",
+      "thuyết minh",
+      "chuyển ngữ",
+      "tts",
+      "voice"
+    ],
+    "bestRoute": "Khi dùng ElevenLabs TTS lồng tiếng tiếng Việt: 1) Dùng ElevenLabs API key từ context, requests.post(..., timeout=60); 2) BẮT BUỘC chọn Voice ID hỗ trợ tiếng Việt mượt mà (dùng multlingual v2 model: eleven_multilingual_v2, Voice ID như 21m00Tcm4TlvDq8ikWAM (Rachel) hoặc ErXwobaYiN019PkySvjV (Antoni) hoặc AZnzlk1XvdvUeBnXmlld (Domi) - TUYỆT ĐỐI KHÔNG dùng voice thuần Anh Roger CwhRBWXzGAHq8TQ4Fs17 để tránh ngọng líu); 3) BẮT BUỘC FORCE OVERWRITE (ghi đè file mới, không dùng if not os.path.exists() bỏ qua); 4) CƠ CHẾ DỰ PHÒNG TỰ PHỤC HỒI & DEFENSIVE TIMEOUT: MỌI subprocess.run PHẢI có timeout=30 trong try...except (subprocess.TimeoutExpired, Exception). Nếu ElevenLabs API trả về 401 Unauthorized hoặc lỗi, thử edge-tts (subprocess.run(['edge-tts', '--voice', 'vi-VN-NamMinhNeural', '--text', vi_text, '--write-media', out_path], timeout=30, check=True)). Nếu edge-tts lỗi hoặc tệp sinh ra <= 100 bytes, BẮT BUỘC fallback sang gTTS trực tiếp trong Python: from gtts import gTTS; gTTS(text=vi_text, lang='vi').save(out_path). Luôn xác minh if not os.path.exists(out_path) or os.path.getsize(out_path) <= 100 trước khi ghép video; 5) Bóc tách chuẩn phần tiếng Việt sau 'VIETNAMESE DUBBING:' trong file kịch bản; 6) Sau khi tạo audio, gọi INSPECT_MEDIA kiểm tra duration và stream âm thanh; 7) BẮT BUỘC giữ tốc độ nói tự nhiên 1.0x-1.05x của con người, TUYỆT ĐỐI CẤM dùng atempo < 1.0 kéo dãn làm chậm méo giọng; phát cùng lúc từ giây 0s và dùng amix duration=first để nhạc nền tiếp tục phát khi giọng đọc kết thúc.",
+    "tokensSaved": 3200,
+    "runsCount": 5,
+    "successCount": 5,
+    "successRate": 1,
+    "wilsonScore": 0.65,
+    "lastOutcomeAt": "2026-11-04T06:32:12.867Z"
+  },
+  "code_execution_verification": {
+    "pattern": "run_code_check",
+    "keywords": [
+      "kiểm tra code",
+      "chạy thử code",
+      "code sandbox",
+      "run script",
+      "phân tích dữ liệu",
+      "code verification"
+    ],
+    "bestRoute": "Khi viết code hoặc script xử lý: 1) Dùng WRITE_FILE tạo script hoàn chỉnh, TUYỆT ĐỐI KHÔNG dùng stub/placeholder; 2) BẮT BUỘC dùng RUN_CMD thực thi script và kiểm tra output thực tế (exitCode === 0); 3) Kiểm tra file đầu ra tồn tại và không rỗng; 4) TUYỆT ĐỐI KHÔNG báo cáo hoàn thành nếu chưa chạy thử nghiệm thực tế.",
+    "tokensSaved": 2200,
+    "runsCount": 8,
+    "successCount": 8,
+    "successRate": 1,
+    "wilsonScore": 0.72,
+    "lastOutcomeAt": "2026-11-04T06:32:12.897Z"
+  },
+  "image_generation_verification": {
+    "pattern": "image_integrity",
+    "keywords": [
+      "tạo ảnh",
+      "banner",
+      "poster",
+      "image generation",
+      "kiểm tra ảnh",
+      "hình ảnh"
+    ],
+    "bestRoute": "Khi tạo ảnh hoặc banner đồ họa: 1) Sử dụng canvas / PIL / sharp / ffmpeg sinh file nhị phân ảnh thật (.png/.jpg); 2) BẮT BUỘC kiểm tra magic header bytes (89 50 4E 47 cho PNG, FF D8 FF cho JPEG); 3) Dung lượng file phải >= 1KB và độ phân giải đạt chuẩn yêu cầu; 4) Gọi INSPECT_MEDIA hoặc fs.stat kiểm chứng trước khi nghiệm thu.",
+    "tokensSaved": 1800,
+    "runsCount": 6,
+    "successCount": 6,
+    "successRate": 1,
+    "wilsonScore": 0.68,
+    "lastOutcomeAt": "2026-11-04T06:32:12.897Z"
+  },
+  "messaging_recipient_safety": {
+    "pattern": "messaging_safety",
+    "keywords": [
+      "gửi tin nhắn",
+      "email marketing",
+      "outreach",
+      "danh sách gửi",
+      "kiểm tra người nhận",
+      "placeholder"
+    ],
+    "bestRoute": "Khi tạo nội dung tin nhắn hoặc chiến dịch outreach: 1) BẮT BUỘC rà soát 100% các biến mẫu template như {name}, {company}, {email}, [INSERT_...]; 2) Thay thế hoàn toàn bằng thông tin thực tế của từng đối tác/khách hàng; 3) Xuất manifest dạng JSON/CSV có trường recipient, status, verified: true; 4) Verifier sẽ chặn đứng nếu còn sót bất kỳ token placeholder chưa điền nào.",
+    "tokensSaved": 2000,
+    "runsCount": 7,
+    "successCount": 7,
+    "successRate": 1,
+    "wilsonScore": 0.7,
+    "lastOutcomeAt": "2026-11-04T06:32:12.897Z"
+  },
+  "data_scraping_and_cleaning": {
+    "pattern": "data_clean_schema",
+    "keywords": [
+      "làm sạch dữ liệu",
+      "csv",
+      "data cleaning",
+      "bóc tách bảng",
+      "schema",
+      "top công ty"
+    ],
+    "bestRoute": "Khi thu thập và làm sạch dữ liệu thành CSV: 1) BẮT BUỘC tạo file CSV có dòng Header rõ ràng và >= 1 dòng dữ liệu thực; 2) Không để sót ô NULL hoặc NaN không được chuẩn hóa; 3) Định dạng đúng chuẩn UTF-8 có dấu tiếng Việt chuẩn xác; 4) Dùng RUN_CMD python/node kiểm tra số dòng và tính toàn vẹn của bảng trước khi bàn giao.",
+    "tokensSaved": 2100,
+    "runsCount": 9,
+    "successCount": 9,
+    "successRate": 1,
+    "wilsonScore": 0.74,
+    "lastOutcomeAt": "2026-11-04T06:32:12.897Z"
+  }
+}

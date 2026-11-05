@@ -1,0 +1,24 @@
+{
+  "taskId": 17,
+  "domain": "Chuỗi Cung ứng & Tiêu chuẩn Nông sản Xuất khẩu",
+  "title": "Giải pháp Kỹ thuật Đáp ứng Quy định Chống Phá rừng EUDR và Tiêu chuẩn GlobalGAP",
+  "durationMs": 67362,
+  "durationSec": 67.4,
+  "success": true,
+  "qualityScore": 95,
+  "stats": {
+    "executionTime": "67252ms",
+    "agentCalls": 5,
+    "averageLatency": "10641ms"
+  },
+  "eval": {
+    "depthScore": 2.5,
+    "actionabilityScore": 3,
+    "reasoningScore": 2.5,
+    "bonus": 0.2,
+    "finalScore": 8.2,
+    "textLength": 1877
+  },
+  "sampleSnippet": "```json\n{\n  \"overallScore\": 96,\n  \"factualOverlap\": 0.98,\n  \"contentAgreement\": 0.97,\n  \"conflictingClaims\": [],\n  \"issues\": [\n    {\n      \"severity\": \"LOW\",\n      \"category\": \"Performance\",\n      \"description\": \"Việc xử lý ảnh vệ tinh quy mô lớn (Sentinel-2 / Landsat) cho toàn bộ diện tích canh tác nông sản Việt Nam đòi hỏi hạ tầng đám mây Google Earth Engine hoặc cụm xử lý GIS chuyên dụng với băng thông và tài nguyên tính toán đáng kể.\",\n      \"recommendation\": \"Khuyến nghị áp dụng cơ chế cach...",
+  "fullResponse": "```json\n{\n  \"overallScore\": 96,\n  \"factualOverlap\": 0.98,\n  \"contentAgreement\": 0.97,\n  \"conflictingClaims\": [],\n  \"issues\": [\n    {\n      \"severity\": \"LOW\",\n      \"category\": \"Performance\",\n      \"description\": \"Việc xử lý ảnh vệ tinh quy mô lớn (Sentinel-2 / Landsat) cho toàn bộ diện tích canh tác nông sản Việt Nam đòi hỏi hạ tầng đám mây Google Earth Engine hoặc cụm xử lý GIS chuyên dụng với băng thông và tài nguyên tính toán đáng kể.\",\n      \"recommendation\": \"Khuyến nghị áp dụng cơ chế caching ảnh theo ô lưới (Grid-based tiling) và xử lý bất đồng bộ (async worker) để tối ưu hóa hiệu năng khi scale hệ thống cho hàng trăm ngàn nông hộ.\"\n    }\n  ],\n  \"strengths\": [\n    \"Giải pháp kỹ thuật toàn diện bám sát 3 trụ cột cốt lõi của Quy định chống phá rừng EUDR (Polygon Mapping > 4ha & GPS đơn < 4ha, Viễn thám Sentinel-2/Landsat mốc 31/12/2020, và Sổ cái số tích hợp EUIS Due Diligence Statement).\",\n    \"Phân tách rõ ràng phương pháp kỹ thuật RTK cho diện tích lớn và thuật toán nội suy vùng ảnh hưởng (Buffer zone) cho nông hộ nhỏ lẻ.\",\n    \"Ứng dụng công nghệ Google Earth Engine và chỉ số thảm thực vật (NDVI, NBR) giúp chứng minh minh bạch đất không bị phá rừng.\",\n    \"Tuân thủ tuyệt đối quy tắc Reality Verification Gate, không bịa đặt nguồn dữ liệu hay đường dẫn ảo.\"\n  ],\n  \"verdict\": \"APPROVED\",\n  \"thinkingProcess\": \"Tôi đã tiến hành rà soát toàn bộ bối cảnh nhiệm vụ và chiến lược kỹ thuật được yêu cầu về việc tuân thủ EUDR cho nông sản Việt Nam (cà phê, cao su, hồ tiêu, gỗ). Các giải pháp về (1) Thu thập tọa độ GPS đa giác và điểm đơn, (2) Đối soát ảnh vệ tinh Sentinel-2/Landsat qua GEE mốc 31/12/2020, và (3) Kiến trúc sổ cái số truyền tải hồ sơ DDS lên EU Information System đều được luận giải cực kỳ logic, chuyên sâu và đúng chuẩn kỹ thuật GIS/Remote Sensing năm 2026. Không phát hiện lỗ hổng logic hay vi phạm quy tắc. Phê duyệt hoàn toàn.\"\n}\n```"
+}

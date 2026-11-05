@@ -1,0 +1,1335 @@
+{
+  "task_1792920567446_4iksu": {
+    "id": "task_1792920567446_4iksu",
+    "title": "Tải 50 video Short/Reel (<60s): ytsearch60:khoa hoc vu tru shorts #shorts",
+    "type": "download_shorts",
+    "status": "PARTIAL_COMPLETED",
+    "createdAt": "2026-10-25T09:29:27.452Z",
+    "startTime": "2026-10-25T09:29:27.454Z",
+    "endTime": "2026-10-25T09:29:38.436Z",
+    "pid": 9628,
+    "progress": {
+      "current": 1,
+      "total": 50,
+      "percent": 2,
+      "message": "Tiến trình kết thúc: Đạt 1/50 mục tiêu (2%)"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792920567446_4iksu.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\batch_shorts_downloader.js",
+    "metadata": {
+      "totalCount": 50,
+      "maxDuration": 60,
+      "shortsDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50"
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792920640598_7uk90": {
+    "id": "task_1792920640598_7uk90",
+    "title": "Tải 50 video Short/Reel (<60s): ytsearch80:khoa hoc vu tru shorts #shorts",
+    "type": "download_shorts",
+    "status": "PARTIAL_COMPLETED",
+    "createdAt": "2026-10-25T09:30:40.599Z",
+    "startTime": "2026-10-25T09:30:40.600Z",
+    "endTime": "2026-10-25T09:30:49.329Z",
+    "pid": 1568,
+    "progress": {
+      "current": 1,
+      "total": 50,
+      "percent": 2,
+      "message": "Tiến trình kết thúc: Đạt 1/50 mục tiêu (2%)"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792920640598_7uk90.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\batch_shorts_downloader.js",
+    "metadata": {
+      "totalCount": 50,
+      "maxDuration": 60,
+      "shortsDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50"
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792920760076_gub7c": {
+    "id": "task_1792920760076_gub7c",
+    "title": "Tải 50 video Short/Reel (<60s): https://www.youtube.com/@TEDEd/shorts",
+    "type": "download_shorts",
+    "status": "PARTIAL_COMPLETED",
+    "createdAt": "2026-10-25T09:32:40.077Z",
+    "startTime": "2026-10-25T09:32:40.078Z",
+    "endTime": "2026-10-25T09:34:07.189Z",
+    "pid": 2304,
+    "progress": {
+      "current": 24,
+      "total": 50,
+      "percent": 48,
+      "message": "Tiến trình kết thúc: Đạt 24/50 mục tiêu (48%)"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792920760076_gub7c.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\batch_shorts_downloader.js",
+    "metadata": {
+      "totalCount": 50,
+      "maxDuration": 60,
+      "shortsDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50"
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792920878321_i96ye": {
+    "id": "task_1792920878321_i96ye",
+    "title": "Tải 50 video Short/Reel (<60s): https://www.youtube.com/@Kurzgesagt/shorts",
+    "type": "download_shorts",
+    "status": "PARTIAL_COMPLETED",
+    "createdAt": "2026-10-25T09:34:38.322Z",
+    "startTime": "2026-10-25T09:34:38.324Z",
+    "endTime": "2026-10-25T09:37:01.795Z",
+    "pid": 2000,
+    "progress": {
+      "current": 32,
+      "total": 50,
+      "percent": 64,
+      "message": "Tiến trình kết thúc: Đạt 32/50 mục tiêu (64%)"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792920878321_i96ye.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\batch_shorts_downloader.js",
+    "metadata": {
+      "totalCount": 50,
+      "maxDuration": 60,
+      "shortsDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50"
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792921293598_catd7": {
+    "id": "task_1792921293598_catd7",
+    "title": "Tải 25 video Short/Reel (<60s): https://www.youtube.com/@veritasium/shorts",
+    "type": "download_shorts",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T09:41:33.600Z",
+    "startTime": "2026-10-25T09:41:33.601Z",
+    "endTime": "2026-10-25T09:46:08.746Z",
+    "pid": 9464,
+    "progress": {
+      "current": 55,
+      "total": 25,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792921293598_catd7.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\batch_shorts_downloader.js",
+    "metadata": {
+      "totalCount": 25,
+      "maxDuration": 60,
+      "shortsDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\shorts_50"
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792922232948_baj5p": {
+    "id": "task_1792922232948_baj5p",
+    "title": "Phân tích & Xử lý 10 lô dữ liệu lớn",
+    "type": "data_processing",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T09:57:12.955Z",
+    "startTime": "2026-10-25T09:57:12.957Z",
+    "endTime": "2026-10-25T09:57:16.272Z",
+    "pid": 4980,
+    "progress": {
+      "current": 10,
+      "total": 10,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792922232948_baj5p.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\test_data_processor.js",
+    "metadata": {
+      "totalCount": 10
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923061623_m5kfr": {
+    "id": "task_1792923061623_m5kfr",
+    "title": "Cào dữ liệu 15 tin tức công nghệ AI (Web Scraping Batch)",
+    "type": "web_scraping",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:01.624Z",
+    "startTime": "2026-10-25T10:11:01.626Z",
+    "endTime": "2026-10-25T10:11:04.042Z",
+    "pid": 4500,
+    "progress": {
+      "current": 15,
+      "total": 15,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923061623_m5kfr.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task1_web_scraper.js",
+    "metadata": {
+      "totalCount": 15
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923064292_sxpsb": {
+    "id": "task_1792923064292_sxpsb",
+    "title": "Xử lý dữ liệu lớn 5,000 giao dịch tài chính (Big Data ETL)",
+    "type": "big_data",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:04.293Z",
+    "startTime": "2026-10-25T10:11:04.294Z",
+    "endTime": "2026-10-25T10:11:05.525Z",
+    "pid": 8404,
+    "progress": {
+      "current": 10,
+      "total": 10,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923064292_sxpsb.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task2_big_data_processor.js",
+    "metadata": {
+      "totalCount": 10
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923065597_6px2i": {
+    "id": "task_1792923065597_6px2i",
+    "title": "Mô phỏng Monte Carlo 10,000 kịch bản rủi ro đầu tư (Simulation)",
+    "type": "simulation",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:05.598Z",
+    "startTime": "2026-10-25T10:11:05.600Z",
+    "endTime": "2026-10-25T10:11:07.147Z",
+    "pid": 9436,
+    "progress": {
+      "current": 10,
+      "total": 10,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923065597_6px2i.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task3_monte_carlo.js",
+    "metadata": {
+      "totalCount": 10
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923067300_6rzxt": {
+    "id": "task_1792923067300_6rzxt",
+    "title": "Trích xuất thực thể thông minh Named Entity Recognition (NLP)",
+    "type": "nlp_ner",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:07.303Z",
+    "startTime": "2026-10-25T10:11:07.304Z",
+    "endTime": "2026-10-25T10:11:08.354Z",
+    "pid": 8584,
+    "progress": {
+      "current": 8,
+      "total": 8,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923067300_6rzxt.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task4_entity_extractor.js",
+    "metadata": {
+      "totalCount": 8
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923068561_df164": {
+    "id": "task_1792923068561_df164",
+    "title": "Kiểm tra sức khỏe đồng thời 10 endpoint mạng (Link Health Audit)",
+    "type": "network_audit",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:08.562Z",
+    "startTime": "2026-10-25T10:11:08.563Z",
+    "endTime": "2026-10-25T10:11:13.980Z",
+    "pid": 10152,
+    "progress": {
+      "current": 10,
+      "total": 10,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923068561_df164.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task5_link_health_auditor.js",
+    "metadata": {
+      "totalCount": 10
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923074266_zphzd": {
+    "id": "task_1792923074266_zphzd",
+    "title": "Thuật toán phân cụm K-Means bằng Python (Python Data Science)",
+    "type": "python_science",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:14.267Z",
+    "startTime": "2026-10-25T10:11:14.268Z",
+    "endTime": "2026-10-25T10:11:15.746Z",
+    "pid": 9932,
+    "progress": {
+      "current": 10,
+      "total": 10,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923074266_zphzd.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task6_kmeans_clustering.py",
+    "metadata": {
+      "totalCount": 10
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923075986_3hbb4": {
+    "id": "task_1792923075986_3hbb4",
+    "title": "Dựng Dashboard HTML tương tác và biểu đồ SVG (Dashboard Generator)",
+    "type": "html_dashboard",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:15.987Z",
+    "startTime": "2026-10-25T10:11:15.989Z",
+    "endTime": "2026-10-25T10:11:16.670Z",
+    "pid": 1828,
+    "progress": {
+      "current": 5,
+      "total": 5,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923075986_3hbb4.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task7_dashboard_generator.js",
+    "metadata": {
+      "totalCount": 5
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923076855_ck7jc": {
+    "id": "task_1792923076855_ck7jc",
+    "title": "Tính toán mã băm SHA256 xác thực toàn vẹn tệp (Integrity Checksum)",
+    "type": "security_checksum",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:16.855Z",
+    "startTime": "2026-10-25T10:11:16.857Z",
+    "endTime": "2026-10-25T10:11:18.096Z",
+    "pid": 9924,
+    "progress": {
+      "current": 8,
+      "total": 8,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923076855_ck7jc.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task8_checksum_archiver.js",
+    "metadata": {
+      "totalCount": 5
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923078269_5yeph": {
+    "id": "task_1792923078269_5yeph",
+    "title": "Thử nghiệm áp lực chạy song song 2 luồng ngầm A & B (Concurrent Stress)",
+    "type": "concurrency_test",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:18.270Z",
+    "startTime": "2026-10-25T10:11:18.272Z",
+    "endTime": "2026-10-25T10:11:20.076Z",
+    "pid": 8096,
+    "progress": {
+      "current": 8,
+      "total": 8,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923078269_5yeph.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task9_concurrent_a.js",
+    "metadata": {
+      "totalCount": 8
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923078301_lxos3": {
+    "id": "task_1792923078301_lxos3",
+    "title": "Thử nghiệm áp lực chạy song song 2 luồng ngầm A & B (Concurrent Stress) [Luồng B]",
+    "type": "concurrency_test",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:18.333Z",
+    "startTime": "2026-10-25T10:11:18.334Z",
+    "endTime": "2026-10-25T10:11:20.152Z",
+    "pid": 240,
+    "progress": {
+      "current": 8,
+      "total": 8,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923078301_lxos3.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task9_concurrent_b.js",
+    "metadata": {
+      "totalCount": 8
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792923080797_u9t3a": {
+    "id": "task_1792923080797_u9t3a",
+    "title": "Thẩm định quy trình xử lý đa phương tiện (Media Batch Pipeline)",
+    "type": "media_pipeline",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:11:20.798Z",
+    "startTime": "2026-10-25T10:11:20.800Z",
+    "endTime": "2026-10-25T10:11:21.566Z",
+    "pid": 1836,
+    "progress": {
+      "current": 4,
+      "total": 4,
+      "percent": 100,
+      "message": "Hoàn thành 100%"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792923080797_u9t3a.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\gemini\\2026-10-25\\10_tasks_test",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\workers\\tasks_10\\task10_media_batch.js",
+    "metadata": {
+      "totalCount": 4
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "test_dead_pid_1792925796563": {
+    "id": "test_dead_pid_1792925796563",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-25T10:56:36.564Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "task_1792925824997_jpwls": {
+    "id": "task_1792925824997_jpwls",
+    "title": "Live Test Full Completion",
+    "type": "generic",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T10:57:05.000Z",
+    "startTime": "2026-10-25T10:57:05.004Z",
+    "endTime": "2026-10-25T10:57:05.254Z",
+    "pid": 6056,
+    "progress": {
+      "current": 5,
+      "total": 5,
+      "percent": 100,
+      "message": "Hoàn thành 100% (5/5)"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792925824997_jpwls.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\AI agent",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\scratch_full_task.js",
+    "metadata": {
+      "totalCount": 5
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792925825449_aq6bt": {
+    "id": "task_1792925825449_aq6bt",
+    "title": "Live Test Partial Completion",
+    "type": "generic",
+    "status": "PARTIAL_COMPLETED",
+    "createdAt": "2026-10-25T10:57:05.450Z",
+    "startTime": "2026-10-25T10:57:05.451Z",
+    "endTime": "2026-10-25T10:57:05.637Z",
+    "pid": 10000,
+    "progress": {
+      "current": 2,
+      "total": 5,
+      "percent": 40,
+      "message": "Tiến trình kết thúc: Đạt 2/5 mục tiêu (40%)"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792925825449_aq6bt.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\AI agent",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\scratch_partial_task.js",
+    "metadata": {
+      "totalCount": 5
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "test_dead_pid_1792925884914": {
+    "id": "test_dead_pid_1792925884914",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-25T10:58:04.915Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1792929261900": {
+    "id": "test_dead_pid_1792929261900",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-25T11:54:21.900Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "task_1792929268402_f8qgu": {
+    "id": "task_1792929268402_f8qgu",
+    "title": "Live Test Full Completion",
+    "type": "generic",
+    "status": "COMPLETED",
+    "createdAt": "2026-10-25T11:54:28.407Z",
+    "startTime": "2026-10-25T11:54:28.410Z",
+    "endTime": "2026-10-25T11:54:28.651Z",
+    "pid": 9272,
+    "progress": {
+      "current": 5,
+      "total": 5,
+      "percent": 100,
+      "message": "Hoàn thành & Nghiệm thu 100% (5/5)"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792929268402_f8qgu.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\AI agent",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\scratch_full_task.js",
+    "metadata": {
+      "totalCount": 5
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "task_1792929268813_szgwf": {
+    "id": "task_1792929268813_szgwf",
+    "title": "Live Test Partial Completion",
+    "type": "generic",
+    "status": "PARTIAL_COMPLETED",
+    "createdAt": "2026-10-25T11:54:28.815Z",
+    "startTime": "2026-10-25T11:54:28.817Z",
+    "endTime": "2026-10-25T11:54:29.032Z",
+    "pid": 840,
+    "progress": {
+      "current": 2,
+      "total": 5,
+      "percent": 40,
+      "message": "Tiến trình kết thúc nhưng chưa đạt tiêu chí nghiệm thu: Số lượng vật lý chưa đạt: 2/5"
+    },
+    "logFile": "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\task_logs\\task_1792929268813_szgwf.log",
+    "workDir": "C:\\Users\\Nam\\Desktop\\AI agent",
+    "command": "node C:\\Users\\Nam\\Desktop\\AI agent\\scratch_partial_task.js",
+    "metadata": {
+      "totalCount": 5
+    },
+    "result": null,
+    "error": null,
+    "exitCode": 0
+  },
+  "test_dead_pid_1792941042271": {
+    "id": "test_dead_pid_1792941042271",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-25T15:10:42.271Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1792941118750": {
+    "id": "test_dead_pid_1792941118750",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-25T15:11:58.751Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1792945951523": {
+    "id": "test_dead_pid_1792945951523",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-25T16:32:31.525Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1792948261260": {
+    "id": "test_dead_pid_1792948261260",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-25T17:11:01.264Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1792950065593": {
+    "id": "test_dead_pid_1792950065593",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-25T17:41:05.595Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1792950294475": {
+    "id": "test_dead_pid_1792950294475",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-25T17:44:54.475Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1792950443858": {
+    "id": "test_dead_pid_1792950443858",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-25T17:47:23.858Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1792950873504": {
+    "id": "test_dead_pid_1792950873504",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-25T17:54:33.505Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1792951697646": {
+    "id": "test_dead_pid_1792951697646",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-25T18:08:17.647Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1792953195800": {
+    "id": "test_dead_pid_1792953195800",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-25T18:33:15.801Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793026453520": {
+    "id": "test_dead_pid_1793026453520",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-26T14:54:13.521Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793174913751": {
+    "id": "test_dead_pid_1793174913751",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-28T08:08:33.752Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793184402690": {
+    "id": "test_dead_pid_1793184402690",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-28T10:46:42.690Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793184481281": {
+    "id": "test_dead_pid_1793184481281",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-28T10:48:01.282Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793184504825": {
+    "id": "test_dead_pid_1793184504825",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-28T10:48:24.826Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793184559247": {
+    "id": "test_dead_pid_1793184559247",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-10-28T10:49:19.247Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793516175561": {
+    "id": "test_dead_pid_1793516175561",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T06:56:15.562Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793516316997": {
+    "id": "test_dead_pid_1793516316997",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T06:58:36.997Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793516587900": {
+    "id": "test_dead_pid_1793516587900",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T07:03:07.900Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793518010528": {
+    "id": "test_dead_pid_1793518010528",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T07:26:50.528Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793519704156": {
+    "id": "test_dead_pid_1793519704156",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T07:55:04.156Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793521174169": {
+    "id": "test_dead_pid_1793521174169",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T08:19:34.170Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793522431956": {
+    "id": "test_dead_pid_1793522431956",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T08:40:31.957Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793522464954": {
+    "id": "test_dead_pid_1793522464954",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T08:41:04.954Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793522482447": {
+    "id": "test_dead_pid_1793522482447",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T08:41:22.447Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793524295860": {
+    "id": "test_dead_pid_1793524295860",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T09:11:35.860Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793524902373": {
+    "id": "test_dead_pid_1793524902373",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T09:21:42.374Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793528839315": {
+    "id": "test_dead_pid_1793528839315",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T10:27:19.316Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793529547927": {
+    "id": "test_dead_pid_1793529547927",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T10:39:07.928Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793532750812": {
+    "id": "test_dead_pid_1793532750812",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T11:32:30.812Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793533588092": {
+    "id": "test_dead_pid_1793533588092",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T11:46:28.092Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793534379257": {
+    "id": "test_dead_pid_1793534379257",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T11:59:39.258Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793539641574": {
+    "id": "test_dead_pid_1793539641574",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T13:27:21.575Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793540066169": {
+    "id": "test_dead_pid_1793540066169",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T13:34:26.169Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793540092412": {
+    "id": "test_dead_pid_1793540092412",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T13:34:52.412Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793540711515": {
+    "id": "test_dead_pid_1793540711515",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T13:45:11.516Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793541375757": {
+    "id": "test_dead_pid_1793541375757",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T13:56:15.758Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793542096365": {
+    "id": "test_dead_pid_1793542096365",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T14:08:16.366Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793544357751": {
+    "id": "test_dead_pid_1793544357751",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T14:45:57.752Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793544396947": {
+    "id": "test_dead_pid_1793544396947",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T14:46:36.947Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793544802502": {
+    "id": "test_dead_pid_1793544802502",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T14:53:22.503Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793548919471": {
+    "id": "test_dead_pid_1793548919471",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T16:01:59.472Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793549125880": {
+    "id": "test_dead_pid_1793549125880",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T16:05:25.881Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793549798919": {
+    "id": "test_dead_pid_1793549798919",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T16:16:38.920Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793551640783": {
+    "id": "test_dead_pid_1793551640783",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T16:47:20.784Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793552071715": {
+    "id": "test_dead_pid_1793552071715",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T16:54:31.715Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793552611031": {
+    "id": "test_dead_pid_1793552611031",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T17:03:31.032Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793553260096": {
+    "id": "test_dead_pid_1793553260096",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-01T17:14:20.096Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793795566744": {
+    "id": "test_dead_pid_1793795566744",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-04T12:32:46.745Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793806309896": {
+    "id": "test_dead_pid_1793806309896",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-04T15:31:49.897Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793806412597": {
+    "id": "test_dead_pid_1793806412597",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-04T15:33:32.597Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793857296631": {
+    "id": "test_dead_pid_1793857296631",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-05T05:41:36.631Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793858003208": {
+    "id": "test_dead_pid_1793858003208",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-05T05:53:23.209Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  },
+  "test_dead_pid_1793863518744": {
+    "id": "test_dead_pid_1793863518744",
+    "title": "Test Orphan Task",
+    "status": "INTERRUPTED",
+    "pid": 99999999,
+    "progress": {
+      "current": 5,
+      "total": 50,
+      "percent": 10,
+      "message": "Bị gián đoạn do khởi động lại server"
+    },
+    "endTime": "2026-11-05T07:25:18.745Z",
+    "error": "Tiến trình bị gián đoạn do máy chủ khởi động lại (Server Restarted)"
+  }
+}

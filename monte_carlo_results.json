@@ -1,0 +1,31 @@
+{
+    "metadata": {
+        "num_simulations": 10000,
+        "initial_portfolio_value": 1000000.0,
+        "time_horizon_days": 252,
+        "weights": [
+            0.4,
+            0.3,
+            0.2,
+            0.1
+        ],
+        "expected_annual_return": 0.07800000000000001,
+        "annual_volatility": 0.09328987083279727
+    },
+    "risk_metrics": {
+        "VaR_95_USD": 82809.0999815926,
+        "VaR_95_percentage": 8.280909998159261,
+        "CVaR_95_USD": 117128.2571094596,
+        "CVaR_95_percentage": 11.71282571094596,
+        "VaR_99_USD": 137554.2917133304,
+        "CVaR_99_percentage": 16.396939981576466,
+        "CVaR_99_USD": 163969.39981576466
+    },
+    "statistics": {
+        "mean_ending_value": 1075586.450183908,
+        "median_ending_value": 1070869.4854947487,
+        "min_ending_value": 747545.1692925601,
+        "max_ending_value": 1654727.5888608564,
+        "std_ending_value": 99517.37937837542
+    }
+}

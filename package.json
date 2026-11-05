@@ -1,0 +1,31 @@
+{
+  "name": "cyber-ai-agent",
+  "version": "2.1.0",
+  "description": "Hệ thống AI Đa Tác Nhân tự học với phản biện khoa học và trí nhớ dài hạn",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "check": "node --check server.js",
+    "test": "node tests/run_all_tests.js",
+    "test:integration": "node tests/comprehensive_test_suite.js",
+    "benchmark": "node tests/scientific_benchmark_harness.js",
+    "benchmark:20": "node tests/run_20_hell_tasks_benchmark.js"
+  },
+  "keywords": [
+    "ai-agent",
+    "multi-agent",
+    "gemini",
+    "autonomous",
+    "research"
+  ],
+  "author": "namoktin",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "puppeteer-core": "^25.14.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  }
+}

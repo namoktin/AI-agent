@@ -1,0 +1,80 @@
+{
+  "taskId": 12,
+  "tier": "CODE_THUAN",
+  "platform": "Macro Strategy",
+  "title": "Dự báo Chiến lược Kinh tế Vĩ mô & Chuỗi Cung ứng Bán dẫn Toàn cầu 2026",
+  "durationMs": 28717,
+  "score": 10,
+  "passed": true,
+  "verification": {
+    "passed": true,
+    "evidence": "Strategic macro report passed (4107 chars) with complete quantitative and action frameworks"
+  },
+  "tokens": 21680,
+  "resultPreview": "```json\n{\n  \"report\": \"### BÁO CÁO CHIẾN LƯỢC: CUỘC ĐUA BÁN DẪN & CHUỖI CUNG ỨNG CHIP AI TOÀN CẦU (2026)\\n\\n#### 1. Bối cảnh & Tổng quan năng lực tiến trình (2nm/3nm)\\nNăm 2026 đánh dấu giai đoạn bùng nổ của các tiến trình dưới 3nm. TSMC duy trì vị thế thống trị với công nghệ N2 (2nm) đã bắt đầu sản xuất thương mại quy mô nhỏ từ cuối 2025. Samsung Foundry tập trung vào công nghệ Gate-All-Around (GAA) thế hệ thứ 2 (SF2), trong khi Intel Foundry (IFS) nỗ lực phục hồi với tiến trình 18A (tương đươn",
+  "fullResponse": {
+    "success": true,
+    "mode": "standard",
+    "result": "```json\n{\n  \"report\": \"### BÁO CÁO CHIẾN LƯỢC: CUỘC ĐUA BÁN DẪN & CHUỖI CUNG ỨNG CHIP AI TOÀN CẦU (2026)\\n\\n#### 1. Bối cảnh & Tổng quan năng lực tiến trình (2nm/3nm)\\nNăm 2026 đánh dấu giai đoạn bùng nổ của các tiến trình dưới 3nm. TSMC duy trì vị thế thống trị với công nghệ N2 (2nm) đã bắt đầu sản xuất thương mại quy mô nhỏ từ cuối 2025. Samsung Foundry tập trung vào công nghệ Gate-All-Around (GAA) thế hệ thứ 2 (SF2), trong khi Intel Foundry (IFS) nỗ lực phục hồi với tiến trình 18A (tương đương 1.8nm).\\n\\n| Hãng sản xuất | Tiến trình chủ đạo (2026) | Công nghệ cốt lõi | Trạng thái thương mại |\\n| :--- | :--- | :--- | :--- |\\n| **TSMC** | N2 / N3P | FinFET (N3) / GAA (N2) | Sản xuất hàng loạt (Mass Production) |\\n| **Samsung** | SF2 / SF3 | GAA (GAAFET) | Sản xuất thử nghiệm/quy mô nhỏ |\\n| **Intel** | 18A | RibbonFET (GAA) | Bắt đầu ramp-up sản lượng |\\n\\n#### 2. Chi phí Capex & Chiến lược của Big Tech\\nCác tập đoàn công nghệ lớn (Hyperscalers) đang chuyển dịch từ việc chỉ mua chip Nvidia sang tự thiết kế chip chuyên dụng (ASIC) để tối ưu hóa chi phí (TCO) và hiệu năng cho các mô hình ngôn ngữ lớn (LLM).\\n\\n*   **Nvidia:** Tiếp tục dẫn đầu với kiến trúc Blackwell và các thế hệ kế nhiệm, chiếm ~80-90% thị phần GPU AI.\\n*   **Google (TPU):** Đẩy mạnh TPU v6, tập trung vào hiệu suất năng lượng.\\n*   **Microsoft (Maia) & AWS (Trainium/Inferentia):** Tăng cường đầu tư vào chip nội bộ để giảm sự phụ thuộc vào Nvidia.\\n\\n*Ước tính chi phí Capex (2026):* Tổng chi phí đầu tư vào hạ tầng AI của nhóm Big Tech dự kiến vượt ngưỡng 250 tỷ USD toàn cầu.\\n\\n#### 3. PHÂN TÍCH RỦI RO & PHƯƠNG ÁN GIẢM THIỂU\\n*   **Rủi ro địa chính trị (Eo biển Đài Loan):** Đây là rủi ro hệ thống lớn nhất. Sự gián đoạn tại TSMC có thể khiến sản lượng chip cao cấp toàn cầu sụt giảm 60-70% trong 6 tháng đầu.\\n    *   *Giảm thiểu:* Đa dạng hóa địa lý (TSMC Arizona, Nhật Bản, Đức); tăng cường dự trữ chiến lược (Buffer stock) từ 3 tháng lên 9-12 tháng.\\n*   **Rủi ro đứt gãy chuỗi cung ứng:** Phụ thuộc quá mức vào thiết bị quang khắc EUV của ASML.\\n    *   *Giảm thiểu:* Đầu tư vào các công nghệ thay thế, tối ưu hóa thiết kế chip để giảm số lượng mask layer cần dùng.\\n\\n#### 4. LỘ TRÌNH THỰC THI & KHUYẾN NGHỊ HÀNH ĐỘNG\\n1.  **Giai đoạn 1 (Q1-Q2/2026):** Thiết lập hệ thống giám sát chuỗi cung ứng thời gian thực (Real-time Supply Chain Visibility) sử dụng AI để dự báo điểm nghẽn.\\n2.  **Giai đoạn 2 (Q3-Q4/2026):** Chuyển dịch chiến lược mua sắm (Multi-sourcing). Không phụ thuộc vào một nhà đúc chip duy nhất. Ký kết các hợp đồng dài hạn (LTA) với cả TSMC và các đối tác thay thế.\\n3.  **Khuyến nghị:** Các doanh nghiệp cần tăng ngân sách R&D cho việc tối ưu hóa phần mềm (Compiler/Library) để chip nội bộ (ASIC) có thể thay thế GPU Nvidia trong các tác vụ suy luận (Inference) ít phức tạp hơn.\",\n  \"findings\": [\n    \"TSMC vẫn giữ vị thế dẫn đầu công nghệ 2nm, nhưng sự cạnh tranh từ Intel 18A đang gia tăng áp lực về giá.\",\n    \"Big Tech đang chuyển dịch mạnh mẽ sang chip tự thiết kế (ASIC) để kiểm soát chi phí Capex khổng lồ.\",\n    \"Rủi ro địa chính trị tại Đài Loan là biến số không thể dự báo chính xác, buộc các tập đoàn phải tăng dự trữ chiến lược lên mức 12 tháng.\",\n    \"Công nghệ GAA (Gate-All-Around) trở thành tiêu chuẩn bắt buộc cho tiến trình 2nm.\"\n  ],\n  \"sources\": [\n    {\n      \"url\": \"https://en.wikipedia.org/wiki/Semiconductor_device_fabrication\",\n      \"title\": \"Semiconductor device fabrication\",\n      \"credibility\": \"MEDIUM\"\n    },\n    {\n      \"url\": \"https://en.wikipedia.org/wiki/CHIPS_and_Science_Act\",\n      \"title\": \"CHIPS and Science Act\",\n      \"credibility\": \"HIGH\"\n    }\n  ],\n  \"insights\": [\n    \"Cuộc đua bán dẫn 2026 không chỉ là về nanomet, mà là về khả năng đóng gói tiên tiến (Advanced Packaging) và hiệu suất năng lượng.\",\n    \"Sự phân mảnh chuỗi cung ứng toàn cầu đang tạo ra các 'ốc đảo' công nghệ, làm tăng chi phí sản xuất chung.\"\n  ],\n  \"confidence\": 0.85,\n  \"limitations\": \"Dữ liệu về Capex chi tiết của từng công ty năm 2026 mang tính chất dự báo dựa trên xu hướng thị trường hiện tại; rủi ro địa chính trị là biến số định tính khó định lượng chính xác.\"\n}\n```",
+    "qualityScore": 85,
+    "critique": {
+      "overallScore": 65,
+      "factualOverlap": 0.85,
+      "contentAgreement": 0.8,
+      "conflictingClaims": [],
+      "issues": [
+        {
+          "severity": "HIGH",
+          "category": "Accuracy",
+          "description": "Báo cáo thiếu dữ liệu định lượng cụ thể về năng lực sản xuất (WPM - Wafers Per Month) và tỷ lệ yield như yêu cầu trong successCriteria.",
+          "recommendation": "Bổ sung bảng dữ liệu ước tính WPM cho các node 2nm/3nm của TSMC/Samsung/Intel dựa trên báo cáo Q3/2026."
+        },
+        {
+          "severity": "MEDIUM",
+          "category": "Logic",
+          "description": "Nội dung bị cắt ngang đột ngột ở phần 'Lộ trình thực thi' (Giai đoạn 2), thiếu tính hoàn thiện của một báo cáo chuyên gia.",
+          "recommendation": "Hoàn thiện các mục còn dang dở và đảm bảo văn bản có kết luận cuối cùng."
+        },
+        {
+          "severity": "MEDIUM",
+          "category": "Performance",
+          "description": "Thiếu các ma trận rủi ro địa chính trị chi tiết (kịch bản đứt gãy cụ thể) như đã cam kết trong chiến lược.",
+          "recommendation": "Thêm bảng ma trận rủi ro với các kịch bản: Gián đoạn vận tải, Cấm vận công nghệ, và Xung đột khu vực."
+        }
+      ],
+      "strengths": [
+        "Cấu trúc báo cáo logic, bám sát bối cảnh thực tế ngày 1/11/2026.",
+        "Nhận diện đúng xu hướng chuyển dịch của Big Tech từ mua GPU sang tự thiết kế ASIC."
+      ],
+      "verdict": "NEEDS_REVISION",
+      "thinkingProcess": "Agent đã cung cấp một khung báo cáo tốt về mặt lý thuyết nhưng thất bại trong việc đáp ứng các tiêu chí định lượng khắt khe (successCriteria). Đặc biệt, việc báo cáo bị cắt ngang cho thấy sự thiếu chỉn chu trong khâu kiểm soát đầu ra. Mặc dù các thông tin về tiến trình 2nm/3nm là hợp lý với thời điểm 1/11/2026, nhưng thiếu các con số cụ thể về WPM làm giảm giá trị của một báo cáo chiến lược cấp cao."
+    },
+    "grounding": null,
+    "stats": {
+      "executionTime": "28427ms",
+      "agentCalls": 6,
+      "averageLatency": "4668ms",
+      "totalTokens": 21680,
+      "taskUsage": {
+        "promptTokens": 16991,
+        "completionTokens": 4689,
+        "totalTokens": 21680,
+        "agentCalls": 6
+      },
+      "requestUsage": {
+        "promptTokens": 16991,
+        "completionTokens": 4689,
+        "totalTokens": 21680,
+        "source": "provider",
+        "providerTokens": 21680,
+        "estimatedTokens": 0
+      },
+      "billingUsage": {
+        "cumulativeTokens": 416485,
+        "cumulativeCalls": 124
+      },
+      "model": "gemini-3.1-flash-lite"
+    },
+    "version": "v2.0-ultimate"
+  }
+}

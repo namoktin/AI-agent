@@ -1,0 +1,31 @@
+node_modules/
+.DS_Store
+*.log
+.env
+chrome_profile/
+.snapshots/
+*.bak
+memory/cookies/
+memory/cookie_vault.json
+screenshots/
+memory/checkpoints/*.json
+
+# Media & Audio files
+*.mp4
+*.mp3
+*.wav
+*.mkv
+*.webm
+
+# Binaries & DB
+*.exe
+*.dll
+*.db
+*.sqlite
+
+# Temp & Cache
+__pycache__/
+*.pyc
+output/
+gemini/
+
