@@ -713,6 +713,23 @@ class ToolExecutor {
     }
 
     /**
+     * Khởi tạo và tự động khám phá công cụ MCP từ cấu hình
+     */
+    async initMCP() {
+        if (this.mcpClientManager && typeof this.mcpClientManager.discoverTools === 'function') {
+            try {
+                const tools = await this.mcpClientManager.discoverTools();
+                console.log(`🔌 [ToolExecutor] MCP Client Manager initialized (${tools?.length || 0} tools discovered)`);
+                return tools;
+            } catch (err) {
+                console.warn('⚠️ [ToolExecutor] MCP discovery error:', err.message);
+                return [];
+            }
+        }
+        return [];
+    }
+
+    /**
      * Tool classification helpers
      */
     isReadOnly(toolName) {

@@ -87,6 +87,8 @@ class IndependentVerifier {
         // 3.5 VERIFY UNIVERSAL GOAL INVARIANTS & ANTI-MOCK PATTERNS
         let goalAudit = null;
         let hasGoalDeficit = false;
+        let hasContractAuditError = false;
+        let contractErrorMessage = '';
         try {
             const UniversalGoalContract = require('../utils/UniversalGoalContract');
             const goalContractEngine = new UniversalGoalContract(this.baseDir);
@@ -106,9 +108,15 @@ class IndependentVerifier {
             const searchDirs = [this.baseDir, outputDir, todayDir, path.join(todayDir, 'reels_download'), path.join(todayDir, 'raw_downloads')];
             goalAudit = goalContractEngine.auditFulfillment(contract, { searchDirs, codeSnippet: combinedCode });
 
-            if (contract.isBatch && contract.requestedCount > 1) {
+            // Áp dụng kiểm toán Goal Contract cho mọi bài toán có yêu cầu đầu ra (kể cả tác vụ đơn lẻ) hoặc vi phạm mock
+            const hasContractRequirement = (contract.isBatch && contract.requestedCount > 1)
+                || (contract.targetExtensions && contract.targetExtensions.length > 0 && contract.domain !== 'general')
+                || (contract.requestedCount >= 1 && contract.domain !== 'general')
+                || (goalAudit && goalAudit.mockViolations && goalAudit.mockViolations.length > 0);
+
+            if (hasContractRequirement) {
                 totalChecks++;
-                if (goalAudit.satisfied) {
+                if (goalAudit && goalAudit.satisfied) {
                     passedChecks++;
                     checks.push({
                         type: 'universal_goal_contract',
@@ -120,12 +128,22 @@ class IndependentVerifier {
                     checks.push({
                         type: 'universal_goal_contract',
                         passed: false,
-                        details: goalAudit.deficitDiagnostic,
-                        remedies: goalAudit.mockViolations
+                        details: goalAudit?.deficitDiagnostic || 'Chưa thỏa mãn hợp đồng mục tiêu (Goal Contract Deficit)',
+                        remedies: goalAudit?.mockViolations || []
                     });
                 }
             }
-        } catch (contractErr) {}
+        } catch (contractErr) {
+            console.warn('⚠️ [IndependentVerifier] Goal contract audit error:', contractErr.message);
+            hasContractAuditError = true;
+            contractErrorMessage = contractErr.message;
+            totalChecks++;
+            checks.push({
+                type: 'universal_goal_contract',
+                passed: false,
+                details: `Lỗi trong quá trình kiểm toán Goal Contract: ${contractErr.message}`
+            });
+        }
 
         // 4. DETERMINE FINAL AUDIT STATUS & SUBSTANTIVE SCORE (Zero Blind Trust & No Inflated 90s)
         const passRatio = totalChecks > 0 ? (passedChecks / totalChecks) : 1;
@@ -137,6 +155,9 @@ class IndependentVerifier {
             verified = true;
         } else if (hasGoalDeficit) {
             status = 'DEFICIT_DETECTED';
+            verified = false;
+        } else if (hasContractAuditError) {
+            status = 'UNVERIFIED';
             verified = false;
         } else if (hasUnverifiedResearch) {
             // Strictly assign UNVERIFIED if factual research claims lacked evidence

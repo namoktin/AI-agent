@@ -179,7 +179,7 @@ class ModelRouter {
             model = this.defaultModel,
             priority = 1,
             timeout = 10000,
-            maxDuration = 90000
+            maxDuration = 300000 // 5 phút mặc định, tương thích với các tác vụ dài hạn
         } = options;
 
         const startTime = Date.now();

@@ -25,6 +25,15 @@ const { SkillLibrary } = require('./SkillLibrary');
 const { CheckpointManager } = require('./CheckpointManager');
 const { AdaptivePlanner } = require('./AdaptivePlanner');
 const { AgentEventStream, globalEventStream } = require('./AgentEventStream');
+const { AsyncLocalStorage } = require('async_hooks');
+
+let DynamicEnvironmentDiscoveryModule;
+try {
+    DynamicEnvironmentDiscoveryModule = require('../utils/DynamicEnvironmentDiscovery');
+} catch (e) {
+    DynamicEnvironmentDiscoveryModule = null;
+}
+const DynamicEnvironmentDiscovery = DynamicEnvironmentDiscoveryModule?.DynamicEnvironmentDiscovery || DynamicEnvironmentDiscoveryModule;
 
 // Ưu tiên sử dụng fetch chuẩn có sẵn của Node.js (Node 18+ / v22) để hỗ trợ đầy đủ AbortSignal và Connection Pooling
 const fetch = typeof globalThis.fetch === 'function' ? globalThis.fetch : function fetchPolyfill(url, options = {}) {
@@ -115,7 +124,9 @@ class AgentOrchestrator {
             enabled: Boolean(options.useCustomAi || process.env.USE_CUSTOM_AI === 'true' || options.customAi?.enabled)
         };
         // Quản lý Token chuẩn xác: Tách riêng Task Usage (từng task) và Cumulative Billing Usage (toàn server)
-        this.taskTokenUsage = {
+        this.asyncLocalStorage = new AsyncLocalStorage();
+        this._fallbackExecutionLog = [];
+        this._fallbackTaskTokenUsage = {
             promptTokens: 0,
             completionTokens: 0,
             totalTokens: 0,
@@ -123,6 +134,9 @@ class AgentOrchestrator {
             providerTokens: 0,
             estimatedTokens: 0
         };
+        this._fallbackTotalTokensConsumed = 0;
+        this._fallbackCurrentContext = null;
+
         this.cumulativeBillingUsage = {
             promptTokens: 0,
             completionTokens: 0,
@@ -131,7 +145,6 @@ class AgentOrchestrator {
             providerTokens: 0,
             estimatedTokens: 0
         };
-        this.totalTokensConsumed = 0; // Backward-compatible alias
         this.activeGraphs = new Map(); // taskId -> StateGraph
         this.pendingCredentialSuspensions = new Map(); // taskId -> Suspended Task Context
         this.modelRouter = new ModelRouter({ defaultModel: this.defaultModel });
@@ -139,16 +152,30 @@ class AgentOrchestrator {
         this.skillLibrary = new SkillLibrary(process.cwd());
         this.checkpointManager = new CheckpointManager(process.cwd());
         this.adaptivePlanner = new AdaptivePlanner();
-        try { this.envDiscovery = new DynamicEnvironmentDiscovery(); } catch(e) { this.envDiscovery = null; }
 
-        // Khởi tạo công cụ thực thi song song
-        this.toolExecutor = new ToolExecutor(this.config.serverUrl);
+        if (DynamicEnvironmentDiscovery) {
+            try {
+                this.envDiscovery = new DynamicEnvironmentDiscovery();
+                console.log('🔍 [AgentOrchestrator] DynamicEnvironmentDiscovery initialized successfully');
+            } catch(e) {
+                console.warn('⚠️ [AgentOrchestrator] DynamicEnvironmentDiscovery initialization error:', e.message);
+                this.envDiscovery = null;
+            }
+        } else {
+            console.warn('⚠️ [AgentOrchestrator] DynamicEnvironmentDiscovery module unavailable');
+            this.envDiscovery = null;
+        }
+
+        // Khởi tạo công cụ thực thi song song (chia sẻ instance nếu được truyền từ bên ngoài)
+        this.toolExecutor = options.toolExecutor || new ToolExecutor(this.config.serverUrl);
+        if (this.envDiscovery && this.toolExecutor) {
+            this.toolExecutor.envDiscovery = this.envDiscovery;
+        }
 
         // Agent definitions với specialized capabilities
         this.agents = this.initializeAgents();
 
-        // Execution context
-        this.executionLog = [];
+        // Execution context fallback
         this.useCustomAiForRun = Boolean(options.useCustomAi || this.customAi.enabled);
         this.consensusThreshold = 0.85; // 85% agreement required
 
@@ -462,29 +489,82 @@ class AgentOrchestrator {
         };
     }
 
+    get executionLog() {
+        return this.asyncLocalStorage?.getStore()?.executionLog || this._fallbackExecutionLog;
+    }
+    set executionLog(val) {
+        this._fallbackExecutionLog = val;
+        const store = this.asyncLocalStorage?.getStore();
+        if (store) store.executionLog = val;
+    }
+
+    get taskTokenUsage() {
+        return this.asyncLocalStorage?.getStore()?.taskTokenUsage || this._fallbackTaskTokenUsage;
+    }
+    set taskTokenUsage(val) {
+        this._fallbackTaskTokenUsage = val;
+        const store = this.asyncLocalStorage?.getStore();
+        if (store) store.taskTokenUsage = val;
+    }
+
+    get totalTokensConsumed() {
+        return this.asyncLocalStorage?.getStore()?.totalTokensConsumed ?? this._fallbackTotalTokensConsumed;
+    }
+    set totalTokensConsumed(val) {
+        this._fallbackTotalTokensConsumed = val;
+        const store = this.asyncLocalStorage?.getStore();
+        if (store) store.totalTokensConsumed = val;
+    }
+
+    get currentContext() {
+        return this.asyncLocalStorage?.getStore()?.currentContext || this._fallbackCurrentContext;
+    }
+    set currentContext(val) {
+        this._fallbackCurrentContext = val;
+        const store = this.asyncLocalStorage?.getStore();
+        if (store) store.currentContext = val;
+    }
+
     /**
      * 🚀 MAIN EXECUTION PIPELINE
      */
     async execute(userRequest, context = {}) {
-        this.executionLog = [];
-        // Đặt lại bộ đếm token cấp task cho mỗi phiên thực thi mới (ngăn cộng dồn & tính trùng)
-        this.taskTokenUsage = {
-            promptTokens: 0,
-            completionTokens: 0,
-            totalTokens: 0,
-            callsCount: 0,
-            providerTokens: 0,
-            estimatedTokens: 0
+        const taskId = context?.taskId || `task_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+        const taskStore = {
+            taskId,
+            executionLog: [],
+            taskTokenUsage: {
+                promptTokens: 0,
+                completionTokens: 0,
+                totalTokens: 0,
+                callsCount: 0,
+                providerTokens: 0,
+                estimatedTokens: 0
+            },
+            totalTokensConsumed: 0,
+            currentContext: context
         };
-        this.totalTokensConsumed = 0;
+
+        // Đồng bộ fallback cho backward compatibility
+        this._fallbackExecutionLog = taskStore.executionLog;
+        this._fallbackTaskTokenUsage = taskStore.taskTokenUsage;
+        this._fallbackTotalTokensConsumed = 0;
+        this._fallbackCurrentContext = context;
+
         this.useCustomAiForRun = Boolean(context.useCustomAi || this.customAi?.enabled || process.env.USE_CUSTOM_AI === 'true');
-        this.currentContext = context;
-        this.log('🎬 MULTI-AGENT EXECUTION STARTED', { userRequest });
 
         // Làm mới bộ đệm công cụ trước mỗi phiên thực thi mới
         if (this.toolExecutor && typeof this.toolExecutor.clearCache === 'function') {
             this.toolExecutor.clearCache();
         }
+
+        return this.asyncLocalStorage.run(taskStore, async () => {
+            return await this._executeInternal(userRequest, context, taskStore);
+        });
+    }
+
+    async _executeInternal(userRequest, context, taskStore) {
+        this.log('🎬 MULTI-AGENT EXECUTION STARTED', { userRequest });
 
         if (!this.cacheInitialized && this.cacheManager) {
             await this.warmupCache();
@@ -525,17 +605,20 @@ class AgentOrchestrator {
             if (context.optimalStrategy) {
                 this.skillLibrary.recordStrategyOutcome(context.optimalStrategy.key, isFastSuccess);
             }
+            const fastStats = this.getStats(taskStore);
             return {
                 success: isFastSuccess,
                 result: fastResult.response,
                 mode: 'fast',
+                taskId: taskStore.taskId,
                 qualityScore: fastVerification.qualityScore,
                 verification: fastVerification,
+                stats: fastStats,
                 executionLog: this.executionLog
             };
         }
 
-        const taskId = context.taskId || `task_${Date.now()}`;
+        const taskId = taskStore.taskId;
         const checkpoint = context.resume !== false ? this.checkpointManager.loadCheckpoint(taskId) : null;
 
         try {
@@ -1099,18 +1182,22 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                 if (context.optimalStrategy) {
                     this.skillLibrary.recordStrategyOutcome(context.optimalStrategy.key, true);
                 }
+                const approveStats = this.getStats(taskStore);
                 return {
                     success: true,
+                    taskId: taskStore.taskId,
                     result: consensus.finalResult,
                     qualityScore: Math.max(overallScore, 85),
                     critique: critique,
                     audit: audit,
+                    stats: approveStats,
                     executionLog: this.executionLog
                 };
             } else if ((verdict === 'NEEDS_REVISION' || verdict === 'REJECTED' || overallScore < 70) && (context.retryCount || 0) < 1 && !consensus.arbitrated && !context.benchmarkTask) {
                 this.log('🔄 Needs Revision - Retrying with improvements');
                 return await this.execute(userRequest, {
                     ...context,
+                    taskId: taskStore.taskId,
                     retryCount: (context.retryCount || 0) + 1,
                     previousAttempts: [...(context.previousAttempts || []), {
                         result: consensus.finalResult,
@@ -1122,14 +1209,17 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                 if (context.matchedSkill) {
                     this.skillLibrary.recordExecution(context.matchedSkill.id, hasSubstantialResult);
                 }
+                const caveatStats = this.getStats(taskStore);
                 return {
                     success: hasSubstantialResult,
                     status: hasSubstantialResult ? 'COMPLETED' : 'NEEDS_REVISION',
                     error: hasSubstantialResult ? null : `Kết quả chưa đạt chuẩn nghiệm thu phê duyệt (Điểm chất lượng: ${overallScore}/100, Phán quyết: ${verdict})`,
+                    taskId: taskStore.taskId,
                     result: consensus.finalResult,
                     qualityScore: hasSubstantialResult ? Math.max(overallScore, 75) : overallScore,
                     critique: critique,
                     audit: audit,
+                    stats: caveatStats,
                     executionLog: this.executionLog
                 };
             }
@@ -1139,9 +1229,12 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
             if (context.matchedSkill) {
                 this.skillLibrary.recordExecution(context.matchedSkill.id, false);
             }
+            const failStats = this.getStats(taskStore);
             return {
                 success: false,
                 error: error.message,
+                taskId: taskStore.taskId,
+                stats: failStats,
                 executionLog: this.executionLog
             };
         }
@@ -1769,7 +1862,8 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                                 slot = await this.modelRouter.acquireDispatchSlot({
                                     estimatedTokens: 1500,
                                     model: altModel,
-                                    priority
+                                    priority,
+                                    maxDuration: this.config.timeout || 600000
                                 });
                                 if (!slot?.granted) {
                                     this.log(`🛑 [QuotaScheduler] Model dự phòng [${altModel}] hết quota. Chuyển trạng thái QUOTA_WAITING.`);
@@ -1990,7 +2084,8 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                     followUpSlot = await this.modelRouter.acquireDispatchSlot({
                         estimatedTokens: 1000,
                         model: modelName,
-                        priority: 2
+                        priority: 2,
+                        maxDuration: this.config.timeout || 600000
                     });
                     if (!followUpSlot?.granted) {
                         this.log(`🛑 [QuotaScheduler] Tool follow-up hoãn do hết hạn mức Quota cho [${modelName}]. Chuyển trạng thái QUOTA_WAITING.`);
@@ -2029,7 +2124,8 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                                 followUpSlot = await this.modelRouter.acquireDispatchSlot({
                                     estimatedTokens: 1000,
                                     model: fallbackModel,
-                                    priority: 2
+                                    priority: 2,
+                                    maxDuration: this.config.timeout || 600000
                                 });
                                 if (!followUpSlot?.granted) {
                                     this.log(`🛑 [QuotaScheduler] Tool follow-up model fallback [${fallbackModel}] hết quota. Chuyển trạng thái QUOTA_WAITING.`);
@@ -2096,7 +2192,8 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                         finSlot = await this.modelRouter.acquireDispatchSlot({
                             estimatedTokens: 1500,
                             model: finModel,
-                            priority: 1
+                            priority: 1,
+                            maxDuration: this.config.timeout || 600000
                         });
                     }
 
@@ -2529,6 +2626,7 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                     } catch (e) {}
                 }
 
+                let isStaticFallback = false;
                 if (articles.length === 0) {
                     articles = [
                         { title: 'What was your win this week?', url: 'https://dev.to/devteam/what-was-your-win-this-week-47ci' },
@@ -2537,12 +2635,16 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                         { title: 'Zero Trust CI/CD: Keyless Bitbucket Deployment on Google Cloud', url: 'https://dev.to/gde/zero-trust-cicd-keyless-bitbucket-deployment-on-google-cloud-1ka1' },
                         { title: 'Welcome to the DEV Community', url: 'https://dev.to/thepracticaldev/welcome-to-dev-community-5452' }
                     ];
+                    isStaticFallback = true;
                 }
 
                 if (articles.length > 0) {
                     const devList = articles.slice(0, 5).map((a, i) => `${i + 1}. **[${a.title}](${a.url})**\n   - Link trực tiếp: \`${a.url}\``).join('\n');
-                    finalTxt += `\n\n### 📰 DANH SÁCH 5 BÀI VIẾT DEV.TO TRENDING THẬT (XÁC THỰC BROWSER / API CÔNG KHAI):\n${devList}`;
-                    this.log(`✅ [_applySmartIntentGuarantees] Bổ sung thành công ${articles.length} bài viết Dev.to thật!`);
+                    const headerLabel = isStaticFallback
+                        ? '### 📰 DANH SÁCH 5 BÀI VIẾT DEV.TO TIÊU BIỂU (DỮ LIỆU DỰ PHÒNG LƯU TRỮ - KẾT NỐI API DEV.TO NGOẠI TUYẾN):'
+                        : '### 📰 DANH SÁCH 5 BÀI VIẾT DEV.TO TRENDING THẬT (XÁC THỰC BROWSER / API CÔNG KHAI):';
+                    finalTxt += `\n\n${headerLabel}\n${devList}`;
+                    this.log(`✅ [_applySmartIntentGuarantees] Bổ sung thành công ${articles.length} bài viết Dev.to!`);
                 }
             } catch (devErr) {
                 this.log(`⚠️ [_applySmartIntentGuarantees] Lỗi trích xuất Dev.to: ${devErr.message}`);
@@ -2687,7 +2789,13 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
             message,
             data
         };
-        this.executionLog.push(entry);
+        const store = this.asyncLocalStorage?.getStore();
+        if (store && Array.isArray(store.executionLog)) {
+            store.executionLog.push(entry);
+        }
+        if (this._fallbackExecutionLog && this._fallbackExecutionLog !== store?.executionLog) {
+            this._fallbackExecutionLog.push(entry);
+        }
 
         console.log(`[${entry.timestamp}] ${message}`);
         if (data) {
@@ -2794,41 +2902,45 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
 
     /**
      * Tối ưu ngân sách vòng lặp công cụ (Tool Budget)
-     * Nâng cấp v6.2: Cấp tối thiểu 10 bước công cụ cho MỌI tác vụ trong toàn bộ codebase
+     * Tôn trọng maxToolIterations nếu người dùng/caller cung cấp; mặc định 10 bước cho mọi tác vụ khác
      */
     _determineToolBudget(agentRole, payload, userRequest) {
         if (payload?.maxToolIterations && typeof payload.maxToolIterations === 'number') {
-            return Math.max(10, payload.maxToolIterations);
+            return payload.maxToolIterations;
         }
         // Mặc định 10 bước cho mọi tác vụ (code, web, phân tích, batch media, webapp)
         return 10;
     }
 
-    getStats() {
-        const agentCalls = this.executionLog.filter(e => e.message.includes('responded'));
+    getStats(targetStore = null) {
+        const store = targetStore || this.asyncLocalStorage?.getStore();
+        const activeLog = store?.executionLog || this.executionLog;
+        const activeTokens = store?.taskTokenUsage || this.taskTokenUsage;
+
+        const agentCalls = activeLog.filter(e => e.message.includes('responded'));
         const totalLatency = agentCalls.reduce((sum, e) => {
             const latency = parseInt(e.data?.latency) || 0;
             return sum + latency;
         }, 0);
 
-        const taskTokens = this.taskTokenUsage?.totalTokens || 0;
-        const providerTokens = this.taskTokenUsage?.providerTokens || 0;
-        const estimatedTokens = this.taskTokenUsage?.estimatedTokens || 0;
+        const taskTokens = activeTokens?.totalTokens || 0;
+        const providerTokens = activeTokens?.providerTokens || 0;
+        const estimatedTokens = activeTokens?.estimatedTokens || 0;
 
         return {
             totalExecutionTime: totalLatency,
             totalTokens: taskTokens, // CHÍNH XÁC 100%, KHÔNG CỘNG TRÙNG!
             requestUsage: {
-                promptTokens: this.taskTokenUsage?.promptTokens || 0,
-                completionTokens: this.taskTokenUsage?.completionTokens || 0,
+                promptTokens: activeTokens?.promptTokens || 0,
+                completionTokens: activeTokens?.completionTokens || 0,
                 totalTokens: taskTokens,
                 source: estimatedTokens > 0 ? (providerTokens > 0 ? 'mixed' : 'estimated') : 'provider',
                 providerTokens: providerTokens,
                 estimatedTokens: estimatedTokens
             },
             taskUsage: {
-                promptTokens: this.taskTokenUsage?.promptTokens || 0,
-                completionTokens: this.taskTokenUsage?.completionTokens || 0,
+                promptTokens: activeTokens?.promptTokens || 0,
+                completionTokens: activeTokens?.completionTokens || 0,
                 totalTokens: taskTokens,
                 agentCalls: agentCalls.length
             },
@@ -2838,7 +2950,7 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
             },
             agentCallsCount: agentCalls.length,
             averageLatency: agentCalls.length > 0 ? Math.round(totalLatency / agentCalls.length) : 0,
-            logEntries: this.executionLog.length
+            logEntries: activeLog.length
         };
     }
 }

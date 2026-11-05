@@ -5983,19 +5983,21 @@ function getOrchestrator() {
             throw new Error('GEMINI_API_KEY not configured');
         }
 
+        globalToolExecutor = new ToolExecutor(`http://127.0.0.1:${PORT}`);
+        if (globalToolExecutor && typeof globalToolExecutor.initMCP === 'function') {
+            globalToolExecutor.initMCP().catch(e => console.warn('⚠️ [MCP] Lỗi khởi tạo ngầm:', e.message));
+        }
+
         globalOrchestrator = new AgentOrchestrator(apiKey, {
             maxRetries: 3,
             timeout: 600000,
             parallelLimit: 5,
+            toolExecutor: globalToolExecutor,
             useCustomAi: process.env.USE_CUSTOM_AI === 'true'
         });
 
         globalCacheManager = new ContextCacheManager(apiKey);
-        globalToolExecutor = new ToolExecutor(`http://127.0.0.1:${PORT}`);
         globalGrounding = new GeminiGrounding(apiKey);
-        if (globalToolExecutor && typeof globalToolExecutor.initMCP === 'function') {
-            globalToolExecutor.initMCP().catch(e => console.warn('⚠️ [MCP] Lỗi khởi tạo ngầm:', e.message));
-        }
 
         console.log('🚀 Ultimate Multi-Agent Orchestrator initialized');
     }
@@ -6067,7 +6069,9 @@ app.post('/api/v2/execute', async (req, res) => {
         let result;
         try {
             console.log('🚀 Calling orchestrator.execute()...');
+            const taskId = context?.taskId || `req_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
             result = await globalOrchestrator.execute(task, {
+                taskId,
                 experiences: experiences.slice(-20),
                 groundingResult: groundingResult,
                 ...context,
@@ -6082,7 +6086,7 @@ app.post('/api/v2/execute', async (req, res) => {
         }
 
         const executionTime = Date.now() - startTime;
-        const stats = globalOrchestrator.getStats();
+        const stats = result?.stats || globalOrchestrator.getStats();
 
         console.log('✅ Execution completed');
         console.log(`⏱️ Total time: ${executionTime}ms`);
