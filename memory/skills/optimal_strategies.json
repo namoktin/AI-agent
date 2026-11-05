@@ -40,11 +40,11 @@
     ],
     "bestRoute": "Dùng SCRAPE_SOCIAL_MEDIA bóc tách JSON-LD Schema.org VideoObject và thẻ ytd-watch-metadata để lấy chuẩn xác 100% view, like, author.",
     "tokensSaved": 1900,
-    "runsCount": 5,
-    "successCount": 5,
+    "runsCount": 7,
+    "successCount": 7,
     "successRate": 1,
-    "lastOutcomeAt": "2026-11-01T08:16:16.794Z",
-    "wilsonScore": 0.566
+    "lastOutcomeAt": "2026-11-05T14:36:47.185Z",
+    "wilsonScore": 0.646
   },
   "batch_daemon": {
     "pattern": "tiến trình ngầm",
@@ -85,9 +85,7 @@
       "lồng tiếng",
       "dubbing",
       "thuyết minh",
-      "chuyển ngữ",
-      "tts",
-      "voice"
+      "chuyển ngữ"
     ],
     "bestRoute": "Khi dùng ElevenLabs TTS lồng tiếng tiếng Việt: 1) Dùng ElevenLabs API key từ context, requests.post(..., timeout=60); 2) BẮT BUỘC chọn Voice ID hỗ trợ tiếng Việt mượt mà (dùng multlingual v2 model: eleven_multilingual_v2, Voice ID như 21m00Tcm4TlvDq8ikWAM (Rachel) hoặc ErXwobaYiN019PkySvjV (Antoni) hoặc AZnzlk1XvdvUeBnXmlld (Domi) - TUYỆT ĐỐI KHÔNG dùng voice thuần Anh Roger CwhRBWXzGAHq8TQ4Fs17 để tránh ngọng líu); 3) BẮT BUỘC FORCE OVERWRITE (ghi đè file mới, không dùng if not os.path.exists() bỏ qua); 4) CƠ CHẾ DỰ PHÒNG TỰ PHỤC HỒI & DEFENSIVE TIMEOUT: MỌI subprocess.run PHẢI có timeout=30 trong try...except (subprocess.TimeoutExpired, Exception). Nếu ElevenLabs API trả về 401 Unauthorized hoặc lỗi, thử edge-tts (subprocess.run(['edge-tts', '--voice', 'vi-VN-NamMinhNeural', '--text', vi_text, '--write-media', out_path], timeout=30, check=True)). Nếu edge-tts lỗi hoặc tệp sinh ra <= 100 bytes, BẮT BUỘC fallback sang gTTS trực tiếp trong Python: from gtts import gTTS; gTTS(text=vi_text, lang='vi').save(out_path). Luôn xác minh if not os.path.exists(out_path) or os.path.getsize(out_path) <= 100 trước khi ghép video; 5) Bóc tách chuẩn phần tiếng Việt sau 'VIETNAMESE DUBBING:' trong file kịch bản; 6) Sau khi tạo audio, gọi INSPECT_MEDIA kiểm tra duration và stream âm thanh; 7) BẮT BUỘC giữ tốc độ nói tự nhiên 1.0x-1.05x của con người, TUYỆT ĐỐI CẤM dùng atempo < 1.0 kéo dãn làm chậm méo giọng; phát cùng lúc từ giây 0s và dùng amix duration=first để nhạc nền tiếp tục phát khi giọng đọc kết thúc.",
     "tokensSaved": 3200,

@@ -842,6 +842,79 @@ app.post('/api/inspect-media', (req, res) => {
     }
 });
 
+/**
+ * POST /api/inspect-spreadsheet
+ * Universal Spreadsheet & Tabular Data Engine
+ */
+app.post('/api/inspect-spreadsheet', (req, res) => {
+    try {
+        const { filePath, sheetName, action = 'summary', targetCell, column, searchTerm } = req.body;
+        if (!filePath) return res.json({ success: false, error: 'Thiếu filePath' });
+        const targetPath = resolvePath(filePath);
+        if (!fs.existsSync(targetPath)) {
+            return res.json({ success: false, error: 'File không tồn tại trên đĩa' });
+        }
+
+        const scriptPath = path.join(__dirname, 'utils', 'universal_spreadsheet_engine.py');
+        const args = ['python', `"${scriptPath}"`, '--file', `"${targetPath}"`, '--action', action];
+        if (sheetName) args.push('--sheet', `"${sheetName}"`);
+        if (targetCell) args.push('--cell', `"${targetCell}"`);
+        if (column) args.push('--column', `"${column}"`);
+        if (searchTerm) args.push('--search', `"${searchTerm}"`);
+
+        const output = execSync(args.join(' '), { encoding: 'utf-8', timeout: 60000 });
+        const data = JSON.parse(output);
+        res.json(data);
+    } catch (e) {
+        res.json({ success: false, error: e.message });
+    }
+});
+
+/**
+ * POST /api/get-media-transcript
+ * Universal YouTube & Media Intelligence Engine
+ */
+app.post('/api/get-media-transcript', (req, res) => {
+    try {
+        const { url, filePath, query } = req.body;
+        if (!url && !filePath) return res.json({ success: false, error: 'Thiếu url hoặc filePath' });
+
+        const scriptPath = path.join(__dirname, 'utils', 'universal_media_engine.py');
+        const target = url || resolvePath(filePath);
+        const action = url ? 'youtube_transcript' : 'transcribe_audio';
+        const args = ['python', `"${scriptPath}"`, '--action', action, '--url', `"${target}"`];
+        if (query) args.push('--query', `"${query}"`);
+
+        const output = execSync(args.join(' '), { encoding: 'utf-8', timeout: 90000 });
+        const data = JSON.parse(output);
+        res.json(data);
+    } catch (e) {
+        res.json({ success: false, error: e.message });
+    }
+});
+
+/**
+ * POST /api/extract-video-frames
+ * Video Frame Extraction Engine for Visual Grounding
+ */
+app.post('/api/extract-video-frames', (req, res) => {
+    try {
+        const { url, filePath, timestamps, maxFrames = 5 } = req.body;
+        if (!url && !filePath) return res.json({ success: false, error: 'Thiếu url hoặc filePath' });
+
+        const scriptPath = path.join(__dirname, 'utils', 'universal_media_engine.py');
+        const target = url || resolvePath(filePath);
+        const args = ['python', `"${scriptPath}"`, '--action', 'extract_frames', '--file', `"${target}"`];
+        if (timestamps) args.push('--timestamps', `"${Array.isArray(timestamps) ? timestamps.join(',') : timestamps}"`);
+
+        const output = execSync(args.join(' '), { encoding: 'utf-8', timeout: 120000 });
+        const data = JSON.parse(output);
+        res.json(data);
+    } catch (e) {
+        res.json({ success: false, error: e.message });
+    }
+});
+
 // Phục vụ xem trước file trực tiếp trên Live Preview iframe / trình duyệt
 app.get('/api/view-file', (req, res) => {
     try {

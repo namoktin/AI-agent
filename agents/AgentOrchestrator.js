@@ -33,6 +33,14 @@ try {
 } catch (e) {
     DynamicEnvironmentDiscoveryModule = null;
 }
+
+let UniversalOutputValidatorModule;
+try {
+    const { UniversalOutputValidator } = require('../utils/UniversalOutputValidator');
+    UniversalOutputValidatorModule = UniversalOutputValidator;
+} catch (e) {
+    UniversalOutputValidatorModule = null;
+}
 const DynamicEnvironmentDiscovery = DynamicEnvironmentDiscoveryModule?.DynamicEnvironmentDiscovery || DynamicEnvironmentDiscoveryModule;
 
 // Ưu tiên sử dụng fetch chuẩn có sẵn của Node.js (Node 18+ / v22) để hỗ trợ đầy đủ AbortSignal và Connection Pooling
@@ -606,9 +614,13 @@ class AgentOrchestrator {
                 this.skillLibrary.recordStrategyOutcome(context.optimalStrategy.key, isFastSuccess);
             }
             const fastStats = this.getStats(taskStore);
+            const rawFastResponse = fastResult.response;
+            const finalFastOutput = UniversalOutputValidatorModule
+                ? UniversalOutputValidatorModule.sanitize(rawFastResponse, context).result
+                : rawFastResponse;
             return {
                 success: isFastSuccess,
-                result: fastResult.response,
+                result: finalFastOutput,
                 mode: 'fast',
                 taskId: taskStore.taskId,
                 qualityScore: fastVerification.qualityScore,
@@ -1182,11 +1194,14 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                 if (context.optimalStrategy) {
                     this.skillLibrary.recordStrategyOutcome(context.optimalStrategy.key, true);
                 }
+                const sanitizedFinal = UniversalOutputValidatorModule
+                    ? UniversalOutputValidatorModule.sanitize(consensus.finalResult, context).result
+                    : consensus.finalResult;
                 const approveStats = this.getStats(taskStore);
                 return {
                     success: true,
                     taskId: taskStore.taskId,
-                    result: consensus.finalResult,
+                    result: sanitizedFinal,
                     qualityScore: Math.max(overallScore, 85),
                     critique: critique,
                     audit: audit,
@@ -1209,13 +1224,16 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                 if (context.matchedSkill) {
                     this.skillLibrary.recordExecution(context.matchedSkill.id, hasSubstantialResult);
                 }
+                const sanitizedFinal = UniversalOutputValidatorModule
+                    ? UniversalOutputValidatorModule.sanitize(consensus.finalResult, context).result
+                    : consensus.finalResult;
                 const caveatStats = this.getStats(taskStore);
                 return {
                     success: hasSubstantialResult,
                     status: hasSubstantialResult ? 'COMPLETED' : 'NEEDS_REVISION',
                     error: hasSubstantialResult ? null : `Kết quả chưa đạt chuẩn nghiệm thu phê duyệt (Điểm chất lượng: ${overallScore}/100, Phán quyết: ${verdict})`,
                     taskId: taskStore.taskId,
-                    result: consensus.finalResult,
+                    result: sanitizedFinal,
                     qualityScore: hasSubstantialResult ? Math.max(overallScore, 75) : overallScore,
                     critique: critique,
                     audit: audit,
@@ -1753,6 +1771,41 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                 }
             };
 
+            // 🌐 UNIVERSAL MULTIMODAL INGESTION ENGINE: Tự động đính kèm file media (Audio, Image, PDF) qua inlineData
+            const attPath = payload?.context?.attachment || this.currentContext?.attachment;
+            if (attPath && typeof attPath === 'string' && fs.existsSync(attPath)) {
+                try {
+                    const ext = path.extname(attPath).toLowerCase();
+                    const mimeMap = {
+                        '.mp3': 'audio/mp3',
+                        '.wav': 'audio/wav',
+                        '.ogg': 'audio/ogg',
+                        '.m4a': 'audio/m4a',
+                        '.png': 'image/png',
+                        '.jpg': 'image/jpeg',
+                        '.jpeg': 'image/jpeg',
+                        '.webp': 'image/webp',
+                        '.pdf': 'application/pdf'
+                    };
+                    const mimeType = mimeMap[ext];
+                    if (mimeType) {
+                        const stat = fs.statSync(attPath);
+                        if (stat.size > 0 && stat.size <= 20 * 1024 * 1024) {
+                            const b64 = fs.readFileSync(attPath).toString('base64');
+                            requestBody.contents[0].parts.push({
+                                inlineData: {
+                                    mimeType,
+                                    data: b64
+                                }
+                            });
+                            this.log(`🎧 [MultimodalIngestion] Đính kèm tệp đa phương tiện [${path.basename(attPath)}] (${mimeType}, ${Math.round(stat.size / 1024)}KB) vào request Gemini.`);
+                        }
+                    }
+                } catch (mediaErr) {
+                    this.log(`⚠️ [MultimodalIngestion] Không thể nạp tệp đa phương tiện: ${mediaErr.message}`);
+                }
+            }
+
             // Gắn function declarations vào request nếu agent hỗ trợ tools
             if (toolDefs && toolDefs.length > 0) {
                 requestBody.tools = [{
@@ -1835,12 +1888,18 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                     errBody = await response.text();
                     this.modelRouter.recordQuotaError(modelName, response.status, errBody);
 
-                    // Ưu tiên 1: Nếu có nhiều API Key trong pool, tự động xoay key trước
-                    if (response.status === 429 && this.rotateApiKey()) {
-                        this.log(`🔄 Thử lại ngay với API Key dự phòng trên model [${modelName}]...`);
-                        response = await this._callModelApi({ modelName: modelName, requestBody: requestBody, externalSignal, timeoutMs: this.config.timeout || 600000, useCustomAi: isUsingCustomAi });
-                        if (response.ok) {
-                            errBody = '';
+                    // Ưu tiên 1: Nếu có nhiều API Key trong pool, tự động xoay key qua toàn bộ pool
+                    if (response.status === 429) {
+                        let rotatedCount = 0;
+                        const maxRotations = Math.max(0, (this.apiKeys?.length || 1) - 1);
+                        while (response.status === 429 && rotatedCount < maxRotations && this.rotateApiKey()) {
+                            rotatedCount++;
+                            this.log(`🔄 Thử lại với API Key dự phòng #${this.currentKeyIndex + 1} trên model [${modelName}]...`);
+                            response = await this._callModelApi({ modelName: modelName, requestBody: requestBody, externalSignal, timeoutMs: this.config.timeout || 600000, useCustomAi: isUsingCustomAi });
+                            if (response.ok) {
+                                errBody = '';
+                                break;
+                            }
                         }
                     }
 
@@ -2059,9 +2118,9 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                     }
                 }
 
-                // 🛡️ PRUNE STALE VISION TOKENS: Tự động dọn dẹp inlineData (ảnh cũ) từ các lượt trước trong lịch sử
-                // Mô hình chỉ cần ảnh của màn hình MỚI NHẤT, tránh tích lũy tuyết lăn hàng trăm ngàn tokens ảnh cũ
-                for (const turn of conversationContents) {
+                // 🛡️ PRUNE STALE VISION TOKENS: Tự động dọn dẹp screenshot cũ từ web trong các lượt tiếp theo (bỏ qua lượt 0 chứa attachment gốc)
+                for (let turnIdx = 1; turnIdx < conversationContents.length; turnIdx++) {
+                    const turn = conversationContents[turnIdx];
                     if (turn && turn.role === 'user' && Array.isArray(turn.parts)) {
                         turn.parts = turn.parts.filter(p => !p.inlineData);
                     }
@@ -2108,8 +2167,21 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
 
                     if (!followUpRes.ok && (followUpRes.status === 429 || followUpRes.status === 503)) {
                         this.modelRouter.recordQuotaError(modelName, followUpRes.status);
-                        const fallbackModel = this.modelRouter.getFallbackModel(modelName, toolIterationCount + 1);
-                        if (fallbackModel) {
+
+                        // Ưu tiên 1: Tự động xoay API key trong pool khi gặp 429
+                        if (followUpRes.status === 429) {
+                            let rotatedFollowUp = 0;
+                            const maxRotations = Math.max(0, (this.apiKeys?.length || 1) - 1);
+                            while (followUpRes.status === 429 && rotatedFollowUp < maxRotations && this.rotateApiKey()) {
+                                rotatedFollowUp++;
+                                this.log(`🔄 Thử lại tool follow-up với API Key dự phòng #${this.currentKeyIndex + 1}...`);
+                                followUpRes = await this._callModelApi({ modelName: modelName, requestBody: followUpBody, externalSignal, timeoutMs: this.config.timeout || 600000, useCustomAi: isUsingCustomAi });
+                                if (followUpRes.ok) break;
+                            }
+                        }
+                        if (!followUpRes.ok) {
+                            const fallbackModel = this.modelRouter.getFallbackModel(modelName, toolIterationCount + 1);
+                            if (fallbackModel) {
                             // 1. Giải phóng slot của model cũ (Fix Lỗi B)
                             if (this.modelRouter && typeof this.modelRouter.releaseDispatchSlot === 'function') {
                                 this.modelRouter.releaseDispatchSlot(0, modelName, followUpSlot?.slotId);
@@ -2146,6 +2218,7 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
                             followUpRes = await this._callModelApi({ modelName: modelName, requestBody: followUpBody, externalSignal, timeoutMs: this.config.timeout || 600000, useCustomAi: isUsingCustomAi });
                         }
                     }
+                }
 
                     if (!followUpRes.ok) {
                         const errText = await followUpRes.text();
@@ -2769,12 +2842,15 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
             }
         }
 
-        // Đảm bảo 2 đề mục phản biện & hành động luôn hiện diện chuẩn mực
-        if (!/rủi ro|hạn chế|thách thức|cảnh báo|lưu ý|giảm thiểu|phản biện/i.test(text)) {
-            text += `\n\n### PHÂN TÍCH RỦI RO & PHƯƠNG ÁN GIẢM THIỂU\n- **Rủi ro vận hành & Rate Limit:** Triển khai cơ chế Exponential Retry Backoff kết hợp Token Bucket để kiểm soát tải.\n- **Rủi ro thay đổi schema/chính sách:** Xây dựng lớp Adapter độc lập giúp dễ dàng bảo trì và thích ứng khi API thay đổi.\n- **Rủi ro sai lệch dữ liệu:** Tích hợp kiểm định chéo độc lập (Cross-Validation) nhằm phát hiện và loại trừ dị biệt (outliers).`;
-        }
-        if (!/kết luận|hành động|lộ trình|quy trình|khuyến nghị|kế hoạch/i.test(text)) {
-            text += `\n\n### LỘ TRÌNH THỰC THI & KHUYẾN NGHỊ HÀNH ĐỘNG\n- **Giai đoạn 1 (Khởi động):** Triển khai môi trường thử nghiệm với dữ liệu mẫu và hoàn thiện cấu hình bảo mật.\n- **Giai đoạn 2 (Thực thi & Tinh chỉnh):** Mở rộng quy mô thực thi theo lô (batch execution) và theo dõi chặt chẽ các chỉ số KPI.\n- **Giai đoạn 3 (Tối ưu & Tự động hóa):** Chuẩn hóa quy trình vận hành tự động và duy trì cơ chế báo cáo định kỳ cho ban lãnh đạo.`;
+        // Chỉ bổ sung đề mục mở rộng nếu phản hồi là đề án / chiến lược doanh nghiệp dài, KHÔNG chèn vào câu trả lời ngắn, benchmark hoặc hỏi đáp sự thật
+        const isShortAnswer = text.length < 300 || /FINAL ANSWER:/i.test(text);
+        if (!isShortAnswer && /chiến lược|đề án doanh nghiệp|lộ trình triển khai|kế hoạch tổng thể/i.test(text)) {
+            if (!/rủi ro|hạn chế|thách thức|cảnh báo|lưu ý|giảm thiểu|phản biện/i.test(text)) {
+                text += `\n\n### PHÂN TÍCH RỦI RO & PHƯƠNG ÁN GIẢM THIỂU\n- **Rủi ro vận hành & Rate Limit:** Triển khai cơ chế Exponential Retry Backoff kết hợp Token Bucket để kiểm soát tải.\n- **Rủi ro thay đổi schema/chính sách:** Xây dựng lớp Adapter độc lập giúp dễ dàng bảo trì và thích ứng khi API thay đổi.\n- **Rủi ro sai lệch dữ liệu:** Tích hợp kiểm định chéo độc lập (Cross-Validation) nhằm phát hiện và loại trừ dị biệt (outliers).`;
+            }
+            if (!/kết luận|hành động|lộ trình|quy trình|khuyến nghị|kế hoạch/i.test(text)) {
+                text += `\n\n### LỘ TRÌNH THỰC THI & KHUYẾN NGHỊ HÀNH ĐỘNG\n- **Giai đoạn 1 (Khởi động):** Triển khai môi trường thử nghiệm với dữ liệu mẫu và hoàn thiện cấu hình bảo mật.\n- **Giai đoạn 2 (Thực thi & Tinh chỉnh):** Mở rộng quy mô thực thi theo lô (batch execution) và theo dõi chặt chẽ các chỉ số KPI.\n- **Giai đoạn 3 (Tối ưu & Tự động hóa):** Chuẩn hóa quy trình vận hành tự động và duy trì cơ chế báo cáo định kỳ cho ban lãnh đạo.`;
+            }
         }
 
         return text;

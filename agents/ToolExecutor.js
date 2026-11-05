@@ -74,6 +74,8 @@ class ToolExecutor {
                 'READ_FILE',
                 'LIST_FILES',
                 'INSPECT_MEDIA',
+                'INSPECT_SPREADSHEET',
+                'GET_MEDIA_TRANSCRIPT',
                 'WEB_SEARCH',
                 'SEARCH',
                 'ACADEMIC_SEARCH',
@@ -110,7 +112,8 @@ class ToolExecutor {
                 'GENERATE_IMAGE',
                 'DOWNLOAD_VIDEO',
                 'MERGE_AUDIO_VIDEO',
-                'EXTRACT_AUDIO'
+                'EXTRACT_AUDIO',
+                'EXTRACT_VIDEO_FRAMES'
             ]
         };
     }
@@ -187,7 +190,9 @@ class ToolExecutor {
      * Execute single tool with caching and retry
      */
     async executeSingleTool(tool, context = {}, attempt = 1) {
-        const { name, args } = tool;
+        const rawName = tool.name;
+        const name = this._normalizeToolName(rawName);
+        const args = tool.args;
 
         // Bỏ qua cache hoàn toàn nếu:
         // 1. Agent là Critic (Quality Gate bắt buộc phải kiểm tra dữ liệu sống trên đĩa)
@@ -282,12 +287,13 @@ class ToolExecutor {
      * Call tool API endpoint
      */
     async callToolAPI(toolName, args, context) {
+        const cleanName = this._normalizeToolName(toolName);
         // Handle MCP tools via MCPClientManager
-        if (this.mcpClientManager && this.mcpClientManager.isMCPTool(toolName)) {
-            return await this.mcpClientManager.executeTool(toolName, args);
+        if (this.mcpClientManager && (this.mcpClientManager.isMCPTool(cleanName) || this.mcpClientManager.isMCPTool(toolName))) {
+            return await this.mcpClientManager.executeTool(cleanName, args);
         }
 
-        const endpoint = this.getToolEndpoint(toolName);
+        const endpoint = this.getToolEndpoint(cleanName);
 
         const reqSignal = context?.signal
             ? (typeof AbortSignal.any === 'function'
@@ -314,9 +320,18 @@ class ToolExecutor {
     }
 
     /**
+     * Normalize tool name by removing namespace prefixes like system:, tools:, default_api:
+     */
+    _normalizeToolName(toolName) {
+        if (!toolName || typeof toolName !== 'string') return '';
+        return toolName.trim().replace(/^(system|tools|default_api|assistant)[:._]/i, '');
+    }
+
+    /**
      * Map tool names to API endpoints
      */
     getToolEndpoint(toolName) {
+        const clean = this._normalizeToolName(toolName);
         const mapping = {
             'READ_FILE': '/api/read-file',
             'WRITE_FILE': '/api/save-file',
@@ -348,10 +363,13 @@ class ToolExecutor {
             'KILL_BACKGROUND_TASK': '/api/tasks/manage-task',
             'CLEAN_OLD_OUTPUTS': '/api/clean-outputs',
             'MERGE_AUDIO_VIDEO': '/api/merge-audio-video',
-            'EXTRACT_AUDIO': '/api/extract-audio'
+            'EXTRACT_AUDIO': '/api/extract-audio',
+            'INSPECT_SPREADSHEET': '/api/inspect-spreadsheet',
+            'GET_MEDIA_TRANSCRIPT': '/api/get-media-transcript',
+            'EXTRACT_VIDEO_FRAMES': '/api/extract-video-frames'
         };
 
-        return mapping[toolName] || `/api/${toolName.toLowerCase().replace(/_/g, '-')}`;
+        return mapping[clean] || mapping[toolName] || `/api/${clean.toLowerCase().replace(/_/g, '-')}`;
     }
 
     /**
@@ -698,6 +716,87 @@ class ToolExecutor {
                     },
                     required: ['code']
                 }
+            },
+            {
+                name: 'INSPECT_SPREADSHEET',
+                description: 'Bóc tách chuyên sâu file bảng tính Excel (.xlsx, .csv). Đọc danh sách toàn bộ sheet, cấu trúc hàng cột, đọc mã màu HEX/RGB ô (fill color), công thức, thống kê sum/mean toàn bộ sheet hoặc tìm kiếm text.',
+                parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                        filePath: {
+                            type: 'STRING',
+                            description: 'Đường dẫn tới file Excel hoặc CSV'
+                        },
+                        action: {
+                            type: 'STRING',
+                            description: 'Hành động: "summary" (tổng quan), "cell_style" (soi chi tiết màu/style 1 ô), "search_color" (tìm tất cả ô có màu nền), "aggregate" (thống kê 1 cột), "aggregate_all_sheets" (cộng dồn toàn bộ các sheet), "search_text" (tìm từ khóa trên mọi sheet)'
+                        },
+                        sheetName: {
+                            type: 'STRING',
+                            description: 'Tên sheet cụ thể (nếu bỏ trống lấy sheet đầu hoặc toàn bộ)'
+                        },
+                        targetCell: {
+                            type: 'STRING',
+                            description: 'Tọa độ ô cần soi style/màu (ví dụ: "A1", "B4")'
+                        },
+                        column: {
+                            type: 'STRING',
+                            description: 'Tên cột cần tính tổng/thống kê (ví dụ: "Total Sales", "Burgers")'
+                        },
+                        searchTerm: {
+                            type: 'STRING',
+                            description: 'Từ khóa cần tìm kiếm trên toàn bộ các sheet'
+                        }
+                    },
+                    required: ['filePath']
+                }
+            },
+            {
+                name: 'GET_MEDIA_TRANSCRIPT',
+                description: 'Trích xuất phụ đề (captions/transcripts) kèm timestamp từ video YouTube hoặc file âm thanh cục bộ. Hỗ trợ tìm kiếm câu thoại theo từ khóa và lấy câu trả lời ngay sau đó.',
+                parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                        url: {
+                            type: 'STRING',
+                            description: 'Đường dẫn video YouTube (URL) hoặc mã Video ID'
+                        },
+                        filePath: {
+                            type: 'STRING',
+                            description: 'Đường dẫn file âm thanh cục bộ (nếu không dùng URL)'
+                        },
+                        query: {
+                            type: 'STRING',
+                            description: 'Câu hỏi hoặc từ khóa cần tìm trong lời thoại để lấy mốc thời gian và câu phản hồi tiếp theo'
+                        }
+                    }
+                }
+            },
+            {
+                name: 'EXTRACT_VIDEO_FRAMES',
+                description: 'Trích xuất các khung hình (frames) từ video (YouTube hoặc file video MP4/MOV cục bộ) tại các mốc thời gian cụ thể thành file ảnh PNG để kiểm chứng thị giác và đếm đối tượng.',
+                parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                        url: {
+                            type: 'STRING',
+                            description: 'Đường dẫn video YouTube (URL)'
+                        },
+                        filePath: {
+                            type: 'STRING',
+                            description: 'Đường dẫn file video cục bộ'
+                        },
+                        timestamps: {
+                            type: 'ARRAY',
+                            items: { type: 'NUMBER' },
+                            description: 'Danh sách mốc thời gian giây cần chụp ảnh (ví dụ: [5, 10, 25])'
+                        },
+                        maxFrames: {
+                            type: 'NUMBER',
+                            description: 'Số khung hình tối đa cần trích xuất (mặc định: 5)'
+                        }
+                    }
+                }
             }
         ];
 
@@ -733,18 +832,21 @@ class ToolExecutor {
      * Tool classification helpers
      */
     isReadOnly(toolName) {
-        if (this.mcpClientManager && this.mcpClientManager.isMCPTool(toolName)) {
+        const clean = this._normalizeToolName(toolName);
+        if (this.mcpClientManager && (this.mcpClientManager.isMCPTool(clean) || this.mcpClientManager.isMCPTool(toolName))) {
             return true;
         }
-        return this.toolCategories.readonly.includes(toolName);
+        return this.toolCategories.readonly.includes(clean) || this.toolCategories.readonly.includes(toolName);
     }
 
     isWrite(toolName) {
-        return this.toolCategories.write.includes(toolName);
+        const clean = this._normalizeToolName(toolName);
+        return this.toolCategories.write.includes(clean) || this.toolCategories.write.includes(toolName);
     }
 
     isHeavy(toolName) {
-        return this.toolCategories.heavy.includes(toolName);
+        const clean = this._normalizeToolName(toolName);
+        return this.toolCategories.heavy.includes(clean) || this.toolCategories.heavy.includes(toolName);
     }
 
     isRetryable(error) {
