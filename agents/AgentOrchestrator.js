@@ -398,7 +398,7 @@ class AgentOrchestrator {
 
 - ĐÍCH ĐẾN BẮT BUỘC KHI TẢI FILE: File vật lý nằm trên ổ đĩa máy tính. TUYỆT ĐỐI NGHIÊM CẤM bịa đặt link tải giả (như fbcdn.net, cdn...) hoặc đùn đẩy trách nhiệm bắt người dùng tự làm bằng tay.
 - BẢO CHỨNG ĐƯỜNG DẪN GỐC & CHỐNG LINK ẢO (STRICT URL PROVENANCE): Mọi đường link BẮT BUỘC phải được copy nguyên văn từ kết quả trả về của công cụ.
-- Khi cào hoặc tải từ Facebook: Dùng cookie "C:\\Users\\Nam\\Desktop\\AI agent\\memory\\cookies\\facebook.com.txt" và công cụ thích hợp.
+- Khi cào hoặc tải từ Facebook: Dùng cookie tại memory/cookies/facebook.com.txt và công cụ thích hợp.
 
 ⚠️ QUY TRÌNH THỰC THI BẮT BUỘC (EXECUTION ORDER & ANTI-LAZINESS):
 - Nếu nhiệm vụ yêu cầu cào web, tương tác web app, tải video/file hoặc ghi file vật lý: BƯỚC ĐẦU TIÊN BẮT BUỘC PHẢI PHÁT RA FUNCTION CALL (BROWSE_WEB, BROWSER_ACTION, DOWNLOAD_VIDEO, WRITE_FILE). TUYỆT ĐỐI CẤM xuất văn bản báo cáo hoặc code giả lập trước khi công cụ thực tế chạy xong!
@@ -2354,7 +2354,7 @@ YÊU CẦU BẮT BUỘC VỀ ĐẦU RA (COMPREHENSIVE EXHAUSTIVENESS):
         let finalTxt = typeof consensus.finalResult === 'string' ? consensus.finalResult : JSON.stringify(consensus.finalResult);
         const BASE_PROJECT_DIR = path.resolve(__dirname, '..');
         const todayDir = (() => {
-            const outDir = path.resolve(process.env.OUTPUT_DIR || 'C:\\Users\\Nam\\Desktop\\gemini');
+            const outDir = path.resolve(process.env.OUTPUT_DIR || path.join(require('os').homedir(), 'Desktop', 'gemini'));
             const now = new Date();
             const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
             const target = path.join(outDir, dateStr);

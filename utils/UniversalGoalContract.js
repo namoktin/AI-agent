@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 
 class UniversalGoalContract {
-    constructor(baseDir = 'C:\\Users\\Nam\\Desktop\\AI agent') {
+    constructor(baseDir = path.resolve(__dirname, '..')) {
         this.baseDir = baseDir;
     }
 

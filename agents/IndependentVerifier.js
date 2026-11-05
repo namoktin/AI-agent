@@ -103,7 +103,8 @@ class IndependentVerifier {
                 }
             }
 
-            const todayDir = path.join('C:\\Users\\Nam\\Desktop\\gemini', new Date().toISOString().slice(0, 10));
+            const baseGeminiDir = process.env.OUTPUT_DIR || path.join(require('os').homedir(), 'Desktop', 'gemini');
+            const todayDir = path.join(baseGeminiDir, new Date().toISOString().slice(0, 10));
             const outputDir = path.join(this.baseDir, 'output');
             const searchDirs = [this.baseDir, outputDir, todayDir, path.join(todayDir, 'reels_download'), path.join(todayDir, 'raw_downloads')];
             goalAudit = goalContractEngine.auditFulfillment(contract, { searchDirs, codeSnippet: combinedCode });

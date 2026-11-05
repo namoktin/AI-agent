@@ -55,8 +55,8 @@ class GeminiGrounding {
         this.apiKey = geminiApiKey;
         this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
         this.models = {
-            flash: 'gemini-3.5-flash-lite',
-            pro: 'gemini-3.5-flash-lite'
+            flash: 'gemini-3.5-flash',
+            pro: 'gemini-3.5-flash'
         };
     }
 
@@ -97,9 +97,9 @@ class GeminiGrounding {
 
             let finalRes = response;
             if (!response.ok && (response.status === 429 || response.status === 503)) {
-                console.warn(`[GeminiGrounding] Model ${modelName} gặp ${response.status}, thử fallback sang gemini-3.5-flash-lite...`);
+                console.warn(`[GeminiGrounding] Model ${modelName} gặp ${response.status}, thử fallback sang gemini-3.6-flash...`);
                 finalRes = await fetch(
-                    `${this.baseUrl}/models/gemini-3.5-flash-lite:generateContent?key=${this.apiKey}`,
+                    `${this.baseUrl}/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -121,9 +121,9 @@ class GeminiGrounding {
             }
 
             if (!finalRes.ok && (finalRes.status === 429 || finalRes.status === 503)) {
-                console.warn(`[GeminiGrounding] Google Search grounding quota chạm giới hạn. Fallback sang sinh nội dung trực tiếp (Un-grounded)...`);
+                console.warn(`[GeminiGrounding] Google Search grounding quota chạm giới hạn. Fallback sang sinh nội dung trực tiếp (Un-grounded) với gemini-3.1-flash-lite...`);
                 finalRes = await fetch(
-                    `${this.baseUrl}/models/gemini-3.5-flash-lite:generateContent?key=${this.apiKey}`,
+                    `${this.baseUrl}/models/gemini-3.1-flash-lite:generateContent?key=${this.apiKey}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -159,9 +159,15 @@ class GeminiGrounding {
             const searchQueries = groundingMetadata.retrievalQueries || [];
             const webSearchQueries = groundingMetadata.webSearchQueries || [];
 
+            const sources = groundingSupport.flatMap(s =>
+                s.groundingChunkIndices?.map(idx => groundingMetadata.groundingChunks?.[idx]) || []
+            ).filter(Boolean);
+
             return {
                 success: true,
                 text: text,
+                content: text, // Thuộc tính tương thích ngược
+                sources: sources, // Truy cập nguồn trực tiếp thuận tiện
                 grounding: {
                     hasGrounding: groundingSupport.length > 0,
                     supportCount: groundingSupport.length,
