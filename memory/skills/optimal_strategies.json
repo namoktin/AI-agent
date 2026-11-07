@@ -9,11 +9,11 @@
     ],
     "bestRoute": "Sử dụng BROWSE_WEB kèm extractReels: true hoặc SCRAPE_SOCIAL_MEDIA để trích xuất cả caption, view count, author và canonical reel url. Nếu tải batch, tạo script Node.js / Python tải tuần tự thay vì gọi lệnh thô.",
     "tokensSaved": 2400,
-    "runsCount": 3,
-    "successCount": 3,
+    "runsCount": 5,
+    "successCount": 5,
     "successRate": 1,
-    "wilsonScore": 0.438,
-    "lastOutcomeAt": "2026-11-02T16:32:24.699Z"
+    "wilsonScore": 0.566,
+    "lastOutcomeAt": "2026-11-06T23:56:27.165Z"
   },
   "tiktok_video": {
     "pattern": "tiktok.com",
@@ -24,11 +24,11 @@
     ],
     "bestRoute": "Dùng SCRAPE_SOCIAL_MEDIA hoặc BROWSE_WEB trích xuất trực tiếp selector [data-e2e='browse-video-desc'], like-count và comment-count qua UniversalSocialScraper.",
     "tokensSaved": 1800,
-    "runsCount": 12,
-    "successCount": 12,
+    "runsCount": 13,
+    "successCount": 13,
     "successRate": 1,
-    "lastOutcomeAt": "2026-10-27T15:06:12.896Z",
-    "wilsonScore": 0.757
+    "lastOutcomeAt": "2026-11-06T04:20:26.184Z",
+    "wilsonScore": 0.772
   },
   "youtube_shorts": {
     "pattern": "youtube.com",
@@ -40,11 +40,11 @@
     ],
     "bestRoute": "Dùng SCRAPE_SOCIAL_MEDIA bóc tách JSON-LD Schema.org VideoObject và thẻ ytd-watch-metadata để lấy chuẩn xác 100% view, like, author.",
     "tokensSaved": 1900,
-    "runsCount": 7,
-    "successCount": 7,
+    "runsCount": 36,
+    "successCount": 36,
     "successRate": 1,
-    "lastOutcomeAt": "2026-11-05T14:36:47.185Z",
-    "wilsonScore": 0.646
+    "lastOutcomeAt": "2026-11-07T13:48:11.428Z",
+    "wilsonScore": 0.904
   },
   "batch_daemon": {
     "pattern": "tiến trình ngầm",
@@ -161,10 +161,10 @@
     ],
     "bestRoute": "Khi thu thập và làm sạch dữ liệu thành CSV: 1) BẮT BUỘC tạo file CSV có dòng Header rõ ràng và >= 1 dòng dữ liệu thực; 2) Không để sót ô NULL hoặc NaN không được chuẩn hóa; 3) Định dạng đúng chuẩn UTF-8 có dấu tiếng Việt chuẩn xác; 4) Dùng RUN_CMD python/node kiểm tra số dòng và tính toàn vẹn của bảng trước khi bàn giao.",
     "tokensSaved": 2100,
-    "runsCount": 9,
-    "successCount": 9,
+    "runsCount": 11,
+    "successCount": 11,
     "successRate": 1,
-    "wilsonScore": 0.74,
-    "lastOutcomeAt": "2026-11-04T06:32:12.897Z"
+    "wilsonScore": 0.741,
+    "lastOutcomeAt": "2026-11-07T00:50:52.115Z"
   }
 }

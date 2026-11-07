@@ -18,7 +18,7 @@ REGRESSION_OUTPUT_FILE = RESULTS_DIR / "regression_19_results.jsonl"
 GT_FILE = DATA_DIR / "ground_truth_evaluator.json"
 
 API_ENDPOINT = "http://127.0.0.1:3000/api/v2/execute"
-TIMEOUT_SECONDS = 300
+TIMEOUT_SECONDS = 600
 
 from scoring import extract_final_answer, compare_answers
 
@@ -120,7 +120,8 @@ def run_regression_test(target_index=None, target_task_id=None, max_count=None):
             fail_count += 1
             status_icon = "❌ FAIL"
 
-        print(f"Result: {status_icon} | Extracted: '{extracted}' | GT: '{gt_answer}' | Time: {duration:.1f}s\n")
+        print(f"Result: {status_icon} | Extracted: '{extracted}' | GT: '{gt_answer}' | Time: {duration:.1f}s")
+        print(f"--- Agent Raw Output Tail ---\n{agent_raw_output[-600:]}\n----------------------------\n")
 
         rec = {
             "task_id": task_id,

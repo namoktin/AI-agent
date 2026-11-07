@@ -70,6 +70,30 @@ def get_youtube_transcript(video_id, search_query=None):
             "segments_sample": segments[:15]
         }
     except Exception as e:
+        # Fallback to yt-dlp video metadata extraction (title, description, tags) when subtitles are disabled
+        try:
+            import subprocess
+            video_url = f"https://www.youtube.com/watch?v={video_id}"
+            cmd = ['yt-dlp', '--dump-json', '--no-playlist', video_url]
+            proc = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', timeout=25)
+            if proc.returncode == 0:
+                meta = json.loads(proc.stdout)
+                title = meta.get('title', '')
+                desc = meta.get('description', '')
+                tags = meta.get('tags', [])
+                full_text = f"Title: {title}\n\nDescription: {desc}\n\nTags: {', '.join(tags)}"
+                return {
+                    "success": True,
+                    "video_id": video_id,
+                    "fallback_to_metadata": True,
+                    "title": title,
+                    "description": desc[:3000],
+                    "tags": tags,
+                    "full_transcript": full_text[:4000],
+                    "note": f"Subtitles unavailable. Extracted official video title, description, and metadata via yt-dlp."
+                }
+        except Exception:
+            pass
         return {"success": False, "error": f"Transcript extraction failed: {str(e)}"}
 
 def extract_video_frames(video_path_or_url, timestamps=None, max_frames=5, output_dir=None):
@@ -113,6 +137,7 @@ def extract_video_frames(video_path_or_url, timestamps=None, max_frames=5, outpu
         if not timestamps:
             timestamps = [1, 5, 10, 15, 20][:max_frames]
 
+        frame_images = []
         for i, ts in enumerate(timestamps):
             out_img = output_dir / f"frame_{i+1}_t{int(ts)}.png"
             cmd = [
@@ -125,11 +150,23 @@ def extract_video_frames(video_path_or_url, timestamps=None, max_frames=5, outpu
             subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
             if out_img.exists():
                 extracted_paths.append(str(out_img))
+                try:
+                    import base64
+                    with open(out_img, 'rb') as f_img:
+                        b64 = base64.b64encode(f_img.read()).decode('utf-8')
+                        frame_images.append({
+                            "timestamp": ts,
+                            "file": str(out_img),
+                            "base64": b64
+                        })
+                except Exception:
+                    pass
 
         return {
             "success": True,
             "total_frames_extracted": len(extracted_paths),
-            "frame_files": extracted_paths
+            "frame_files": extracted_paths,
+            "frame_images": frame_images
         }
     except Exception as fe:
         return {"success": False, "error": f"Frame extraction error: {fe}"}

@@ -46,7 +46,8 @@ def load_completed_task_ids():
                 if line:
                     try:
                         record = json.loads(line)
-                        completed.add(record.get("task_id"))
+                        if record.get("status") == "completed":
+                            completed.add(record.get("task_id"))
                     except Exception:
                         pass
     return completed
@@ -154,7 +155,7 @@ def execute_task(task_dict):
 
     return record
 
-def run_gaia_benchmark(target_level=None, max_tasks=None):
+def run_gaia_benchmark(target_level=None, max_tasks=None, fresh=False):
     tasks_file = DATA_DIR / "tasks_for_agent.json"
     if not tasks_file.exists():
         print(f"Error: {tasks_file} not found. Please run download_gaia.py first.")
@@ -169,7 +170,26 @@ def run_gaia_benchmark(target_level=None, max_tasks=None):
     if max_tasks:
         tasks = tasks[:max_tasks]
 
-    completed_ids = load_completed_task_ids()
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    if fresh:
+        ts = int(time.time())
+        if RAW_RESULTS_FILE.exists():
+            arc = RESULTS_DIR / f"raw_results_pre_fresh_{ts}.jsonl"
+            import shutil
+            shutil.copy2(RAW_RESULTS_FILE, arc)
+            open(RAW_RESULTS_FILE, "w", encoding="utf-8").close()
+            print(f"[Fresh Run] Cleared raw_results.jsonl (archived to {arc.name})")
+        eval_file = RESULTS_DIR / "evaluator_results.jsonl"
+        if eval_file.exists():
+            eval_arc = RESULTS_DIR / f"evaluator_results_pre_fresh_{ts}.jsonl"
+            import shutil
+            shutil.copy2(eval_file, eval_arc)
+            open(eval_file, "w", encoding="utf-8").close()
+        completed_ids = set()
+    else:
+        completed_ids = load_completed_task_ids()
+
     remaining = [t for t in tasks if t["task_id"] not in completed_ids]
 
     print(f"=== CYBER AGENT PRO - GAIA BENCHMARK RUNNER ===")
@@ -202,6 +222,13 @@ def run_gaia_benchmark(target_level=None, max_tasks=None):
         except Exception as eval_err:
             print(f"Periodic eval notice: {eval_err}")
 
+        # Adaptive pause between tasks to avoid quota bursts
+        if record.get("status") == "infra_error":
+            print("Notice: Task encountered infra_error. Cooling down for 30s...")
+            time.sleep(30)
+        else:
+            time.sleep(4)
+
     print("\nBenchmark run session finished.")
     try:
         from gaia_evaluator import evaluate_gaia
@@ -214,6 +241,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--level", type=int, default=None, help="Specific level to run (1, 2, or 3)")
     parser.add_argument("--max", type=int, default=None, help="Max number of tasks to run")
+    parser.add_argument("--fresh", action="store_true", help="Start fresh benchmark run from task 1 (clear previous raw results)")
     args = parser.parse_args()
 
-    run_gaia_benchmark(target_level=args.level, max_tasks=args.max)
+    run_gaia_benchmark(target_level=args.level, max_tasks=args.max, fresh=args.fresh)

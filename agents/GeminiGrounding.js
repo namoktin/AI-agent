@@ -52,12 +52,25 @@ const fetch = typeof globalThis.fetch === 'function' ? globalThis.fetch : functi
 
 class GeminiGrounding {
     constructor(geminiApiKey) {
-        this.apiKey = geminiApiKey;
+        const rawKeys = (geminiApiKey || process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '')
+            .split(',')
+            .map(k => k.trim())
+            .filter(Boolean);
+        this.apiKeys = rawKeys.length > 0 ? rawKeys : (geminiApiKey ? [geminiApiKey] : []);
+        this.keyIndex = 0;
+        this.apiKey = this.apiKeys[0] || '';
         this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
         this.models = {
-            flash: 'gemini-3.5-flash',
-            pro: 'gemini-3.5-flash'
+            flash: 'gemini-flash-lite-latest',
+            pro: 'gemini-3.5-flash-lite'
         };
+    }
+
+    getApiKey() {
+        if (!this.apiKeys || this.apiKeys.length === 0) return this.apiKey || '';
+        const key = this.apiKeys[this.keyIndex % this.apiKeys.length];
+        this.keyIndex = (this.keyIndex + 1) % this.apiKeys.length;
+        return key;
     }
 
     /**
@@ -72,10 +85,11 @@ class GeminiGrounding {
         } = options;
 
         const modelName = this.models[model] || model;
+        const currentKey = this.getApiKey();
 
         try {
             const response = await fetch(
-                `${this.baseUrl}/models/${modelName}:generateContent?key=${this.apiKey}`,
+                `${this.baseUrl}/models/${modelName}:generateContent?key=${currentKey}`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -97,9 +111,10 @@ class GeminiGrounding {
 
             let finalRes = response;
             if (!response.ok && (response.status === 429 || response.status === 503)) {
-                console.warn(`[GeminiGrounding] Model ${modelName} gặp ${response.status}, thử fallback sang gemini-3.6-flash...`);
+                console.warn(`[GeminiGrounding] Model ${modelName} gặp ${response.status}, thử fallback sang gemini-flash-lite-latest...`);
+                const fallbackKey = this.getApiKey();
                 finalRes = await fetch(
-                    `${this.baseUrl}/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`,
+                    `${this.baseUrl}/models/gemini-flash-lite-latest:generateContent?key=${fallbackKey}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -121,9 +136,10 @@ class GeminiGrounding {
             }
 
             if (!finalRes.ok && (finalRes.status === 429 || finalRes.status === 503)) {
-                console.warn(`[GeminiGrounding] Google Search grounding quota chạm giới hạn. Fallback sang sinh nội dung trực tiếp (Un-grounded) với gemini-3.1-flash-lite...`);
+                console.warn(`[GeminiGrounding] Google Search grounding quota chạm giới hạn. Fallback sang sinh nội dung trực tiếp (Un-grounded) với gemini-flash-lite-latest...`);
+                const fallbackKey2 = this.getApiKey();
                 finalRes = await fetch(
-                    `${this.baseUrl}/models/gemini-3.1-flash-lite:generateContent?key=${this.apiKey}`,
+                    `${this.baseUrl}/models/gemini-flash-lite-latest:generateContent?key=${fallbackKey2}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },

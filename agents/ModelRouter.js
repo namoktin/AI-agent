@@ -5,17 +5,14 @@
 
 class ModelRouter {
     constructor(customConfig = {}) {
-        this.defaultModel = customConfig.defaultModel || process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+        this.defaultModel = customConfig.defaultModel || process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 
         // Unified Model Registry with Distinct Tiers (Fast, Standard, Reasoning Pro)
         this.registry = {
-            FAST: customConfig.FAST || (customConfig.defaultModel ? customConfig.defaultModel : process.env.GEMINI_MODEL_FAST) || 'gemini-3-flash-preview',
+            FAST: customConfig.FAST || (customConfig.defaultModel ? customConfig.defaultModel : process.env.GEMINI_MODEL_FAST) || 'gemini-flash-lite-latest',
             STANDARD: customConfig.STANDARD || (customConfig.defaultModel ? customConfig.defaultModel : process.env.GEMINI_MODEL_STANDARD) || this.defaultModel,
-            REASONING: customConfig.REASONING || (customConfig.defaultModel ? customConfig.defaultModel : process.env.GEMINI_MODEL_HEAVY) || 'gemini-3.6-flash',
+            REASONING: customConfig.REASONING || (customConfig.defaultModel ? customConfig.defaultModel : process.env.GEMINI_MODEL_HEAVY) || 'gemini-3.1-flash-lite',
             FALLBACK_POOL: [
-                'gemini-3.6-flash',
-                'gemini-3.5-flash',
-                'gemini-3-flash-preview',
                 'gemini-flash-lite-latest',
                 'gemini-3.5-flash-lite',
                 'gemini-3.1-flash-lite'
@@ -178,7 +175,7 @@ class ModelRouter {
             estimatedTokens = 1200,
             model = this.defaultModel,
             priority = 1,
-            timeout = 10000,
+            timeout = options.timeout || this.config?.slotTimeout || 30000,
             maxDuration = 300000 // 5 phút mặc định, tương thích với các tác vụ dài hạn
         } = options;
 

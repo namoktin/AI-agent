@@ -74,7 +74,9 @@ class ToolExecutor {
                 'READ_FILE',
                 'LIST_FILES',
                 'INSPECT_MEDIA',
+                'ANALYZE_IMAGE',
                 'INSPECT_SPREADSHEET',
+                'INSPECT_DOCUMENT',
                 'GET_MEDIA_TRANSCRIPT',
                 'WEB_SEARCH',
                 'SEARCH',
@@ -365,8 +367,10 @@ class ToolExecutor {
             'MERGE_AUDIO_VIDEO': '/api/merge-audio-video',
             'EXTRACT_AUDIO': '/api/extract-audio',
             'INSPECT_SPREADSHEET': '/api/inspect-spreadsheet',
+            'INSPECT_DOCUMENT': '/api/inspect-document',
             'GET_MEDIA_TRANSCRIPT': '/api/get-media-transcript',
-            'EXTRACT_VIDEO_FRAMES': '/api/extract-video-frames'
+            'EXTRACT_VIDEO_FRAMES': '/api/extract-video-frames',
+            'ANALYZE_IMAGE': '/api/analyze-image'
         };
 
         return mapping[clean] || mapping[toolName] || `/api/${clean.toLowerCase().replace(/_/g, '-')}`;
@@ -442,7 +446,7 @@ class ToolExecutor {
             },
             {
                 name: 'WEB_SEARCH',
-                description: 'Tìm kiếm thông tin đa nguồn trên Internet (Dev.to, Wikipedia, Tin tức công nghệ).',
+                description: 'Tìm kiếm thông tin đa nguồn trên Internet thời gian thực (DuckDuckGo Stealth, Wikipedia, Tin tức). Dùng để tìm kiếm các đường link trang web và dữ liệu sơ bộ. Sau khi tìm thấy URL tiềm năng (đặc biệt là Wikipedia, bài báo khoa học, trang web chính thức, trang lưu trữ), hãy gọi ngay công cụ READ_URL với URL đó để đọc toàn bộ bảng số liệu hoặc văn bản gốc.',
                 parameters: {
                     type: 'OBJECT',
                     properties: {
@@ -478,13 +482,17 @@ class ToolExecutor {
             },
             {
                 name: 'READ_URL',
-                description: 'Đọc và trích xuất nội dung toàn văn từ một đường link web cụ thể.',
+                description: 'Đọc và trích xuất nội dung toàn văn, bảng dữ liệu từ một đường link web cụ thể (hỗ trợ Wikipedia, bài báo khoa học, trang luật, bảng thống kê lên đến 45.000 ký tự). Có thể truyền thêm findText để tự động cuộn đến và trích xuất phần bảng biểu/nội dung chứa từ khóa (ví dụ: "Batting", "Roy White", "Roster", "Rule 701"). Dùng công cụ này sau WEB_SEARCH để đọc chi tiết tài liệu gốc.',
                 parameters: {
                     type: 'OBJECT',
                     properties: {
                         url: {
                             type: 'STRING',
                             description: 'Đường dẫn website cần đọc (bắt đầu bằng https://)'
+                        },
+                        findText: {
+                            type: 'STRING',
+                            description: 'Từ khóa hoặc tiêu đề mục cần tìm trong trang để tự động cuộn đến và trích xuất vùng văn bản đó (ví dụ: "Batting", "Roy White", "Tamai", "Rule 701")'
                         }
                     },
                     required: ['url']
@@ -752,6 +760,32 @@ class ToolExecutor {
                 }
             },
             {
+                name: 'INSPECT_DOCUMENT',
+                description: 'Bóc tách tài liệu văn bản & bài thuyết trình chuyên sâu (hỗ trợ .pdf, .pptx, .docx). Cho phép đếm chính xác số trang/slide, tìm kiếm từ khóa xuất hiện ở những trang/slide nào, trích xuất văn bản từng trang/slide hoặc toàn bộ bài thuyết trình (all_slides/all_pages).',
+                parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                        filePath: {
+                            type: 'STRING',
+                            description: 'Đường dẫn tới file tài liệu (PDF, PPTX, DOCX)'
+                        },
+                        action: {
+                            type: 'STRING',
+                            description: 'Hành động: "summary" (tổng quan), "page_count" hoặc "slide_count" (đếm số trang/slide), "search_keyword" (tìm từ khóa ở các trang/slide), "extract_page" hoặc "extract_slide" (trích xuất 1 trang/slide), "all_slides" hoặc "all_pages" (trích xuất toàn bộ)'
+                        },
+                        keyword: {
+                            type: 'STRING',
+                            description: 'Từ khóa cần tìm kiếm trong các trang hoặc slide'
+                        },
+                        page: {
+                            type: 'INTEGER',
+                            description: 'Số thứ tự trang hoặc slide cần trích xuất (bắt đầu từ 1)'
+                        }
+                    },
+                    required: ['filePath']
+                }
+            },
+            {
                 name: 'GET_MEDIA_TRANSCRIPT',
                 description: 'Trích xuất phụ đề (captions/transcripts) kèm timestamp từ video YouTube hoặc file âm thanh cục bộ. Hỗ trợ tìm kiếm câu thoại theo từ khóa và lấy câu trả lời ngay sau đó.',
                 parameters: {
@@ -796,6 +830,24 @@ class ToolExecutor {
                             description: 'Số khung hình tối đa cần trích xuất (mặc định: 5)'
                         }
                     }
+                }
+            },
+            {
+                name: 'ANALYZE_IMAGE',
+                description: 'Phân tích thị giác chuyên sâu (Vision / OCR) cho file ảnh cục bộ (.png, .jpg, .webp, ảnh frame trích xuất từ video). Đọc chữ, trích xuất danh sách phân số, bảng biểu, nhận diện loài động vật/chim hoặc đếm số lượng đối tượng xuất hiện trong ảnh.',
+                parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                        filePath: {
+                            type: 'STRING',
+                            description: 'Đường dẫn file ảnh cục bộ (ví dụ: file đính kèm hoặc frame trích xuất)'
+                        },
+                        prompt: {
+                            type: 'STRING',
+                            description: 'Câu hỏi hoặc chỉ thị cụ thể cho Vision Model (ví dụ: "Liệt kê tất cả phân số theo thứ tự xuất hiện", "Đếm số loài chim trong hình", "Xác định loài chim này là gì")'
+                        }
+                    },
+                    required: ['filePath']
                 }
             }
         ];

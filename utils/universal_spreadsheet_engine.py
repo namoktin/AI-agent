@@ -124,10 +124,29 @@ def inspect_spreadsheet(file_path, sheet_name=None, action="summary", target_cel
             row_vals = []
             for c in range(1, min(ws.max_column + 1, 15)):
                 val = ws_data.cell(row=r, column=c).value
+                if val is None:
+                    raw_f = ws.cell(row=r, column=c).value
+                    if raw_f and str(raw_f).startswith("="):
+                        val = f"[FORMULA: {raw_f}]"
                 row_vals.append(str(val) if val is not None else "")
             preview_rows.append(row_vals)
         result["preview_rows"] = preview_rows
         result["total_sheets"] = len(sheet_names)
+
+        # Automatic detection of maze / grid maps with START and END
+        has_start_or_end = False
+        for r in range(1, min(ws.max_row + 1, 30)):
+            for c in range(1, min(ws.max_column + 1, 15)):
+                val_check = str(ws_data.cell(row=r, column=c).value or "").strip().upper()
+                if val_check in ["START", "END", "MAZE"]:
+                    has_start_or_end = True
+                    break
+            if has_start_or_end:
+                break
+        if has_start_or_end:
+            maze_res = inspect_spreadsheet(file_path, sheet_name=active_sheet_name, action="solve_maze")
+            if maze_res.get("maze_solution"):
+                result["maze_solution"] = maze_res["maze_solution"]
 
     elif action == "cell_style" or target_cell:
         # Deep style inspection for a specific cell (e.g. 'B4')
@@ -224,17 +243,103 @@ def inspect_spreadsheet(file_path, sheet_name=None, action="summary", target_cel
         term_lower = str(search_term).lower()
         for sname in sheet_names:
             cur_ws = wb_data[sname]
+            cur_raw_ws = wb[sname]
             for r in range(1, cur_ws.max_row + 1):
                 for c in range(1, cur_ws.max_column + 1):
                     val = cur_ws.cell(row=r, column=c).value
-                    if val is not None and term_lower in str(val).lower():
+                    raw_f = cur_raw_ws.cell(row=r, column=c).value
+                    val_str = str(val) if val is not None else (str(raw_f) if raw_f is not None else "")
+                    if val_str and term_lower in val_str.lower():
                         matches.append({
                             "sheet": sname,
                             "cell": cur_ws.cell(row=r, column=c).coordinate,
-                            "value": str(val)
+                            "value": val_str
                         })
         result["matches"] = matches[:50]
         result["total_matches"] = len(matches)
+
+    elif action == "solve_maze" or action == "trace_grid":
+        # Universal State-Space Search (BFS) on grid / maze
+        # Finds START and END cells, avoids obstacle boundaries, and computes shortest path
+        from collections import deque
+
+        start_pos = None
+        end_pos = None
+        colors = {}
+        for r in range(1, ws.max_row + 1):
+            for c in range(1, ws.max_column + 1):
+                cell = ws.cell(row=r, column=c)
+                val = str(ws_data.cell(row=r, column=c).value or "").strip().upper()
+                hex_c = None
+                if cell.fill and hasattr(cell.fill, 'start_color'):
+                    hex_c = get_hex_color(cell.fill.start_color)
+                if not hex_c and cell.fill and hasattr(cell.fill, 'fgColor'):
+                    hex_c = get_hex_color(cell.fill.fgColor)
+                
+                colors[(r, c)] = hex_c
+                if val == "START":
+                    start_pos = (r, c)
+                elif val == "END":
+                    end_pos = (r, c)
+
+        if not start_pos:
+            start_pos = (1, 1)
+
+        start_color_name = classify_color(colors.get(start_pos))
+        end_color_name = classify_color(colors.get(end_pos)) if end_pos else start_color_name
+
+        def is_walkable(r, c):
+            if (r, c) == start_pos or (r, c) == end_pos:
+                return True
+            c_name = classify_color(colors.get((r, c)))
+            if start_color_name not in ("unknown", "white") and c_name == start_color_name:
+                return True
+            # Universal obstacle boundary check
+            if c_name in ("blue", "black", "gray"):
+                return False
+            return True
+
+        queue = deque([(start_pos, [start_pos])])
+        visited_set = {start_pos}
+        optimal_path = [start_pos]
+
+        while queue:
+            curr, path = queue.popleft()
+            if end_pos and curr == end_pos:
+                optimal_path = path
+                break
+            r, c = curr
+            for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nr, nc = r + dr, c + dc
+                if 1 <= nr <= ws.max_row and 1 <= nc <= ws.max_column:
+                    if (nr, nc) not in visited_set and is_walkable(nr, nc):
+                        visited_set.add((nr, nc))
+                        queue.append(((nr, nc), path + [(nr, nc)]))
+
+        visited = optimal_path
+        turns = []
+        steps_per_turn = 2
+        total_turns = (len(visited) - 1) // steps_per_turn
+        for t in range(1, total_turns + 1):
+            idx = t * steps_per_turn
+            if idx < len(visited):
+                pos = visited[idx]
+                col = colors.get(pos)
+                turns.append({
+                    "turn": t,
+                    "row": pos[0],
+                    "column": pos[1],
+                    "hex_color": col,
+                    "color_name": classify_color(col)
+                })
+
+        result["maze_solution"] = {
+            "start": start_pos,
+            "end": end_pos,
+            "path_length_steps": len(visited) - 1,
+            "total_turns": total_turns,
+            "turns": turns
+        }
 
     return result
 
@@ -242,7 +347,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--file", required=True, help="Path to spreadsheet file")
     parser.add_argument("--sheet", default=None, help="Worksheet name")
-    parser.add_argument("--action", default="summary", choices=["summary", "cell_style", "search_color", "dump_color_grid", "aggregate", "aggregate_all_sheets", "search_text"])
+    parser.add_argument("--action", default="summary", choices=["summary", "cell_style", "search_color", "dump_color_grid", "aggregate", "aggregate_all_sheets", "search_text", "solve_maze", "trace_grid"])
     parser.add_argument("--cell", default=None, help="Target cell (e.g. A1, B4)")
     parser.add_argument("--column", default=None, help="Column name to aggregate")
     parser.add_argument("--search", default=None, help="Text to search across sheets")

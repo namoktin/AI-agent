@@ -871,6 +871,32 @@ app.post('/api/inspect-spreadsheet', (req, res) => {
 });
 
 /**
+ * POST /api/inspect-document
+ * Universal Document & Presentation Engine (PDF, PPTX, DOCX)
+ */
+app.post('/api/inspect-document', (req, res) => {
+    try {
+        const { filePath, action = 'summary', keyword, page } = req.body;
+        if (!filePath) return res.json({ success: false, error: 'Thiếu filePath' });
+        const targetPath = resolvePath(filePath);
+        if (!fs.existsSync(targetPath)) {
+            return res.json({ success: false, error: 'File không tồn tại trên đĩa' });
+        }
+
+        const scriptPath = path.join(__dirname, 'utils', 'universal_document_engine.py');
+        const args = ['python', `"${scriptPath}"`, '--file', `"${targetPath}"`, '--action', action];
+        if (keyword) args.push('--keyword', `"${keyword}"`);
+        if (page) args.push('--page', page);
+
+        const output = execSync(args.join(' '), { encoding: 'utf-8', timeout: 60000 });
+        const data = JSON.parse(output);
+        res.json(data);
+    } catch (e) {
+        res.json({ success: false, error: e.message });
+    }
+});
+
+/**
  * POST /api/get-media-transcript
  * Universal YouTube & Media Intelligence Engine
  */
@@ -910,6 +936,94 @@ app.post('/api/extract-video-frames', (req, res) => {
         const output = execSync(args.join(' '), { encoding: 'utf-8', timeout: 120000 });
         const data = JSON.parse(output);
         res.json(data);
+    } catch (e) {
+        res.json({ success: false, error: e.message });
+    }
+});
+
+/**
+ * POST /api/analyze-image
+ * Universal Multimodal Vision & OCR Engine
+ */
+app.post('/api/analyze-image', async (req, res) => {
+    try {
+        const { filePath, prompt = 'Describe this image in detail, transcribing all text, formulas, fractions, tables, and notable objects.' } = req.body;
+        if (!filePath) return res.json({ success: false, error: 'Thiếu filePath' });
+        const targetPath = resolvePath(filePath);
+        if (!fs.existsSync(targetPath)) {
+            return res.json({ success: false, error: 'File không tồn tại trên đĩa' });
+        }
+        const ext = path.extname(targetPath).toLowerCase();
+        const mimeMap = {
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.webp': 'image/webp',
+            '.gif': 'image/gif'
+        };
+        const mimeType = mimeMap[ext] || 'image/png';
+        const fileBytes = fs.readFileSync(targetPath);
+        const b64 = fileBytes.toString('base64');
+
+        const { globalOrchestrator } = getOrchestrator();
+        const rawKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || globalOrchestrator?.apiKey || '';
+        const keys = (globalOrchestrator?.apiKeys && globalOrchestrator.apiKeys.length > 0)
+            ? globalOrchestrator.apiKeys
+            : rawKeys.split(',').map(k => k.trim()).filter(Boolean);
+        let startKeyIdx = globalOrchestrator?.currentKeyIndex || 0;
+
+        let geminiRes = null;
+        let lastErr = '';
+        const modelsToTry = ['gemini-flash-lite-latest', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'];
+
+        key_loop: for (let kOffset = 0; kOffset < Math.max(1, keys.length); kOffset++) {
+            const currentKey = keys.length > 0 ? keys[(startKeyIdx + kOffset) % keys.length] : '';
+            for (const model of modelsToTry) {
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${currentKey}`;
+                try {
+                    geminiRes = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{
+                                role: 'user',
+                                parts: [
+                                    { inlineData: { mimeType, data: b64 } },
+                                    { text: prompt }
+                                ]
+                            }],
+                            generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
+                        }),
+                        signal: AbortSignal.timeout(60000)
+                    });
+
+                    if (geminiRes && geminiRes.ok) {
+                        break key_loop;
+                    }
+                    if (geminiRes && (geminiRes.status === 429 || geminiRes.status === 503)) {
+                        lastErr = `Key ${(startKeyIdx + kOffset) % keys.length} ${geminiRes.status}`;
+                        break; // Try next key
+                    } else if (geminiRes) {
+                        lastErr = await geminiRes.text();
+                    }
+                } catch (e) {
+                    lastErr = e.message;
+                }
+            }
+        }
+
+        if (!geminiRes || !geminiRes.ok) {
+            return res.json({ success: false, error: `Vision API error: ${lastErr}` });
+        }
+
+        const data = await geminiRes.json();
+        const text = data.candidates?.[0]?.content?.parts?.filter(p => p.text).map(p => p.text).join('\n') || '';
+        res.json({
+            success: true,
+            filePath: targetPath,
+            analysis: text,
+            result: text
+        });
     } catch (e) {
         res.json({ success: false, error: e.message });
     }
@@ -1357,31 +1471,19 @@ async function multiSourceWebSearch(query, limit = 6) {
 
     const timeoutSignal = () => AbortSignal.timeout(4000);
 
-    // Tìm kiếm đồng thời từ các nguồn tin cậy với timeout nghiêm ngặt 4s cho mỗi nguồn
+    // 1. Chạy DuckDuckGo Stealth Search đầu tiên (công cụ tìm kiếm Internet thời gian thực mạnh nhất)
+    if (typeof executeStealthDuckDuckGoSearch === 'function') {
+        try {
+            const stealthItems = await executeStealthDuckDuckGoSearch(query, limit);
+            if (Array.isArray(stealthItems) && stealthItems.length > 0) {
+                results.push(...stealthItems);
+            }
+        } catch (sErr) {}
+    }
+
+    // 2. Chạy song song Wikipedia, DuckDuckGo Instant Answer và Dev.to để bổ sung tri thức
     await Promise.allSettled([
-        // 1. Dev.to
-        (async () => {
-            try {
-                const res = await fetch(`https://dev.to/api/articles?per_page=4&q=${encodeURIComponent(query)}`, {
-                    headers: { 'User-Agent': 'Mozilla/5.0' },
-                    signal: timeoutSignal()
-                });
-                const data = await res.json();
-                if (Array.isArray(data)) {
-                    data.slice(0, 3).forEach(a => {
-                        if (a.title && a.url) {
-                            results.push({
-                                title: a.title,
-                                url: a.url,
-                                snippet: a.description || `Tài liệu kỹ thuật về ${query}`,
-                                source: 'Dev.to'
-                            });
-                        }
-                    });
-                }
-            } catch(e) {}
-        })(),
-        // 2. Wikipedia
+        // Wikipedia
         (async () => {
             try {
                 const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json`, {
@@ -1401,7 +1503,7 @@ async function multiSourceWebSearch(query, limit = 6) {
                 }
             } catch(e) {}
         })(),
-        // 3. DuckDuckGo Instant Answer
+        // DuckDuckGo Instant Answer
         (async () => {
             try {
                 const res = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`, {
@@ -1415,6 +1517,30 @@ async function multiSourceWebSearch(query, limit = 6) {
                         url: data.AbstractURL,
                         snippet: data.Abstract.slice(0, 300),
                         source: 'DuckDuckGo'
+                    });
+                }
+            } catch(e) {}
+        })(),
+        // Dev.to (chỉ kích hoạt nếu kết quả còn ít hoặc truy vấn liên quan đến code/lập trình)
+        (async () => {
+            const isDevQuery = /coding|programming|javascript|python|css|html|react|vue|node|npm|docker|kubernetes|api|backend|frontend|sql/i.test(query);
+            if (!isDevQuery) return;
+            try {
+                const res = await fetch(`https://dev.to/api/articles?per_page=4&q=${encodeURIComponent(query)}`, {
+                    headers: { 'User-Agent': 'Mozilla/5.0' },
+                    signal: timeoutSignal()
+                });
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    data.slice(0, 2).forEach(a => {
+                        if (a.title && a.url) {
+                            results.push({
+                                title: a.title,
+                                url: a.url,
+                                snippet: a.description || `Tài liệu kỹ thuật về ${query}`,
+                                source: 'Dev.to'
+                            });
+                        }
                     });
                 }
             } catch(e) {}
@@ -1446,9 +1572,10 @@ app.post(['/api/search', '/api/web-search'], async (req, res) => {
         results.forEach((r, idx) => {
             md += `${idx + 1}. **[${r.title}](${r.url})** *(${r.source})*\n   - ${r.snippet}\n   - Link: \`${r.url}\`\n\n`;
         });
-        res.json({ success: true, result: md, items: results });
+        md += `\n💡 **GỢI Ý:** Để đọc chi tiết bảng số liệu, danh sách đầy đủ hoặc văn bản toàn văn của bất kỳ link nào ở trên, hãy gọi ngay công cụ \`READ_URL\` với URL tương ứng.\n`;
+        res.json({ success: true, result: md, items: results, results: results });
     } else {
-        res.json({ success: false, result: `Không tìm thấy kết quả nào cho "${query}". Hãy thử đổi từ khóa cụ thể hơn.` });
+        res.json({ success: false, result: `Không tìm thấy kết quả nào cho "${query}". Hãy thử đổi từ khóa cụ thể hơn.`, items: [], results: [] });
     }
 });
 
@@ -1590,6 +1717,71 @@ async function setupStealthPage(page) {
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36');
 }
 
+// Universal Stealth DuckDuckGo Search Engine using Puppeteer Stealth
+async function executeStealthDuckDuckGoSearch(query, limit = 5) {
+    let stealthBrowser = null;
+    try {
+        const chromePath = getInstalledBrowserPath();
+        if (!chromePath) return [];
+
+        cleanChromeProfileLock(CHROME_PROFILE_DIR);
+        stealthBrowser = await puppeteer.launch({
+            executablePath: chromePath,
+            headless: 'new',
+            ignoreHTTPSErrors: true,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-blink-features=AutomationControlled',
+                '--disable-gpu',
+                '--ignore-certificate-errors',
+                '--lang=en-US,en'
+            ]
+        });
+
+        const page = await stealthBrowser.newPage();
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
+
+        const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+        await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+
+        const items = await page.evaluate((maxItems) => {
+            const list = [];
+            const titles = document.querySelectorAll('.result__title');
+            const snippets = document.querySelectorAll('.result__snippet');
+            for (let i = 0; i < Math.min(titles.length, maxItems); i++) {
+                const a = titles[i].querySelector('a');
+                if (a) {
+                    let rawHref = a.href || '';
+                    if (rawHref.includes('uddg=')) {
+                        try {
+                            const u = new URL(rawHref);
+                            const uddg = u.searchParams.get('uddg');
+                            if (uddg) rawHref = decodeURIComponent(uddg);
+                        } catch (e) {}
+                    }
+                    list.push({
+                        title: a.innerText.trim(),
+                        url: rawHref,
+                        snippet: snippets[i] ? snippets[i].innerText.trim() : ''
+                    });
+                }
+            }
+            return list;
+        }, limit);
+
+        await stealthBrowser.close();
+        stealthBrowser = null;
+        return (items || []).map(item => ({ ...item, source: 'DuckDuckGo Stealth' }));
+    } catch (err) {
+        if (stealthBrowser) {
+            try { await stealthBrowser.close(); } catch (e) {}
+        }
+        console.warn('⚠️ [Stealth Search] DuckDuckGo search error:', err.message);
+        return [];
+    }
+}
+
 // Hàm chuẩn hóa HTML & trích xuất liên kết việc làm / tài liệu chuyên sâu
 function extractContentAndJobLinks(rawHtml, baseUrl) {
     const titleMatch = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(rawHtml);
@@ -1620,6 +1812,10 @@ function extractContentAndJobLinks(rawHtml, baseUrl) {
         .replace(/<nav[\s\S]*?<\/nav>/gi, '')
         .replace(/<header[\s\S]*?<\/header>/gi, '')
         .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+        .replace(/<\/tr>/gi, '\n')
+        .replace(/<\/t[dh]>/gi, ' | ')
+        .replace(/<t[dh][^>]*>/gi, '')
+        .replace(/<tr[^>]*>/gi, '')
         .replace(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/gi, '\n### $1\n')
         .replace(/<p[^>]*>(.*?)<\/p>/gi, '\n$1\n')
         .replace(/<li[^>]*>(.*?)<\/li>/gi, '\n* $1')
@@ -1660,7 +1856,7 @@ function extractContentAndJobLinks(rawHtml, baseUrl) {
 
 // Đọc toàn bộ nội dung của 1 đường dẫn URL (Cơ chế Vượt Chặn Bot Đa Tầng 3 Lớp: Stealth Fetch -> Jina AI Reader -> Puppeteer Stealth)
 app.post('/api/fetch-webpage', async (req, res) => {
-    let { url } = req.body;
+    let { url, findText, findAfter } = req.body;
     if (!url) return res.json({ success: false, error: 'Thiếu đường dẫn URL' });
 
     let parsedInputUrl;
@@ -1678,11 +1874,18 @@ app.post('/api/fetch-webpage', async (req, res) => {
     let usedEngine = 'Direct Stealth HTTP/2 Fetch';
     let title = '';
 
+    // Hỗ trợ arXiv: Nếu là trang abstract, ưu tiên thử bản HTML toàn văn để trích xuất đầy đủ nội dung, kết quả và tài trợ
+    let targetFetchUrl = url;
+    if (url.includes('arxiv.org/abs/')) {
+        targetFetchUrl = url.replace('/abs/', '/html/') + (url.endsWith('v1') ? '' : 'v1');
+    }
+
     // =========================================================================
     // TẦNG 1: Fetch trực tiếp với đầy đủ Realistic Modern Headers
     // =========================================================================
     try {
-        const response = await fetch(url, {
+        let fetchTarget = targetFetchUrl;
+        let response = await fetch(fetchTarget, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
@@ -1698,6 +1901,18 @@ app.post('/api/fetch-webpage', async (req, res) => {
             },
             signal: AbortSignal.timeout(15000)
         });
+
+        if (!response.ok && fetchTarget !== url) {
+            fetchTarget = url;
+            response = await fetch(fetchTarget, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                    'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7'
+                },
+                signal: AbortSignal.timeout(15000)
+            });
+        }
 
         if (response.ok) {
             const html = await response.text();
@@ -1764,8 +1979,9 @@ app.post('/api/fetch-webpage', async (req, res) => {
                         .replace(/Markdown Content:\s*\n/i, '')
                         .trim();
 
-                    const truncated = cleanContent.length > 7000;
-                    cleanContent = cleanContent.slice(0, 7000);
+                    const maxLen = 35000;
+                    const truncated = cleanContent.length > maxLen;
+                    cleanContent = cleanContent.slice(0, maxLen);
 
                     let socialAppendix = "";
                     if (typeof socialData !== 'undefined' && socialData && (socialData.caption || socialData.views || socialData.likes || socialData.comments_count || socialData.author)) {
@@ -1808,12 +2024,14 @@ app.post('/api/fetch-webpage', async (req, res) => {
                 stealthBrowser = await puppeteer.launch({
                     executablePath: chromePath,
                     headless: 'new',
+                    ignoreHTTPSErrors: true,
                     userDataDir: CHROME_PROFILE_DIR,
                     args: [
                         '--no-sandbox',
                         '--disable-setuid-sandbox',
                         '--disable-blink-features=AutomationControlled',
                         '--disable-features=IsolateOrigins,site-per-process',
+                        '--ignore-certificate-errors',
                         '--window-size=1920,1080',
                         '--disable-infobars',
                         '--lang=vi-VN,vi'
@@ -1846,8 +2064,41 @@ app.post('/api/fetch-webpage', async (req, res) => {
     // Xử lý HTML từ Tầng 1 hoặc Tầng 3
     const parsed = extractContentAndJobLinks(rawHtml, url);
     const finalTitle = title || parsed.title;
-    const truncated = parsed.cleanText.length > 7000;
-    const cleanSlice = parsed.cleanText.slice(0, 7000);
+    const maxLen = 45000;
+
+    let targetSearch = (findText || findAfter || '').trim().toLowerCase();
+    if (!targetSearch && url.includes('#')) {
+        targetSearch = decodeURIComponent(url.split('#')[1]).replace(/_/g, ' ').toLowerCase();
+    }
+
+    let cleanSlice = parsed.cleanText;
+    let truncated = false;
+
+    if (targetSearch && cleanSlice.toLowerCase().includes(targetSearch)) {
+        let matchIdx = -1;
+        const allMatches = [];
+        let pos = 0;
+        const lowerClean = cleanSlice.toLowerCase();
+        while ((pos = lowerClean.indexOf(targetSearch, pos)) !== -1) {
+            allMatches.push(pos);
+            pos += targetSearch.length;
+        }
+        if (allMatches.length > 0) {
+            matchIdx = allMatches.length > 1 && allMatches[0] < 5000 ? allMatches[allMatches.length - 1] : allMatches[0];
+            const start = Math.max(0, matchIdx - 2000);
+            const end = Math.min(cleanSlice.length, start + maxLen);
+            cleanSlice = (start > 0 ? '... [Đoạn trước đã được lược bớt để tập trung vào mục yêu cầu] ...\n\n' : '') +
+                         cleanSlice.slice(start, end) +
+                         (end < cleanSlice.length ? '\n\n... [Đoạn sau đã được lược bớt] ...' : '');
+            truncated = start > 0 || end < parsed.cleanText.length;
+        } else {
+            truncated = cleanSlice.length > maxLen;
+            cleanSlice = cleanSlice.slice(0, maxLen);
+        }
+    } else {
+        truncated = cleanSlice.length > maxLen;
+        cleanSlice = cleanSlice.slice(0, maxLen);
+    }
 
     let deepLinkAppendix = "";
     if (parsed.deepJobLinks.length > 0) {
@@ -3323,10 +3574,21 @@ app.post('/api/browse-web', async (req, res) => {
         await browser.close();
         browser = null;
 
-        // Cắt gọn văn bản nếu quá dài
+        // Cắt gọn văn bản nếu quá dài (Hỗ trợ đọc sâu lên tới 35,000 ký tự)
         let cleanText = (extraction.bodyText || '').replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n\n').trim();
-        const truncated = cleanText.length > 7000;
-        cleanText = cleanText.slice(0, 7000);
+        const maxLen = 35000;
+        let targetWindow = cleanText;
+        if (cleanText.length > maxLen) {
+            if (findText && cleanText.toLowerCase().includes(findText.toLowerCase())) {
+                const idx = cleanText.toLowerCase().indexOf(findText.toLowerCase());
+                const start = Math.max(0, idx - 4000);
+                targetWindow = cleanText.slice(start, start + maxLen);
+            } else {
+                targetWindow = cleanText.slice(0, maxLen);
+            }
+        }
+        const truncated = cleanText.length > maxLen;
+        cleanText = targetWindow;
 
         let articleAppendix = "";
         if (extraction.articles && extraction.articles.length > 0) {
