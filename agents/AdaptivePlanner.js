@@ -148,7 +148,104 @@ class AdaptivePlanner {
                 };
 
             case 'standard':
-            default:
+            default: {
+                // Tier 4 Dynamic Task Decomposition: Phân tích ngữ cảnh tệp đính kèm và miền bài toán
+                const reqLower = (userRequest || '').toLowerCase();
+                const isBenchmarkOrFactual = /FINAL ANSWER:|gaia|benchmark|how many|which|what|who|calculate|tính|cho biết|in what/i.test(userRequest);
+
+                // Phát hiện tệp đính kèm và loại bài toán
+                const isSpreadsheet = reqLower.includes('.xlsx') || reqLower.includes('.xls') || reqLower.includes('.csv') || reqLower.includes('spreadsheet') || reqLower.includes('bảng tính');
+                const isAudio = reqLower.includes('.mp3') || reqLower.includes('.wav') || reqLower.includes('.m4a') || reqLower.includes('audio') || reqLower.includes('âm thanh');
+                const isVisual = reqLower.includes('.png') || reqLower.includes('.jpg') || reqLower.includes('.jpeg') || reqLower.includes('image') || reqLower.includes('ảnh');
+                const isWebResearch = reqLower.includes('wikipedia') || reqLower.includes('http') || reqLower.includes('doi') || reqLower.includes('author') || reqLower.includes('website');
+
+                if (isSpreadsheet) {
+                    return {
+                        mode: 'standard',
+                        domain: 'spreadsheet_data_analytics',
+                        description: 'Phân tích dữ liệu bảng tính đa tầng: Trích xuất cấu trúc -> Tính toán tất định -> Nghiệm thu trực tiếp',
+                        tasks: [
+                            {
+                                id: 'T001',
+                                description: `Khảo sát tệp bảng tính (.xlsx/.csv): mở file, duyệt danh sách sheet và cột, lọc chính xác các bản ghi mục tiêu theo đúng điều kiện câu hỏi: ${userRequest}`,
+                                assignedTo: 'researcher',
+                                priority: 1,
+                                parallelizable: true,
+                                requirements: ['inspect_spreadsheet', 'filter_records', 'column_schema']
+                            },
+                            {
+                                id: 'T002',
+                                description: `Viết và thực thi script Python tất định (pandas/openpyxl) để tính toán, kiểm chứng quy tắc nghiệp vụ/đơn vị từ dữ liệu bảng tính và chốt đáp án: ${userRequest}`,
+                                assignedTo: 'developer',
+                                priority: 1,
+                                parallelizable: true,
+                                dependencies: ['T001'],
+                                requirements: ['deterministic_code', 'direct_calculation', 'final_scalar']
+                            }
+                        ],
+                        skipConsensus: false,
+                        skipCritic: false
+                    };
+                }
+
+                if (isAudio) {
+                    return {
+                        mode: 'standard',
+                        domain: 'audio_speech_intelligence',
+                        description: 'Xử lý âm thanh đa tầng: Whisper Transcription -> Phân tích ngữ nghĩa -> Trích xuất kết luận',
+                        tasks: [
+                            {
+                                id: 'T001',
+                                description: `Thực thi lệnh RUN_CMD gọi Whisper (openai-whisper) chuyển đổi toàn bộ tệp âm thanh đính kèm sang văn bản transcript đầy đủ: ${userRequest}`,
+                                assignedTo: 'developer',
+                                priority: 1,
+                                parallelizable: false,
+                                requirements: ['whisper_transcription', 'full_audio_text']
+                            },
+                            {
+                                id: 'T002',
+                                description: `Phân tích transcript âm thanh, đối chiếu chính xác mốc thời gian/chủ đề và trích xuất câu trả lời trực tiếp cho: ${userRequest}`,
+                                assignedTo: 'researcher',
+                                priority: 1,
+                                parallelizable: false,
+                                dependencies: ['T001'],
+                                requirements: ['transcript_analysis', 'terminal_answer']
+                            }
+                        ],
+                        skipConsensus: false,
+                        skipCritic: false
+                    };
+                }
+
+                if (isVisual) {
+                    return {
+                        mode: 'standard',
+                        domain: 'visual_spatial_reasoning',
+                        description: 'Phân tích thị giác & tính toán không gian: Visual Inspection -> Script hình học/pixel -> Kiểm chứng',
+                        tasks: [
+                            {
+                                id: 'T001',
+                                description: `Kiểm tra và bóc tách dữ liệu thị giác: tọa độ, màu sắc, ký hiệu, nhãn số và văn bản trong tệp ảnh cho: ${userRequest}`,
+                                assignedTo: 'researcher',
+                                priority: 1,
+                                parallelizable: true,
+                                requirements: ['visual_inspection', 'ocr_labels', 'spatial_coordinates']
+                            },
+                            {
+                                id: 'T002',
+                                description: `Thực thi script Python (OpenCV/PIL) tính toán hình học, giải thuật pixel hoặc đối chiếu ràng buộc từ ảnh và xuất giá trị: ${userRequest}`,
+                                assignedTo: 'developer',
+                                priority: 1,
+                                parallelizable: true,
+                                dependencies: ['T001'],
+                                requirements: ['spatial_calculation', 'deterministic_solution']
+                            }
+                        ],
+                        skipConsensus: false,
+                        skipCritic: false
+                    };
+                }
+
                 return {
                     mode: 'standard',
                     description: 'Standard multi-agent collaboration with strategic alignment',
@@ -171,6 +268,7 @@ class AdaptivePlanner {
                     skipConsensus: false,
                     skipCritic: false
                 };
+            }
         }
     }
 

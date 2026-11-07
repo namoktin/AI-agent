@@ -146,7 +146,27 @@ class IndependentVerifier {
             });
         }
 
-        // 4. DETERMINE FINAL AUDIT STATUS & SUBSTANTIVE SCORE (Zero Blind Trust & No Inflated 90s)
+        // 4. VERIFY TERMINAL FACTUAL & BENCHMARK ANSWER INTEGRITY (Tier 4 Zero Blind Trust)
+        const isFactualOrBenchmark = mode === 'fast'
+            || /FINAL ANSWER:|gaia|benchmark|how many|which|what|who|calculate|tính|cho biết/i.test(directive?.objective || '')
+            || /FINAL ANSWER:|gaia|benchmark/i.test(plan?.description || '')
+            || (directive && directive.thinkingProcess && /tiên đề 7|tiên đề 4|factual/i.test(directive.thinkingProcess));
+
+        let hasTerminalAnswerDeficit = false;
+        let terminalAnswerDiagnostic = '';
+        if (isFactualOrBenchmark) {
+            totalChecks++;
+            const terminalCheck = this.verifyTerminalAnswerIntegrity(specialistResults, executionLog, directive);
+            checks.push(terminalCheck);
+            if (terminalCheck.passed) {
+                passedChecks++;
+            } else {
+                hasTerminalAnswerDeficit = true;
+                terminalAnswerDiagnostic = terminalCheck.details;
+            }
+        }
+
+        // 5. DETERMINE FINAL AUDIT STATUS & SUBSTANTIVE SCORE (Zero Blind Trust & No Inflated 90s)
         const passRatio = totalChecks > 0 ? (passedChecks / totalChecks) : 1;
         let status = 'APPROVED';
         let verified = true;
@@ -154,7 +174,7 @@ class IndependentVerifier {
         if (totalChecks === 0) {
             status = 'NEEDS_REVIEW';
             verified = true;
-        } else if (hasGoalDeficit) {
+        } else if (hasGoalDeficit || hasTerminalAnswerDeficit) {
             status = 'DEFICIT_DETECTED';
             verified = false;
         } else if (hasContractAuditError) {
@@ -1058,6 +1078,80 @@ class IndependentVerifier {
                 details: e.message
             };
         }
+    }
+
+    /**
+     * Tier 4 Terminal Answer Integrity & Evidence Verification (Zero Blind Trust)
+     */
+    verifyTerminalAnswerIntegrity(specialistResults = [], executionLog = [], directive = {}) {
+        let rawAnswer = '';
+
+        // 1. Thu thập văn bản từ specialist results
+        for (const res of specialistResults) {
+            if (!res) continue;
+            const content = typeof res === 'string' ? res : (res.response || res.result || res.content || '');
+            if (typeof content === 'string' && content.trim()) {
+                const m = content.match(/FINAL ANSWER:\s*([^\n\r]+)/i);
+                if (m && m[1]) {
+                    rawAnswer = m[1].trim();
+                }
+            }
+        }
+
+        // 2. Nếu chưa thấy, tìm trong executionLog
+        if (!rawAnswer && Array.isArray(executionLog)) {
+            for (let i = executionLog.length - 1; i >= 0; i--) {
+                const entry = executionLog[i];
+                const txt = typeof entry === 'string' ? entry : JSON.stringify(entry);
+                const m = txt.match(/FINAL ANSWER:\s*([^\n\r"]+)/i);
+                if (m && m[1]) {
+                    rawAnswer = m[1].trim();
+                    break;
+                }
+            }
+        }
+
+        // 3. Kiểm toán tính hiện diện
+        if (!rawAnswer) {
+            return {
+                type: 'terminal_answer_integrity',
+                passed: false,
+                details: 'Thiếu dòng FINAL ANSWER: chuẩn theo Tiên đề 4 (Terminal Direct Target Extraction).',
+                remedy: 'Yêu cầu trích xuất giá trị kết quả cuối cùng và định dạng thành: FINAL ANSWER: [đáp án]'
+            };
+        }
+
+        // 4. Bẫy Anti-Code-Echo: Từ chối nếu câu trả lời là câu lệnh code
+        const isCodeStatement = /^(console\.log\(|print\(|df\s*=|pd\.read_|import\s+|const\s+|let\s+|var\s+|return\s+|def\s+)/i.test(rawAnswer)
+            || (/;$/.test(rawAnswer) && rawAnswer.includes('('))
+            || (rawAnswer.startsWith('{') && rawAnswer.endsWith('}') && rawAnswer.includes(':'));
+
+        if (isCodeStatement) {
+            return {
+                type: 'terminal_answer_integrity',
+                passed: false,
+                details: `Bẫy Anti-Code-Echo phát hiện: Đáp án bị ô nhiễm bởi mã code lệnh thay vì giá trị mục tiêu ('${rawAnswer}').`,
+                remedy: 'Loại bỏ câu lệnh code, chỉ giữ lại giá trị vô hướng thực tế được trả về từ stdout công cụ.'
+            };
+        }
+
+        // 5. Kiểm tra đáp án rỗng hoặc từ chối giải
+        const isRefusal = /^(i don't know|cannot be determined|unable to find|unknown|không rõ|n\/a|none)$/i.test(rawAnswer);
+        if (isRefusal) {
+            return {
+                type: 'terminal_answer_integrity',
+                passed: false,
+                details: `Đáp án mang tính từ chối hoặc không hội tụ ('${rawAnswer}').`,
+                remedy: 'Kích hoạt chiến lược tra cứu bổ sung hoặc tính toán giải tích thay thế.'
+            };
+        }
+
+        return {
+            type: 'terminal_answer_integrity',
+            passed: true,
+            extractedAnswer: rawAnswer,
+            details: `Đã kiểm chứng tính toàn vẹn của đáp án đích ('${rawAnswer}'). Không dính bẫy code hay từ chối.`
+        };
     }
 }
 

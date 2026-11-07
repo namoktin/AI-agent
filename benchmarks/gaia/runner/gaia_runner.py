@@ -2,6 +2,8 @@ import os
 import sys
 import time
 import json
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import urllib.request
 import urllib.error
 from pathlib import Path
@@ -155,7 +157,7 @@ def execute_task(task_dict):
 
     return record
 
-def run_gaia_benchmark(target_level=None, max_tasks=None, fresh=False):
+def run_gaia_benchmark(target_level=None, max_tasks=None, fresh=False, workers=4):
     tasks_file = DATA_DIR / "tasks_for_agent.json"
     if not tasks_file.exists():
         print(f"Error: {tasks_file} not found. Please run download_gaia.py first.")
@@ -199,35 +201,59 @@ def run_gaia_benchmark(target_level=None, max_tasks=None, fresh=False):
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    for idx, task in enumerate(remaining, start=1):
+    file_lock = threading.Lock()
+    eval_lock = threading.Lock()
+    print_lock = threading.Lock()
+
+    def process_task_item(item):
+        idx, task = item
         task_id = task["task_id"]
         lvl = task["level"]
-        print(f"\n[{idx}/{len(remaining)}] Running Task {task_id} (Level {lvl})...")
-        print(f"Question preview: {task['question'][:120]}...")
-        if task.get("attachment_path"):
-            print(f"Attachment: {task.get('file_name')}")
+        with print_lock:
+            print(f"\n[Worker-Pool] [{idx}/{len(remaining)}] Running Task {task_id} (Level {lvl})...")
+            print(f"Question preview: {task['question'][:120]}...")
+            if task.get("attachment_path"):
+                print(f"Attachment: {task.get('file_name')}")
 
         record = execute_task(task)
 
-        print(f"Finished in {record['execution_time_seconds']}s | Status: {record['status']}")
+        with print_lock:
+            print(f"[Worker-Pool] [{idx}/{len(remaining)}] Finished Task {task_id} in {record['execution_time_seconds']}s | Status: {record['status']}")
 
-        # Append to raw_results.jsonl
-        with open(RAW_RESULTS_FILE, "a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        # Thread-safe append to raw_results.jsonl
+        with file_lock:
+            with open(RAW_RESULTS_FILE, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
         # Periodically update evaluation report
-        try:
-            from gaia_evaluator import evaluate_gaia
-            evaluate_gaia()
-        except Exception as eval_err:
-            print(f"Periodic eval notice: {eval_err}")
+        with eval_lock:
+            try:
+                from gaia_evaluator import evaluate_gaia
+                evaluate_gaia()
+            except Exception as eval_err:
+                pass
 
-        # Adaptive pause between tasks to avoid quota bursts
         if record.get("status") == "infra_error":
-            print("Notice: Task encountered infra_error. Cooling down for 30s...")
-            time.sleep(30)
+            time.sleep(15)
         else:
-            time.sleep(4)
+            time.sleep(1)
+
+        return record
+
+    if workers <= 1:
+        for idx, task in enumerate(remaining, start=1):
+            process_task_item((idx, task))
+    else:
+        print(f"🚀 Launching Parallel Concurrency Pool with {workers} simultaneous workers!")
+        items = list(enumerate(remaining, start=1))
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = [executor.submit(process_task_item, item) for item in items]
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    with print_lock:
+                        print(f"Worker task error: {e}")
 
     print("\nBenchmark run session finished.")
     try:
@@ -241,7 +267,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--level", type=int, default=None, help="Specific level to run (1, 2, or 3)")
     parser.add_argument("--max", type=int, default=None, help="Max number of tasks to run")
+    parser.add_argument("--workers", type=int, default=4, help="Number of concurrent workers (default: 4)")
     parser.add_argument("--fresh", action="store_true", help="Start fresh benchmark run from task 1 (clear previous raw results)")
     args = parser.parse_args()
 
-    run_gaia_benchmark(target_level=args.level, max_tasks=args.max, fresh=args.fresh)
+    run_gaia_benchmark(target_level=args.level, max_tasks=args.max, fresh=args.fresh, workers=args.workers)

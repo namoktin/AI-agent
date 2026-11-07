@@ -181,6 +181,53 @@ class StateGraph extends EventEmitter {
         return this;
     }
 
+    /**
+     * Tier 4 Conditional Edge: Route between nodes based on dynamic evaluation of runtime state and results
+     */
+    addConditionalEdge(fromId, toId, conditionFn) {
+        if (!conditionFn || typeof conditionFn !== 'function') {
+            return this.addEdge(fromId, toId);
+        }
+        return this.addEdge(fromId, toId, conditionFn);
+    }
+
+    /**
+     * Tier 4 Branching: Route from source node to alternative target nodes based on condition predicates
+     */
+    addBranch(sourceNodeId, branches = [], defaultTarget = null) {
+        if (Array.isArray(branches)) {
+            for (const b of branches) {
+                if (b && b.target) {
+                    this.addEdge(sourceNodeId, b.target, b.condition || null);
+                }
+            }
+        } else if (typeof branches === 'object' && branches !== null) {
+            for (const [target, condition] of Object.entries(branches)) {
+                this.addEdge(sourceNodeId, target, typeof condition === 'function' ? condition : null);
+            }
+        }
+        if (defaultTarget && this.nodes.has(defaultTarget)) {
+            this.addEdge(sourceNodeId, defaultTarget, null);
+        }
+        return this;
+    }
+
+    /**
+     * Tier 4 Dynamic Node Injection: Insert a new self-healing node at runtime
+     */
+    insertNodeDynamically(afterNodeId, newNodeConfig) {
+        const newNode = this.addNode(newNodeConfig);
+        if (afterNodeId && this.nodes.has(afterNodeId)) {
+            this.addEdge(afterNodeId, newNode.id);
+        }
+        this.emit('NODE_DYNAMICALLY_INSERTED', {
+            graphId: this.graphId,
+            afterNodeId,
+            newNodeId: newNode.id
+        });
+        return newNode;
+    }
+
     addConditionalLoop(fromNodeId, toNodeId, conditionFn, maxLoops = 3, conditionId = null) {
         if (!this.nodes.has(fromNodeId) || !this.nodes.has(toNodeId)) {
             throw new Error(`StateGraph: Invalid loop endpoints: ${fromNodeId} -> ${toNodeId}`);

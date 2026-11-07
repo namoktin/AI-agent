@@ -166,6 +166,36 @@ class UniversalOutputValidator {
         // 1. Clean code backticks and quotes
         answer = this.cleanMarkdownAnswerArtifacts(answer);
 
+        // 1.5 Detect and prevent code echo trap (e.g. console.log(babylonValue); or df = pd.read_excel(...))
+        const isCodeStatement = /^(?:console\.log|print\s*\(|df\s*=|pd\.read_|import\s+|from\s+|return\s+|var\s+|let\s+|const\s+|def\s+)/i.test(answer) ||
+                                (answer.includes('(') && answer.endsWith(');'));
+        if (isCodeStatement) {
+            const toolStdout = context?.toolStdout || context?.lastToolOutput;
+            if (toolStdout && typeof toolStdout === 'string' && toolStdout.trim()) {
+                const subLines = toolStdout.trim().split('\n').map(l => l.trim()).filter(Boolean);
+                const lastLine = subLines[subLines.length - 1];
+                if (lastLine && !/error|traceback/i.test(lastLine)) {
+                    answer = lastLine.replace(/^['"]+|['"]+$/g, '').trim();
+                }
+            } else if (context?.fullText) {
+                const allJsonMatches = Array.from(context.fullText.matchAll(/\[([A-Z_]+)\]:\s*(\{[\s\S]*?\})(?=\n\[|\n\n|$)/g));
+                const runMatch = allJsonMatches.find(m => m[1] === 'RUN_CMD' || m[1] === 'RUN_CODE');
+                if (runMatch) {
+                    try {
+                        const parsed = JSON.parse(runMatch[2]);
+                        const out = parsed.output || parsed.result || parsed.stdout;
+                        if (typeof out === 'string' && out.trim()) {
+                            const sub = out.trim().split('\n').map(l => l.trim()).filter(Boolean);
+                            const cand = sub[sub.length - 1];
+                            if (cand && !cand.includes('=') && cand.length < 100) {
+                                answer = cand.replace(/^['"]+|['"]+$/g, '').trim();
+                            }
+                        }
+                    } catch (e) {}
+                }
+            }
+        }
+
         // 2. Clean unresolved placeholder leaks
         answer = this.cleanUnresolvedPlaceholders(answer);
 
@@ -221,7 +251,7 @@ class UniversalOutputValidator {
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             if (/FINAL ANSWER:/i.test(line)) {
-                const sanitized = this.sanitizeFinalAnswerLine(line, context);
+                const sanitized = this.sanitizeFinalAnswerLine(line, { ...context, fullText: rawOutput });
                 finalAnswerLine = sanitized;
                 wasModified = true;
             } else {

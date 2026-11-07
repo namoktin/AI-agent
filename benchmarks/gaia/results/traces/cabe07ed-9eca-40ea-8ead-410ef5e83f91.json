@@ -6,64 +6,60 @@
   "response": {
     "success": true,
     "mode": "standard",
-    "result": "FINAL ANSWER: Louvrier",
+    "result": "FINAL ANSWER: Smith",
     "qualityScore": 85,
     "critique": {
-      "overallScore": 45,
-      "factualOverlap": 0.2,
-      "contentAgreement": 0.3,
+      "overallScore": 40,
+      "factualOverlap": 0.5,
+      "contentAgreement": 0.4,
       "conflictingClaims": [
-        "Kết quả 'Louvrier' không khớp với dữ liệu thực tế trong tài liệu LibreTexts Introductory Chemistry (Alviar-Agnew & Agnew).",
-        "IndependentVerifier báo cáo DEFICIT_DETECTED, cho thấy quy trình tìm kiếm không đạt yêu cầu."
+        "IndependentVerifier reported status as UNVERIFIED with a low quality score of 65 and passRatio of 25%."
       ],
       "issues": [
         {
           "severity": "HIGH",
           "category": "Accuracy",
-          "description": "Kết quả 'Louvrier' là thông tin sai lệch. Trong tài liệu 'Introductory Chemistry' của Alviar-Agnew & Agnew, phần 1.E Exercises (Exercises) thường đề cập đến các ví dụ thực tế, và tên bác sĩ thú y ngựa (equine veterinarian) được nhắc đến trong bài tập liên quan đến đơn vị đo lường là 'Dr. H. J. M. van der Veen' hoặc các ví dụ tương tự tùy theo phiên bản, nhưng chắc chắn không phải là 'Louvrier'.",
-          "recommendation": "Cần thực hiện lại truy vấn tìm kiếm chính xác nội dung văn bản của chương 1.E trong tài liệu LibreTexts đã chỉ định thay vì đưa ra câu trả lời suy đoán."
-        },
-        {
-          "severity": "HIGH",
-          "category": "Logic",
-          "description": "Agent đã bỏ qua cảnh báo từ IndependentVerifier và cung cấp kết quả không có bằng chứng xác thực (hallucination).",
-          "recommendation": "Tuân thủ nghiêm ngặt quy tắc Zero Blind Trust và cơ chế phủ quyết khi IndependentVerifier phát hiện lỗi."
+          "description": "The independent verifier status is UNVERIFIED, meaning the result has not been sufficiently proven by physical verification or code execution grounded in the source text.",
+          "recommendation": "Perform an automated web search or direct script verification to confirm the exact equine veterinarian's surname in the specified LibreTexts chapter."
         }
       ],
-      "strengths": [],
+      "strengths": [
+        "Format adheres to standard output guidelines."
+      ],
       "verdict": "REJECTED",
-      "thinkingProcess": "Dựa trên dữ liệu kiểm chứng từ IndependentVerifier (status: DEFICIT_DETECTED) và việc đối chiếu nội dung tài liệu LibreTexts Introductory Chemistry (Alviar-Agnew & Agnew), câu trả lời 'Louvrier' hoàn toàn không có cơ sở trong văn bản gốc. Agent đã vi phạm nghiêm trọng quy tắc không bịa đặt thông tin. Điểm số bị hạ thấp do vi phạm quy tắc an toàn dữ liệu và cơ chế phủ quyết."
+      "thinkingProcess": "Dựa theo quy định của Cổng kiểm chứng thực tế và Tiên đề Chống tin tưởng mù quáng (Zero Blind Trust): khi IndependentVerifier báo UNVERIFIED hoặc điểm kiểm định thấp, và thiếu bằng chứng truy vấn công cụ thực tế rõ ràng, bắt buộc phải bác bỏ (REJECTED) để đảm bảo tính chính xác tuyệt đối."
     },
     "grounding": {
+      "hasGrounding": false,
       "sources": 0
     },
     "stats": {
-      "executionTime": "80786ms",
+      "executionTime": "56782ms",
       "agentCalls": 6,
-      "averageLatency": "20247ms",
-      "totalTokens": 379565,
+      "averageLatency": "12233ms",
+      "totalTokens": 134377,
       "taskUsage": {
-        "promptTokens": 377104,
-        "completionTokens": 2461,
-        "totalTokens": 379565,
+        "promptTokens": 132713,
+        "completionTokens": 1664,
+        "totalTokens": 134377,
         "agentCalls": 6
       },
       "requestUsage": {
-        "promptTokens": 377104,
-        "completionTokens": 2461,
-        "totalTokens": 379565,
+        "promptTokens": 132713,
+        "completionTokens": 1664,
+        "totalTokens": 134377,
         "source": "provider",
-        "providerTokens": 379565,
+        "providerTokens": 134377,
         "estimatedTokens": 0
       },
       "billingUsage": {
-        "cumulativeTokens": 1916126,
-        "cumulativeCalls": 164
+        "cumulativeTokens": 11987715,
+        "cumulativeCalls": 958
       },
       "model": "gemini-flash-lite-latest"
     },
     "version": "v2.0-ultimate"
   },
-  "duration": 81.06199193000793,
+  "duration": 73.67533922195435,
   "status": "completed"
 }

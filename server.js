@@ -1438,7 +1438,7 @@ function runSafeCommand(command, cwd, callback) {
     });
 }
 
-app.post('/api/run-cmd', (req, res) => {
+app.post(['/api/run-cmd', '/api/exec', '/api/execute'], (req, res) => {
     const { command, cwd } = req.body;
     const parsed = parseSafeCommand(command);
     if (!parsed) {
@@ -4411,7 +4411,8 @@ app.post('/api/test-custom-ai', async (req, res) => {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey.trim()}`,
             'x-api-key': apiKey.trim(),
-            'anthropic-version': '2023-06-01'
+            'anthropic-version': '2023-06-01',
+            'User-Agent': 'curl/7.88.1'
         };
 
         let response = await fetch(targetUrl, {
@@ -4663,10 +4664,11 @@ app.post('/api/custom-ai-chat', async (req, res) => {
     let { baseUrl, apiKey, model, messages, tools, systemInstruction, stream } = req.body;
     baseUrl = baseUrl || process.env.CUSTOM_AI_BASE_URL || 'https://api.miraiapi.com/v1';
     apiKey = apiKey || process.env.CUSTOM_AI_KEY;
-    model = model || process.env.CUSTOM_AI_MODEL || 'deepseek-v4-pro';
+    model = model || process.env.CUSTOM_AI_MODEL || 'deepseek-v4.1-flash';
     if (!baseUrl || !apiKey || !model) {
         return res.status(400).json({ success: false, error: 'Thiếu cấu hình Custom AI (Base URL, API Key hoặc Model).' });
     }
+    console.log(`[Custom AI Proxy] 🚀 Gửi request tới Custom AI: model=[${model}] (messages: ${messages?.length || 0}, tools: ${tools ? (Array.isArray(tools) ? tools.length : 1) : 0})`);
 
     try {
         let targetUrl = resolveApiEndpoint(baseUrl, model);
@@ -4682,7 +4684,8 @@ app.post('/api/custom-ai-chat', async (req, res) => {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey.trim()}`,
             'x-api-key': apiKey.trim(),
-            'anthropic-version': '2023-06-01'
+            'anthropic-version': '2023-06-01',
+            'User-Agent': 'curl/7.88.1'
         };
 
         if (isAnthropic) {
@@ -4765,7 +4768,7 @@ app.post('/api/custom-ai-chat', async (req, res) => {
                     let contentText = m.content || '';
                     let imagePart = null;
 
-                    if (m.image) {
+                    if (m.image && String(m.image.mimeType || '').startsWith('image/')) {
                         imagePart = {
                             type: 'image_url',
                             image_url: { url: `data:${m.image.mimeType};base64,${m.image.data}` }
@@ -4805,7 +4808,7 @@ app.post('/api/custom-ai-chat', async (req, res) => {
                             return;
                         }
 
-                        const inlineImg = m.parts.find(p => p.inlineData);
+                        const inlineImg = m.parts.find(p => p.inlineData && String(p.inlineData.mimeType || '').startsWith('image/'));
                         if (inlineImg && inlineImg.inlineData) {
                             imagePart = {
                                 type: 'image_url',
@@ -4938,6 +4941,7 @@ app.post('/api/custom-ai-chat', async (req, res) => {
         if (!response || !response.ok) {
             const errBody = lastErrBody || (response ? await response.text() : 'Không có phản hồi');
             console.error(`[Custom AI Error ${response?.status}]`, errBody);
+            console.error(`[Custom AI Rejected Payload]`, JSON.stringify(payload));
             if (payload && Array.isArray(payload.messages)) {
                 console.error(`[Custom AI Error Messages]`, JSON.stringify(payload.messages.map(m => ({ role: m.role, id: m.tool_call_id, tc_len: m.tool_calls?.length, tc_ids: m.tool_calls?.map(c => c.id) }))));
             }
@@ -6411,7 +6415,7 @@ app.post('/api/v2/execute', async (req, res) => {
                 groundingResult: groundingResult,
                 ...context,
                 signal: reqController.signal,
-                useCustomAi: useCustomAi || context.useCustomAi
+                useCustomAi: useCustomAi || context.useCustomAi || (process.env.USE_CUSTOM_AI === 'true')
             });
             console.log('✅ Orchestrator.execute() returned:', result.success);
         } catch (execError) {

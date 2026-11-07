@@ -127,7 +127,7 @@ class AgentOrchestrator {
         this.eventStream = options.eventStream || globalEventStream;
         this.customAi = {
             baseUrl: options.customAi?.baseUrl || process.env.CUSTOM_AI_BASE_URL || 'https://api.miraiapi.com/v1',
-            model: options.customAi?.model || process.env.CUSTOM_AI_MODEL || 'deepseek-v4-pro',
+            model: options.customAi?.model || process.env.CUSTOM_AI_MODEL || 'deepseek-v4.1-flash',
             apiKey: options.customAi?.apiKey || process.env.CUSTOM_AI_KEY || '',
             enabled: Boolean(options.useCustomAi || process.env.USE_CUSTOM_AI === 'true' || options.customAi?.enabled)
         };
@@ -231,6 +231,7 @@ class AgentOrchestrator {
 1. TIÊN ĐỀ TÍNH TOÁN & THỐNG KÊ TẤT ĐỊNH (DETERMINISTIC COMPUTATIONAL GROUNDING):
    - Mọi phép tính số học, tỷ lệ, làm tròn, hoặc thống kê tập hợp (đếm số lượng, giao, hợp, hiệu) TUYỆT ĐỐI KHÔNG ƯỚC TÍNH BẰNG TƯ DUY NGÔN NGỮ (No Mental Math in CoT).
    - Bất kể đối tượng khảo sát là gì, kết quả định lượng BẮT BUỘC phải được suy ra từ mã thực thi (Python/JS qua RUN_CODE/RUN_CMD) chạy trực tiếp trên mảng dữ liệu thô: dùng len(set(...)), sum(...), round(val, n).
+   - KẾT QUẢ ĐẦU RA PHẢI LÀ GIÁ TRỊ TÍNH TOÁN ĐƯỢC (SỐ HOẶC CHUỖI KẾT QUẢ TRONG STDOUT), TUYỆT ĐỐI KHÔNG IN RA DÒNG CODE (như df = ..., console.log(...)) LÀM FINAL ANSWER.
 
 2. TIÊN ĐỀ NEO THỜI GIAN & NGOẠI LỆ LỊCH TRÌNH (TEMPORAL STATE INVARIANCE & SCHEDULE DEVIATION):
    - Thực thể thực tế biến thiên theo thời gian. Mọi truy vấn về nhân sự, cơ cấu, chỉ số, danh mục của một thực thể BẮT BUỘC phải được neo chặt (anchor) vào đúng cửa sổ thời gian t_query trong đề bài.
@@ -246,6 +247,7 @@ class AgentOrchestrator {
 
 5. TIÊN ĐỀ BẰNG CHỨNG NGUYÊN BẢN & PHỤC HỒI KHI BỊ RÀO CẢN (MULTIMODAL EVIDENCE & ANTI-BLOCK TRIANGULATION):
    - Không suy diễn nội dung video/audio/hình ảnh chỉ qua tiêu đề hay văn bản bên ngoài; luôn bóc tách trực tiếp tín hiệu gốc (phụ đề qua GET_MEDIA_TRANSCRIPT, khung hình qua EXTRACT_VIDEO_FRAMES).
+   - Khi có tệp Audio (.mp3, .wav), BẮT BUỘC phải gọi lệnh RUN_CMD chạy script Whisper hoặc đọc file transcript trên máy, TUYỆT ĐỐI KHÔNG in code markdown mà không gọi lệnh thực thi.
    - Khi một nguồn tài nguyên chính thức bị chặn kỹ thuật (bot-gate, 403, paywall), phân rã các siêu dữ liệu đặc trưng (mã định danh, tác giả, năm, chủ đề cốt lõi) để thực hiện đối soát chéo độc lập (cross-reference triangulation) qua các nguồn mở khác. TUYỆT ĐỐI CẤM gán cứng đáp án hoặc phỏng đoán mò.
 
 6. TIÊN ĐỀ KIỂM ĐỊNH VẬT LÝ ĐA GIÁC QUAN (PRODUCTION-GRADE PERCEPTUAL VERIFICATION):
@@ -967,11 +969,11 @@ ${CORE_TIER5_AXIOMS}
                 // STAGE 4.5: ENFORCED REMEDIATION LOOP (Tự chữa lành & Ép buộc thực thi theo lệnh CEO)
                 // Thay vì vội vàng trả về JSON phân xử của Director, ta kích hoạt Specialist khắc phục ngay lập tức
                 const finalAnswerPrior = specialistResults
-                    .map(r => typeof r.response === 'string' ? r.response : JSON.stringify(r.response))
+                    .map(r => r && r.response ? (typeof r.response === 'string' ? r.response : JSON.stringify(r.response)) : '')
                     .find(t => t && /FINAL ANSWER:/i.test(t));
 
                 const candidateTexts = specialistResults
-                    .map(r => typeof r.response === 'string' ? r.response : JSON.stringify(r.response))
+                    .map(r => r && r.response ? (typeof r.response === 'string' ? r.response : JSON.stringify(r.response)) : '')
                     .filter(t => t && t.trim().length > 10);
                 const bestPriorText = finalAnswerPrior || (candidateTexts.length > 0
                     ? candidateTexts.sort((a, b) => b.length - a.length)[0]
@@ -1194,11 +1196,14 @@ ${isBenchmarkOrFactual ? `6. BẮT BUỘC CÂU TRẢ LỜI NGHIỆM THU:
                             // Trích xuất kết quả từ output công cụ hoặc thoughts của specialist
                             let extractedAns = '';
                             for (const sr of specialistResults) {
-                                const respStr = typeof sr.response === 'string' ? sr.response : JSON.stringify(sr.response);
-                                const match = respStr.match(/FINAL ANSWER:\s*([^\n\r]+)/i);
-                                if (match) {
-                                    extractedAns = match[1].trim();
-                                    break;
+                                if (!sr || !sr.response) continue;
+                                const respStr = typeof sr.response === 'string' ? sr.response : JSON.stringify(sr.response || '');
+                                if (respStr && typeof respStr === 'string') {
+                                    const match = respStr.match(/FINAL ANSWER:\s*([^\n\r]+)/i);
+                                    if (match) {
+                                        extractedAns = match[1].trim();
+                                        break;
+                                    }
                                 }
                             }
                             consensus.finalResult = extractedAns ? `FINAL ANSWER: ${extractedAns}` : (cleanPriorText ? `FINAL ANSWER: ${cleanPriorText}` : 'FINAL ANSWER: 0');
@@ -1774,7 +1779,7 @@ ${isBenchmarkOrFactual ? `6. BẮT BUỘC CÂU TRẢ LỜI NGHIỆM THU:
         const effectiveTimeout = Math.min(timeoutMs || 180000, 180000);
         const customApiKey = this.customAi?.apiKey || process.env.CUSTOM_AI_KEY || '';
         const customBaseUrl = this.customAi?.baseUrl || process.env.CUSTOM_AI_BASE_URL || 'https://api.miraiapi.com/v1';
-        const customModel = this.customAi?.model || process.env.CUSTOM_AI_MODEL || 'deepseek-v4-pro';
+        const customModel = this.customAi?.model || process.env.CUSTOM_AI_MODEL || 'deepseek-v4.1-flash';
 
         if (useCustomAi && customApiKey) {
             const customAiUrl = `${(this.config.serverUrl || 'http://127.0.0.1:3000').replace('localhost', '127.0.0.1')}/api/custom-ai-chat`;

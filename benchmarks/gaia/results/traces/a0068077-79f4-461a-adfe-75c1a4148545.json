@@ -6,42 +6,60 @@
   "response": {
     "success": true,
     "mode": "standard",
-    "result": "boundaries\n\nThe clinical trial titled \"Prevalence of H.Pylori in Patients With Acne Vulgaris\" (NCT03411733) listed on the NIH ClinicalTrials.gov website reported an actual enrollment count of 90 participants.\n\nFINAL ANSWER: 90\n\n### PHÂN TÍCH RỦI RO & PHƯƠNG ÁN GIẢM THIỂU\n- **Rủi ro vận hành & Rate Limit:** Triển khai cơ chế Exponential Retry Backoff kết hợp Token Bucket để kiểm soát tải.\n- **Rủi ro thay đổi schema/chính sách:** Xây dựng lớp Adapter độc lập giúp dễ dàng bảo trì và thích ứng khi API thay đổi.\n- **Rủi ro sai lệch dữ liệu:** Tích hợp kiểm định chéo độc lập (Cross-Validation) nhằm phát hiện và loại trừ dị biệt (outliers).\n\n### LỘ TRÌNH THỰC THI & KHUYẾN NGHỊ HÀNH ĐỘNG\n- **Giai đoạn 1 (Khởi động):** Triển khai môi trường thử nghiệm với dữ liệu mẫu và hoàn thiện cấu hình bảo mật.\n- **Giai đoạn 2 (Thực thi & Tinh chỉnh):** Mở rộng quy mô thực thi theo lô (batch execution) và theo dõi chặt chẽ các chỉ số KPI.\n- **Giai đoạn 3 (Tối ưu & Tự động hóa):** Chuẩn hóa quy trình vận hành tự động và duy trì cơ chế báo cáo định kỳ cho ban lãnh đạo.",
-    "qualityScore": 75,
+    "result": "```json\n{\n  \"report\": \"Nghiên cứu dữ liệu lâm sàng trên trang ClinicalTrials.gov của NIH về tỷ lệ hiện mắc H. pylori ở bệnh nhân mụn trứng cá (Acne Vulgaris) có mã định danh NCT03411733.\",\n  \"findings\": [\n    \"Nghiên cứu lâm sàng: NCT03411733\",\n    \"Tên nghiên cứu: Prevalence of H.Pylori in Patients With Acne Vulgaris\",\n    \"Số lượng tham gia đăng ký / quy mô thực tế (enrollment count): 90\"\n  ],\n  \"sources\": [\n    {\n      \"url\": \"https://clinicaltrials.gov/study/NCT03411733\",\n      \"title\": \"Prevalence of H.Pylori in Patients With Acne Vulgaris - ClinicalTrials.gov\",\n      \"credibility\": \"HIGH\"\n    }\n  ],\n  \"insights\": [\n    \"Quy mô tuyển dụng (enrollment) chính thức được ghi nhận cho thử nghiệm lâm sàng này là 90 bệnh nhân.\"\n  ],\n  \"confidence\": 0.95,\n  \"limitations\": \"\"\n}\n```\nFINAL ANSWER: 90",
+    "qualityScore": 85,
     "critique": {
-      "text": "Hệ thống đang tạm hoãn điều phối tác vụ do chạm ngưỡng RPM/TPM/RPD của Gemini API."
+      "overallScore": 45,
+      "factualOverlap": 0.5,
+      "contentAgreement": 0.4,
+      "conflictingClaims": [
+        "IndependentVerifier đã báo cáo trạng thái FAILED (status: FAILED, passRatio: 60)"
+      ],
+      "issues": [
+        {
+          "severity": "HIGH",
+          "category": "Accuracy",
+          "description": "IndependentVerifier trả về trạng thái FAILED, vi phạm nghiêm trọng Tiên đề Bảo vệ Chống Tin tưởng Mù quáng (Zero Blind Trust): khi IndependentVerifier báo lỗi hoặc không đạt chuẩn, không được phép phê duyệt kết quả.",
+          "recommendation": "Từ chối kết quả do chưa vượt qua kiểm định thực tế độc lập."
+        }
+      ],
+      "strengths": [
+        "Cung cấp định dạng đáp án ngắn gọn theo đúng yêu cầu."
+      ],
+      "verdict": "REJECTED",
+      "thinkingProcess": "Theo quy tắc Zero Blind Trust và Cơ chế Phủ quyết: Khi IndependentVerifier báo trạng thái 'FAILED', Critic BẮT BUỘC phải bác bỏ (VERDICT: REJECTED, điểm số <= 50). Do đó, kết quả này không thể được chấp nhận."
     },
     "grounding": {
       "hasGrounding": false,
       "sources": 0
     },
     "stats": {
-      "executionTime": "75247ms",
-      "agentCalls": 0,
-      "averageLatency": "0ms",
-      "totalTokens": 0,
+      "executionTime": "160194ms",
+      "agentCalls": 6,
+      "averageLatency": "35170ms",
+      "totalTokens": 377667,
       "taskUsage": {
-        "promptTokens": 0,
-        "completionTokens": 0,
-        "totalTokens": 0,
-        "agentCalls": 0
+        "promptTokens": 373903,
+        "completionTokens": 3764,
+        "totalTokens": 377667,
+        "agentCalls": 6
       },
       "requestUsage": {
-        "promptTokens": 0,
-        "completionTokens": 0,
-        "totalTokens": 0,
+        "promptTokens": 373903,
+        "completionTokens": 3764,
+        "totalTokens": 377667,
         "source": "provider",
-        "providerTokens": 0,
+        "providerTokens": 377667,
         "estimatedTokens": 0
       },
       "billingUsage": {
-        "cumulativeTokens": 6914707,
-        "cumulativeCalls": 800
+        "cumulativeTokens": 9110122,
+        "cumulativeCalls": 745
       },
-      "model": "gemini-3-flash-preview"
+      "model": "gemini-flash-lite-latest"
     },
     "version": "v2.0-ultimate"
   },
-  "duration": 76.86815762519836,
+  "duration": 161.70365142822266,
   "status": "completed"
 }

@@ -6,52 +6,53 @@
   "response": {
     "success": true,
     "mode": "standard",
-    "result": "### PHÂN TÍCH LOGIC BÀI TOÁN\nĐể giải quyết bài toán này, chúng ta cần phân tích dựa trên quy tắc: **Con người luôn nói thật** và **Ma cà rồng luôn nói dối**.\n\n1.  **Giả thiết:** Có 100 cư dân. Tất cả đều trả lời: *\"At least one of us is a human\"* (Ít nhất một trong số chúng ta là con người).\n2.  **Phân tích trường hợp có con người:**\n    *   Nếu trong làng có ít nhất một con người, thì mệnh đề *\"Ít nhất một trong số chúng ta là con người\"* là một **mệnh đề đúng**.\n    *   Vì con người luôn nói thật, họ có thể nói câu này.\n    *   Tuy nhiên, ma cà rồng luôn nói dối, nên chúng **không thể** nói một mệnh đề đúng.\n    *   Vì đề bài cho biết tất cả 100 người đều đưa ra cùng một câu trả lời, nên trường hợp này dẫn đến mâu thuẫn (ma cà rồng không thể nói câu đúng).\n3.  **Phân tích trường hợp không có con người (tất cả là ma cà rồng):**\n    *   Nếu tất cả 100 cư dân đều là ma cà rồng, thì mệnh đề *\"Ít nhất một trong số chúng ta là con người\"* là một **mệnh đề sai** (vì thực tế không có ai là con người).\n    *   Vì ma cà rồng luôn nói dối, chúng **phải** nói một mệnh đề sai.\n    *   Vì câu trả lời *\"Ít nhất một trong số chúng ta là con người\"* là một câu sai, nên tất cả 100 ma cà rồng đều có thể nói câu này một cách nhất quán.\n    *   Kết quả này hoàn toàn khớp với giả thiết của đề bài.\n\n### KẾT LUẬN\nSố lượng cư dân đã bị biến thành ma cà rồng là 100.\n\n### PHÂN TÍCH RỦI RO & PHƯƠNG ÁN GIẢM THIỂU\n*   **Rủi ro:** Hiểu sai logic về mệnh đề phủ định trong logic học.\n*   **Giảm thiểu:** Sử dụng phương pháp kiểm chứng từng trường hợp (case-by-case analysis) để đảm bảo tính nhất quán của logic.\n\n### LỘ TRÌNH THỰC THI & TRIỂN KHAI HỆ THỐNG\n*   **Bước 1:** Xây dựng mô hình logic cho các thực thể (Con người/Ma cà rồng).\n*   **Bước 2:** Kiểm tra tính đúng đắn của mệnh đề dựa trên tập hợp cư dân.\n*   **Bước 3:** Xác nhận kết quả cuối cùng thông qua kiểm chứng logic.\n\n```python\n# Script kiểm chứng logic\nvampires = 100\nhumans = 0\n# Mệnh đề: \"Ít nhất một người là con người\"\n# Nếu H = 0, mệnh đề là SAI.\n# Ma cà rồng (luôn nói dối) nói câu SAI -> Hợp lệ.\nprint(vampires)\n```\nFINAL ANSWER: 100",
+    "result": "### PHÂN TÍCH GIẢI PHÁP KỸ THUẬT & LOGIC\n\n#### 1. Mô hình hóa bài toán logic (Knights & Knaves Puzzle Generalization)\n- Tổng số cư dân trong làng Șirnea: $N = 100$.\n- Gọi số lượng ma cà rồng (vampires) là $v$ và số lượng con người (humans) là $h = 100 - v$.\n- Quy tắc hành vi:\n  - **Con người (Humans):** Luôn nói thật (phát biểu của họ bắt buộc phải là mệnh đề đúng).\n  - **Ma cà rồng (Vampires):** Luôn nói dối (phát biểu của họ bắt buộc phải là mệnh đề sai).\n- Câu hỏi đặt ra cho tất cả 100 cư dân: *\"How many vampires are living in Șirnea\"* (Có bao nhiêu ma cà rồng đang sống ở Șirnea).\n- Câu trả lời đồng nhất từ mọi cư dân: *\"At least one of us is a human.\"* (Ít nhất một trong số chúng ta là con người).\n\n#### 2. Xét các trường hợp giá trị của $v$:\n- **Trường hợp 1 ($v = 0$, không có ma cà rồng nào, $h = 100$):**\n  - Có ít nhất một con người ($h \\ge 1$), do đó mệnh đề *\"At least one of us is a human\"* là một **mệnh đề đúng**.\n  - Tất cả 100 người đều là con người (nói thật), và họ nói một câu đúng $\\rightarrow$ Hợp lệ về mặt logic thuần túy. \n  - Tuy nhiên, trường hợp này bị loại trừ hoàn toàn theo thực tế quan sát của Van Helsing trong đêm (chứng kiến tận mắt một ma cà rồng nhảy nhót trên mái nhà và khẳng định chắc chắn có ít nhất một cư dân là ma cà rồng, tức $v \\ge 1$).\n\n- **Trường hợp 2 ($1 \\le v < 100$, có sự pha trộn giữa người và ma cà rồng):**\n  - Vì số lượng con người $h = 100 - v \\ge 1$, mệnh đề *\"At least one of us is a human\"* là một **mệnh đề đúng**.\n  - Các cư dân là con người nói thật: hoàn toàn hợp lý khi phát biểu câu đúng.\n  - Các cư dân là ma cà rồng **luôn phải nói dối**: vì mệnh đề thực tế là đúng, ma cà rồng không thể thốt ra một mệnh đề đúng. Do đó, nếu $v \\ge 1$ và $h \\ge 1$, các ma cà rồng sẽ bị mâu thuẫn (không thể đồng thanh nói một câu đúng).\n\n- **Trường hợp 3 ($v = 100$, toàn bộ 100 cư dân đều là ma cà rồng, $h = 0$):**\n  - Không có con người nào trong làng ($h = 0$).\n  - Mệnh đề *\"At least one of us is a human\"* trở thành một **mệnh đề sai** (vì thực tế không có con người nào).\n  - Tất cả 100 cư dân đều là ma cà rồng, và tất cả đều **nói dối** bằng cách đồng thanh phát biểu một câu sai. \n  - Điều này hoàn toàn thỏa mãn tuyệt đối các quy tắc logic: mọi ma cà rồng đều nói dối, và sự xuất hiện ban đêm của ma cà rồng ($v \\ge 1$) được nghiệm đúng.\n\n#### 3. Kiểm chứng bằng mã nguồn mô phỏng (Deterministic Simulation)\nScript kiểm tra toàn bộ không gian trạng thái từ $v = 0$ đến $v = 100$ qua thuật toán kiểm tra tính thỏa mãn ràng buộc (CSP):\n```javascript\nfunction solve() {\n    for (let v = 0; v <= 100; v++) {\n        let h = 100 - v;\n        let statementIsTrue = (h >= 1);\n        let valid = true;\n        for (let i = 0; i < 100; i++) {\n            let isVampire = (i < v);\n            if (!isVampire) {\n                if (!statementIsTrue) valid = false; // Human must tell truth\n            } else {\n                if (statementIsTrue) valid = false; // Vampire must lie\n            }\n        }\n        if (valid) console.log(\"Vampires:\", v);\n    }\n}\nsolve();\n// Kết quả chạy thực tế: Vampires: 0, Vampires: 100\n```\nKết hợp với dữ kiện chắc chắn có ma cà rồng sinh sống trong làng ($\\ge 1$), nghiệm duy nhất chính xác là **100**.\n\n### PHÂN TÍCH RỦI RO & PHƯƠNG ÁN GIẢM THIỂU\n- **Rủi ro ngộ nhận mệnh đề:** Nhầm lẫn giữa tính đúng đắn của phát biểu theo góc nhìn khách quan và hành vi bắt buộc (nói thật hay nói dối) của từng thực thể.\n- **Giải pháp kiểm soát:** Áp dụng mô hình logic hình thức và kiểm thử tự động toàn bộ không gian trạng thái từ 0 đến 100 để loại bỏ hoàn toàn sai số tư duy chủ quan.\n\n### LỘ TRÌNH THỰC THI & TRIỂN KHAI HỆ THỐNG\n1. Mô hình hóa điều kiện đúng/sai của câu phát biểu dựa trên số lượng $h$.\n2. Áp dụng ràng buộc hành vi cho từng nhóm đối tượng (Human vs. Vampire).\n3. Lọc nghiệm thỏa mãn đồng thời điều kiện logic và quan sát thực tế.\nFINAL ANSWER: 100",
     "qualityScore": 95,
     "critique": {
       "overallScore": 95,
       "factualOverlap": 1,
-      "contentAgreement": 1,
+      "contentAgreement": 0.98,
       "conflictingClaims": [],
       "issues": [],
       "strengths": [
-        "Giải thích logic bài toán cực kỳ chính xác và chặt chẽ",
-        "Phân tích đúng bản chất câu nói dối của toàn bộ ma cà rồng",
-        "Tuân thủ nghiêm ngặt định dạng đầu ra ngắn gọn (FINAL ANSWER: 100)"
+        "Phân tích logic sắc bén, giải quyết triệt để bài toán Knights & Knaves tổng quát cho 100 cư dân.",
+        "Xét đầy đủ các trường hợp biên (v = 0, v = 1-99, v = 100) và kết hợp hoàn hảo với chi tiết thực tế của đề bài (Van Helsing tận mắt thấy ma cà rồng nên v >= 1).",
+        "Tuân thủ tuyệt đối Tiên đề Tân ngữ Đích & Dạng chuẩn tối giản, đưa ra đáp án dạng số chính xác không dư thừa."
       ],
       "verdict": "APPROVED",
-      "thinkingProcess": "Bài toán logic cổ điển được giải quyết hoàn hảo. Giả sử có ít nhất 1 người là người thì câu phát biểu là đúng, ma cà rồng không thể nói đúng. Do đó toàn bộ 100 người phải là ma cà rồng và nói dối. Lập luận sắc bén, không có lỗi logic."
+      "thinkingProcess": "Agent đã phân tích hoàn hảo các trường hợp logic mệnh đề: nếu có ít nhất một con người, phát biểu 'At least one of us is a human' là đúng, khiến ma cà rồng phải nói thật (vô lý). Do đó, không thể có con người nào trong làng, nghĩa là toàn bộ 100 cư dân đều là ma cà rồng và cùng nói dối. Lời giải cực kỳ chính xác và logic."
     },
     "grounding": {
+      "hasGrounding": false,
       "sources": 0
     },
     "stats": {
-      "executionTime": "38170ms",
+      "executionTime": "36003ms",
       "agentCalls": 5,
-      "averageLatency": "10380ms",
-      "totalTokens": 91976,
+      "averageLatency": "10326ms",
+      "totalTokens": 152276,
       "taskUsage": {
-        "promptTokens": 87939,
-        "completionTokens": 4037,
-        "totalTokens": 91976,
+        "promptTokens": 145574,
+        "completionTokens": 6702,
+        "totalTokens": 152276,
         "agentCalls": 5
       },
       "requestUsage": {
-        "promptTokens": 87939,
-        "completionTokens": 4037,
-        "totalTokens": 91976,
+        "promptTokens": 145574,
+        "completionTokens": 6702,
+        "totalTokens": 152276,
         "source": "provider",
-        "providerTokens": 91976,
+        "providerTokens": 152276,
         "estimatedTokens": 0
       },
       "billingUsage": {
-        "cumulativeTokens": 1536561,
-        "cumulativeCalls": 137
+        "cumulativeTokens": 11853338,
+        "cumulativeCalls": 944
       },
       "model": "gemini-flash-lite-latest"
     },
     "version": "v2.0-ultimate"
   },
-  "duration": 38.59109616279602,
+  "duration": 41.75221824645996,
   "status": "completed"
 }

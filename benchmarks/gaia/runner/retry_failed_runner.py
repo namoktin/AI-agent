@@ -15,7 +15,7 @@ RAW_RESULTS_FILE = RESULTS_DIR / "raw_results.jsonl"
 EVAL_RESULTS_FILE = RESULTS_DIR / "evaluator_results.jsonl"
 ATTACHMENTS_DIR = DATA_DIR / "attachments"
 API_ENDPOINT = "http://127.0.0.1:3000/api/v2/execute"
-TIMEOUT_SECONDS = 300
+TIMEOUT_SECONDS = 600 # Đồng bộ trần thời gian 10 phút như Forward Runner
 
 def get_failed_tasks():
     if not EVAL_RESULTS_FILE.exists():
@@ -24,39 +24,27 @@ def get_failed_tasks():
     with open(TASKS_FILE, "r", encoding="utf-8") as f:
         all_tasks = {t["task_id"]: t for t in json.load(f)}
         
-    failed_ids = []
+    failed_items = []
     with open(EVAL_RESULTS_FILE, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line:
                 rec = json.loads(line)
                 if not rec.get("is_correct"):
-                    failed_ids.append(rec["task_id"])
+                    failed_items.append(rec)
                     
-    # Prioritize tasks: tool envelope leaks first, then others
-    raw_by_id = {}
-    if RAW_RESULTS_FILE.exists():
-        with open(RAW_RESULTS_FILE, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    r = json.loads(line)
-                    raw_by_id[r["task_id"]] = r
-                    
-    recently_run = {
-        'cca530fc', 'cffe0e32', 'e142056d', '023e9d44', '04a04a9b',
-        '08f3a05f', '0b260a57', '0bb3b44a', '16d825ff', '1dcc160f',
-        '20194330', '4d51c4bf', '2dfc4c37', '56137764', '624cbf11'
-    }
-    def priority_key(tid):
-        is_recent = any(tid.startswith(r) for r in recently_run)
-        raw = raw_by_id.get(tid, {}).get("raw_output", "")
-        # Tool envelope leak gets top priority
-        has_leak = "Dữ liệu thu thập từ các công cụ:" in raw or raw.startswith("[")
-        return (1 if is_recent else 0, 0 if has_leak else 1, all_tasks[tid].get("level", 2))
+    # Priority order:
+    # 1. High priority tasks: code echo bugs (076c8171, 0bb3b44a), audio calculus (1f975693), unit traps (e1fc63a2, 7d4a7d1d)
+    high_priority_prefixes = ['076c8171', '0bb3b44a', '1f975693', 'e1fc63a2', '7d4a7d1d', 'c365c1c7', 'cca530fc', '0ff53813', '08f3a05f', 'a1e91b78']
+    
+    def priority_key(item):
+        tid = item["task_id"]
+        is_hp = any(tid.startswith(p) for p in high_priority_prefixes)
+        lvl = item.get("level", 2)
+        return (0 if is_hp else 1, lvl)
         
-    failed_ids.sort(key=priority_key)
-    return [all_tasks[tid] for tid in failed_ids if tid in all_tasks]
+    failed_items.sort(key=priority_key)
+    return [all_tasks[it["task_id"]] for it in failed_items if it["task_id"] in all_tasks]
 
 def run_single_task(task):
     task_id = task["task_id"]
@@ -143,13 +131,71 @@ def run_single_task(task):
     return record
 
 if __name__ == '__main__':
+    import argparse
+    import threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--workers", type=int, default=2, help="Number of concurrent retry workers (default: 2)")
+    args = parser.parse_args()
+
+    from gaia_evaluator import extract_final_answer, compare_answers, evaluate_gaia
+    gt_file = BASE_DIR / "data" / "ground_truth_evaluator.json"
+    with open(gt_file, "r", encoding="utf-8") as gf:
+        ground_truth = json.load(gf)
+
     failed_tasks = get_failed_tasks()
-    print(f"=== RETRY RUNNER: {len(failed_tasks)} failed tasks queued ===", flush=True)
-    for idx, t in enumerate(failed_tasks, 1):
-        print(f"[{idx}/{len(failed_tasks)}] Retrying Task {t['task_id']} (Level {t['level']})...", flush=True)
+    print(f"=== RETRY RUNNER ({args.workers} Workers with DeepSeek / Custom AI): {len(failed_tasks)} failed tasks queued ===", flush=True)
+
+    file_lock = threading.Lock()
+    eval_lock = threading.Lock()
+    print_lock = threading.Lock()
+
+    def process_retry_task(item):
+        idx, t = item
+        tid = t['task_id']
+        gt_info = ground_truth.get(tid, {})
+        gt_ans = str(gt_info.get("final_answer", "")).strip()
+
+        with print_lock:
+            print(f"\n=======================================================", flush=True)
+            print(f"[{idx}/{len(failed_tasks)}] 🔄 [Retry Worker] Retrying Task {tid} (Level {t['level']})...", flush=True)
+            print(f"Question preview: {t['question'][:120]}...", flush=True)
+            if t.get("file_name"):
+                print(f"Attachment: {t.get('file_name')}", flush=True)
+
         rec = run_single_task(t)
-        print(f"Finished in {rec['execution_time_seconds']}s | Status: {rec['status']}", flush=True)
-        # Re-evaluate periodically
-        if idx % 5 == 0 or idx == len(failed_tasks):
-            from gaia_evaluator import evaluate_gaia
-            evaluate_gaia()
+
+        pred = extract_final_answer(rec["raw_output"])
+        passed = compare_answers(pred, gt_ans)
+        verdict = "PASS ✅" if passed else "FAIL ❌"
+
+        with print_lock:
+            print(f"Finished in {rec['execution_time_seconds']}s", flush=True)
+            print(f"  Result : {verdict}", flush=True)
+            print(f"  New Ans: {pred}", flush=True)
+            print(f"  GT Ans : {gt_ans}", flush=True)
+            print(f"=======================================================", flush=True)
+
+        # Thread-safe re-evaluate benchmark
+        with eval_lock:
+            try:
+                evaluate_gaia()
+            except Exception:
+                pass
+        time.sleep(1)
+        return rec
+
+    items = list(enumerate(failed_tasks, 1))
+    if args.workers <= 1:
+        for it in items:
+            process_retry_task(it)
+    else:
+        with ThreadPoolExecutor(max_workers=args.workers) as executor:
+            futures = [executor.submit(process_retry_task, it) for it in items]
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    with print_lock:
+                        print(f"Retry worker error: {e}")

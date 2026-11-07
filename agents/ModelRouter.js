@@ -13,6 +13,8 @@ class ModelRouter {
             STANDARD: customConfig.STANDARD || (customConfig.defaultModel ? customConfig.defaultModel : process.env.GEMINI_MODEL_STANDARD) || this.defaultModel,
             REASONING: customConfig.REASONING || (customConfig.defaultModel ? customConfig.defaultModel : process.env.GEMINI_MODEL_HEAVY) || 'gemini-3.1-flash-lite',
             FALLBACK_POOL: [
+                'gemini-3.5-flash',
+                'gemini-3-flash-preview',
                 'gemini-flash-lite-latest',
                 'gemini-3.5-flash-lite',
                 'gemini-3.1-flash-lite'

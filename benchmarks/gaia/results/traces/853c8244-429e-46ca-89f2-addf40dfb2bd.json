@@ -3,69 +3,7 @@
   "level": 2,
   "question": "In the 2015 Metropolitan Museum of Art exhibition titled after the Chinese zodiac animal of 2015, how many of the \"twelve animals of the Chinese zodiac\" have a hand visible?",
   "prompt_sent": "You are a general AI assistant. Solve the task using available tools, resources, and capabilities. You may browse the web, inspect files, process data, execute code, and use other available tools as needed.\n\nCarefully complete the requested task. Your final answer must end with:\n\nFINAL ANSWER: [YOUR ANSWER]\n\nThe final answer should be a number, a few words, or a comma-separated list of numbers and/or strings, depending on the question.\n\nFor numerical answers, do not include units, currency symbols, commas as thousands separators, or percent signs unless explicitly requested.\n\nFor string answers, use the shortest unambiguous answer, without unnecessary articles or explanations.\n\nDo not invent information. If you cannot solve the task, report that honestly.\n\nDo not put additional content after the FINAL ANSWER line.\n\n\n--- TASK QUESTION ---\n\nIn the 2015 Metropolitan Museum of Art exhibition titled after the Chinese zodiac animal of 2015, how many of the \"twelve animals of the Chinese zodiac\" have a hand visible?",
-  "response": {
-    "success": true,
-    "mode": "standard",
-    "result": "Dữ liệu thu thập từ các công cụ:\n\n[WEB_SEARCH]: {\"success\":true,\"result\":\"### 🌐 Kết quả nghiên cứu Internet cho: \\\"\\\"Set of twelve zodiac animals\\\" Met Museum hand visible\\\"\\n\\n1. **[Set of twelve zodiac animals - The Metropolitan Museum of Art](https://www.metmuseum.org/art/collection/search/49381)** *(DuckDuckGo Stealth)*\\n   - By the Eastern Han dynasty (9-220 CE), the conventional order of the twelve Chinese zodiac animals was well established—rat, ox, tiger, rabbit, dragon, snake, horse, ram, monkey, rooster, dog, and pig.\\n   - Link: `https://www.metmuseum.org/art/collection/search/49381`\\n\\n2. **[Set of Twelve Zodiac Animals — The Met | China Heritage](https://chinaheritageguide.com/treasures-abroad/tang-twelve-zodiac-set)** *(DuckDuckGo Stealth)*\\n   - A complete set of the twelve Chinese zodiac animals, each modelled on a human body — rat, ox, tiger, rabbit, dragon, snake, horse, goat, monkey, rooster, dog, pig. They stood guard in the four directions around a Tang tomb.\\n   - Link: `https://chinaheritageguide.com/treasures-abroad/tang-twelve-zodiac-set`\\n\\n3. **[唐 陶十二生肖俑|Set of Twelve Zodiac Animals - PICRYL](https://picryl.com/media/orset-of-twelve-zodiac-animals-275c02)** *(DuckDuckGo Stealth)*\\n   - By the Eastern Han dynasty (9-220 CE), the conventional order of the twelve Chinese zodiac animals was well established. Subsequently, they were paired with ten other calendrical elements, forming a rotating cycle of sixty that was used in China to count the years until the twentieth century.\\n   - Link: `https://\n\n[ANALYZE_IMAGE]: {\"success\":false,\"error\":\"Vision API error: Key 2 429\"}\n\n[BROWSE_WEB]: {\"success\":true,\"title\":\"Set of twelve zodiac animals - China - Tang dynasty (618–907) - The Metropolitan Museum of Art\",\"url\":\"https://www.metmuseum.org/art/collection/search/49381\",\"content\":\"Skip to main content\\nSelect language\\nEnglish\\nDonate\\nMembership\\nTickets\\nSet of twelve zodiac animals\\nChina\\n8th century\\nOn view at The Met Fifth Avenue in Gallery 207\\nBy the Eastern Han dynasty (9–220 CE), the conventional order of the twelve Chinese zodiac animals was well established—rat, ox, tiger, rabbit, dragon, snake, horse, ram, monkey, rooster, dog, and pig. Subsequently, these were paired with ten other calendrical elements to form a rotating cycle of sixty, which continued to be used as a way of counting years until the twentieth century. The animals, along with this calendrical system, were adopted by many other East and Southeast Asian countries.\\n\\nAs burial practices became more elaborate, pottery figures of the zodiac creatures wearing official robes became popular tomb offerings, presumably as symbols of renewal and regeneration. These examples were once painted with colorful pigments, but only the white slip, which usually served as a base for decoration, has survived.\\nView more\\ngroup\\nPublic Domain\\nDownload Image\\nShare\\nEnlarge Image\\nArtwork Details\\nObject Information\\nOverview\\nProvenance\\nExhibition History\\n唐 彩繪陶十二生肖俑\\nTitle: Set of twelve zodiac animals\\nPeriod: Tang dynasty (618–907)\\nDate: 8th century\\nCulture: China\\nMedium: Earthenware with white",
-    "qualityScore": 75,
-    "critique": {
-      "overallScore": 45,
-      "factualOverlap": 0.3,
-      "contentAgreement": 0.2,
-      "conflictingClaims": [
-        "Agent chưa thực hiện kiểm đếm trực quan (visual inspection) trên bộ tượng cụ thể mà chỉ trích dẫn thông tin chung về lịch sử 12 con giáp.",
-        "Báo cáo của IndependentVerifier chỉ ra sự thiếu hụt nghiêm trọng (DEFICIT_DETECTED) trong việc xác thực dữ liệu hình ảnh."
-      ],
-      "issues": [
-        {
-          "severity": "HIGH",
-          "category": "Accuracy",
-          "description": "Agent thất bại trong việc trả lời câu hỏi cốt lõi: 'Số lượng con giáp có bàn tay lộ diện'. Dữ liệu thu thập được chỉ là mô tả lịch sử chung chung, không có phân tích hình thái học cho từng bức tượng.",
-          "recommendation": "Cần truy cập trực tiếp vào gallery 207 của The Met hoặc phân tích chi tiết từng bức tượng trong bộ sưu tập Accession Number 2002.470.1–.12 để xác định tư thế tay."
-        },
-        {
-          "severity": "HIGH",
-          "category": "Logic",
-          "description": "Kết quả ANALYZE_IMAGE bị lỗi (429) nhưng Agent không có phương án thay thế (fallback) để giải quyết vấn đề, dẫn đến việc bỏ trống đáp án.",
-          "recommendation": "Sử dụng các nguồn tài liệu học thuật hoặc catalog triển lãm chi tiết hơn thay vì chỉ dựa vào mô tả trang chủ."
-        }
-      ],
-      "strengths": [
-        "Đã xác định đúng nguồn dữ liệu (Met Museum, Gallery 207, Tang Dynasty set)."
-      ],
-      "verdict": "REJECTED",
-      "thinkingProcess": "Agent đã thất bại trong việc cung cấp con số cụ thể theo yêu cầu. Việc trích dẫn thông tin lịch sử về 12 con giáp không giải quyết được câu hỏi về hình thái học (bàn tay). Do IndependentVerifier đã báo cáo DEFICIT_DETECTED và điểm số thấp, tôi buộc phải bác bỏ kết quả này theo quy tắc Zero Blind Trust."
-    },
-    "grounding": {
-      "sources": 0
-    },
-    "stats": {
-      "executionTime": "200506ms",
-      "agentCalls": 7,
-      "averageLatency": "33709ms",
-      "totalTokens": 420368,
-      "taskUsage": {
-        "promptTokens": 416415,
-        "completionTokens": 3953,
-        "totalTokens": 420368,
-        "agentCalls": 7
-      },
-      "requestUsage": {
-        "promptTokens": 416415,
-        "completionTokens": 3953,
-        "totalTokens": 420368,
-        "source": "provider",
-        "providerTokens": 420368,
-        "estimatedTokens": 0
-      },
-      "billingUsage": {
-        "cumulativeTokens": 4223049,
-        "cumulativeCalls": 293
-      },
-      "model": "gemini-flash-lite-latest"
-    },
-    "version": "v2.0-ultimate"
-  },
-  "duration": 200.66782975196838,
-  "status": "completed"
+  "response": {},
+  "duration": 600.0167233943939,
+  "status": "timeout"
 }
