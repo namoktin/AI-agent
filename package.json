@@ -1,6 +1,6 @@
 {
   "name": "cyber-ai-agent",
-  "version": "5.5.0",
+  "version": "5.6.0",
   "description": "Hệ thống AI Đa Tác Nhân tự học với phản biện khoa học và trí nhớ dài hạn",
   "main": "server.js",
   "scripts": {

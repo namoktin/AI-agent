@@ -24,7 +24,8 @@ const suites = [
     { name: '6. Safe Command & Syntax Verification', file: 'test_parse_cmd_comprehensive.js' },
     { name: '7. Universal Goal Contract & Self-Healing', file: 'test_universal_goal_contract_and_self_healing.js' },
     { name: '8. Web App Interaction Engine & Adaptive Navigation', file: 'test_webapp_interaction_suite.js' },
-    { name: '9. Tier 4 Core Architecture & Verification Engine', file: 'test_tier4_update18_core.js' }
+    { name: '9. Tier 4 Core Architecture & Verification Engine', file: 'test_tier4_update18_core.js' },
+    { name: '10. Tier 4 Hardening & True Resilience (Update 19)', file: 'test_tier4_update19_hardening.js' }
 ];
 
 async function runSuite(suite) {

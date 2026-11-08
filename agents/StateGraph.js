@@ -7,6 +7,7 @@
  */
 
 const EventEmitter = require('events');
+const { globalConditionRegistry, builtInConditions } = require('./StateGraphConditions');
 
 class StateNode {
     constructor(config = {}) {
@@ -22,6 +23,7 @@ class StateNode {
             : (Array.isArray(config.prerequisites) ? [...config.prerequisites] : []);
         this.prerequisites = this.dependencies;
         this.condition = typeof config.condition === 'function' ? config.condition : null; // Start condition
+        this.conditionId = config.conditionId || (typeof config.condition === 'string' ? config.condition : null);
         this.acceptanceCriteria = Array.isArray(config.acceptanceCriteria) ? [...config.acceptanceCriteria] : [];
         this.action = typeof config.action === 'function' ? config.action : null;
         this.requiresApproval = Boolean(config.requiresApproval || config.type === 'human_approval');
@@ -67,10 +69,16 @@ class StateNode {
         const depsMet = this.dependencies.every(depId => completedNodeIds.has(depId) || skippedNodeIds.has(depId));
         if (!depsMet) return false;
 
-        // Condition check if defined on node itself
-        if (this.condition) {
+        // Condition check if defined on node itself (supports runtime or persistent conditionId)
+        let condFn = this.condition;
+        if (!condFn && this.conditionId && typeof StateGraph !== 'undefined' && StateGraph.resolveCondition) {
+            condFn = StateGraph.resolveCondition(this.conditionId);
+            if (condFn) this.condition = condFn;
+        }
+
+        if (condFn) {
             try {
-                return Boolean(this.condition(state));
+                return Boolean(condFn(state));
             } catch (e) {
                 return false;
             }
@@ -87,6 +95,7 @@ class StateNode {
             description: this.description,
             assignedTo: this.assignedTo,
             dependencies: this.dependencies,
+            conditionId: this.conditionId || null,
             acceptanceCriteria: this.acceptanceCriteria,
             requiresApproval: this.requiresApproval,
             approvalDescription: this.approvalDescription,
@@ -119,6 +128,7 @@ class StateGraph extends EventEmitter {
         this.state = config.initialState ? { ...config.initialState } : {};
         this.completedNodes = new Set(config.completedNodes || []);
         this.failedNodes = new Set(config.failedNodes || []);
+        this.recoveredNodes = new Set(config.recoveredNodes || []);
         this.skippedNodes = new Set(config.skippedNodes || []);
         this.activeEdges = new Set(config.activeEdges || []);
         this.inactiveEdges = new Set(config.inactiveEdges || []);
@@ -207,13 +217,18 @@ class StateGraph extends EventEmitter {
     }
 
     /**
-     * Tier 4 Conditional Edge: Route between nodes based on dynamic evaluation of runtime state and results
+     * Tier 4 Strict Conditional Edge: Route between nodes based on dynamic evaluation of runtime state and results
      */
     addConditionalEdge(fromId, toId, conditionFn, conditionId = null) {
-        if (!conditionFn || typeof conditionFn !== 'function') {
-            return this.addEdge(fromId, toId);
+        let fn = typeof conditionFn === 'function' ? conditionFn : null;
+        const resolvedId = conditionId || (typeof conditionFn === 'string' ? conditionFn : null);
+        if (!fn && resolvedId) {
+            fn = StateGraph.resolveCondition(resolvedId);
         }
-        return this.addEdge(fromId, toId, conditionFn, conditionId);
+        if (!fn || typeof fn !== 'function') {
+            throw new Error(`StateGraph: addConditionalEdge requires a valid condition function or registered conditionId for edge '${fromId}' -> '${toId}'. Cannot fall back to unconditional edge.`);
+        }
+        return this.addEdge(fromId, toId, fn, resolvedId);
     }
 
     /**
@@ -520,15 +535,16 @@ class StateGraph extends EventEmitter {
                     }
 
                     if (pendingNodes.length === 0 && runningNodes.length === 0) {
-                        if (this.failedNodes.size > 0) {
+                        const unrecoveredFailures = Array.from(this.failedNodes).filter(id => !this.recoveredNodes.has(id));
+                        if (unrecoveredFailures.length > 0) {
                             this.status = 'FAILED';
                             this.emit('GRAPH_FAILED', {
                                 graphId: this.graphId,
-                                reason: `${this.failedNodes.size} node(s) failed without recovery`,
-                                failedNodes: Array.from(this.failedNodes)
+                                reason: `${unrecoveredFailures.length} node(s) failed without recovery: [${unrecoveredFailures.join(', ')}]`,
+                                failedNodes: unrecoveredFailures
                             });
                         } else {
-                            // All reachable nodes completed!
+                            // All reachable nodes completed or cleanly recovered!
                             this.status = 'COMPLETED';
                         }
                         break;
@@ -896,6 +912,10 @@ class StateGraph extends EventEmitter {
         if (Array.isArray(failedNodeIdOrNodes)) {
             for (const n of failedNodeIdOrNodes) {
                 this.addNode(n);
+                if (n.recoveredNodeId) {
+                    this.failedNodes.delete(n.recoveredNodeId);
+                    this.recoveredNodes.add(n.recoveredNodeId);
+                }
             }
             this.emit('GRAPH_REPLANNED', { dynamicNodes: failedNodeIdOrNodes.length });
             return true;
@@ -920,6 +940,18 @@ class StateGraph extends EventEmitter {
                 node.dependencies = node.dependencies.map(d => d === failedNodeId ? recoveryNode.id : d);
             }
         }
+
+        // Redirect graph edges from failedNodeId to recoveryNode.id
+        for (const edge of this.edges) {
+            if (edge.from === failedNodeId) {
+                edge.from = recoveryNode.id;
+            }
+        }
+
+        // P1 Fix: Cleanly clear from failedNodes and record in recoveredNodes
+        this.failedNodes.delete(failedNodeId);
+        this.recoveredNodes.add(failedNodeId);
+        this.executionLog.push(`[${failedNodeId}] RECOVERED via [${recoveryNode.id}]`);
 
         this.emit('GRAPH_REPLANNED', {
             failedNodeId,
@@ -987,7 +1019,7 @@ class StateGraph extends EventEmitter {
      * Resume a paused or waiting StateGraph
      */
     async resume(executorFn = null, context = {}) {
-        if (this.status === 'WAITING_APPROVAL' || this.status === 'PAUSED' || this.status === 'WAITING_QUOTA' || this.status === 'WAITING_CREDENTIALS') {
+        if (this.status === 'WAITING_APPROVAL' || this.status === 'PAUSED' || this.status === 'WAITING_QUOTA' || this.status === 'WAITING_CREDENTIALS' || this.status === 'FAILED') {
             this.status = 'RUNNING';
         }
         for (const node of this.nodes.values()) {
@@ -1005,6 +1037,7 @@ class StateGraph extends EventEmitter {
             state: this.state,
             completedNodes: Array.from(this.completedNodes),
             failedNodes: Array.from(this.failedNodes),
+            recoveredNodes: Array.from(this.recoveredNodes || []),
             skippedNodes: Array.from(this.skippedNodes || []),
             activeEdges: Array.from(this.activeEdges || []),
             inactiveEdges: Array.from(this.inactiveEdges || []),
@@ -1034,6 +1067,7 @@ class StateGraph extends EventEmitter {
             graphId: data.graphId,
             initialState: data.state,
             skippedNodes: data.skippedNodes || [],
+            recoveredNodes: data.recoveredNodes || [],
             activeEdges: data.activeEdges || [],
             inactiveEdges: data.inactiveEdges || [],
             ...config
@@ -1043,6 +1077,7 @@ class StateGraph extends EventEmitter {
         graph.stepCounter = data.stepCounter || 0;
         graph.completedNodes = new Set(data.completedNodes || []);
         graph.failedNodes = new Set(data.failedNodes || []);
+        graph.recoveredNodes = new Set(data.recoveredNodes || []);
         graph.skippedNodes = new Set(data.skippedNodes || []);
         graph.activeEdges = new Set(data.activeEdges || []);
         graph.inactiveEdges = new Set(data.inactiveEdges || []);
@@ -1051,7 +1086,16 @@ class StateGraph extends EventEmitter {
             graph.executionLog = [...data.executionLog];
         }
 
-        // Restore nodes with exact persisted state
+        // Unified condition registry across persistent registry, static registry and runtime configurations
+        const conditionRegistry = new Map([
+            ...globalConditionRegistry.getAll().entries(),
+            ...StateGraph.conditionRegistry.entries(),
+            ...Object.entries(config.edgeConditions || {}),
+            ...Object.entries(config.loopConditions || {}),
+            ...Object.entries(config.transitionRegistry || {})
+        ]);
+
+        // Restore nodes with exact persisted state & node conditions
         if (Array.isArray(data.nodes)) {
             for (const nData of data.nodes) {
                 const node = new StateNode(nData);
@@ -1059,6 +1103,10 @@ class StateGraph extends EventEmitter {
                 node.loopIteration = typeof nData.loopIteration === 'number' ? nData.loopIteration : node.loopIteration;
                 node.tokensUsed = typeof nData.tokensUsed === 'number' ? nData.tokensUsed : node.tokensUsed;
                 node.executedSuccessfully = Boolean(nData.executedSuccessfully);
+                if (nData.conditionId && conditionRegistry.has(nData.conditionId)) {
+                    node.condition = conditionRegistry.get(nData.conditionId);
+                    node.conditionId = nData.conditionId;
+                }
                 const actionFn = (config.nodeActions && config.nodeActions[node.id])
                     || (config.nodeExecutors && config.nodeExecutors[node.id]);
                 if (typeof actionFn === 'function') {
@@ -1067,14 +1115,6 @@ class StateGraph extends EventEmitter {
                 graph.nodes.set(node.id, node);
             }
         }
-
-        // Unified condition registry across static registry and runtime configurations
-        const conditionRegistry = new Map([
-            ...StateGraph.conditionRegistry.entries(),
-            ...Object.entries(config.edgeConditions || {}),
-            ...Object.entries(config.loopConditions || {}),
-            ...Object.entries(config.transitionRegistry || {})
-        ]);
 
         // Restore edges with conditions
         if (Array.isArray(data.edges)) {
@@ -1139,11 +1179,19 @@ class StateGraph extends EventEmitter {
     }
 }
 
-StateGraph.conditionRegistry = new Map();
-StateGraph.registerCondition = function(conditionId, fn) {
+// Persistent static condition registry
+StateGraph.conditionRegistry = new Map(globalConditionRegistry.getAll());
+
+StateGraph.registerCondition = function(conditionId, fn, descriptor = null) {
     if (conditionId && typeof fn === 'function') {
         StateGraph.conditionRegistry.set(conditionId, fn);
+        globalConditionRegistry.register(conditionId, fn, descriptor);
     }
+};
+
+StateGraph.resolveCondition = function(conditionId) {
+    if (!conditionId) return null;
+    return StateGraph.conditionRegistry.get(conditionId) || globalConditionRegistry.get(conditionId) || null;
 };
 
 module.exports = { StateGraph, StateNode };

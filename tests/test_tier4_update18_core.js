@@ -245,10 +245,17 @@ async function runTests() {
 
         assert.strictEqual(auditCircular.passed, false, 'Claims criterion without external sources must fail');
 
-        // Test valid claims with external source
+        // Test unprovenanced mock source (Anti-Mock Sources)
+        const auditNoProvenance = await verifier.verifyNodeOutput(nodeWithClaimsCriteria, {
+            response: 'Doanh thu năm 2026 tăng 85% đạt 50 triệu USD theo số liệu báo cáo.',
+            sources: ['Chuỗi văn bản tự bịa không có nguồn URL DOI hay tài liệu']
+        });
+        assert.strictEqual(auditNoProvenance.passed, false, 'Unprovenanced string source must fail');
+
+        // Test valid claims with verifiable external provenance
         const auditValid = await verifier.verifyNodeOutput(nodeWithClaimsCriteria, {
             response: 'Doanh thu năm 2026 tăng 85% đạt 50 triệu USD theo số liệu báo cáo.',
-            sources: ['Báo cáo tài chính năm 2026 xác nhận tăng 85% đạt 50 triệu USD doanh thu.']
+            sources: [{ documentId: 'SEC-10K-2026', text: 'Báo cáo tài chính năm 2026 xác nhận tăng 85% đạt 50 triệu USD doanh thu.' }]
         });
         assert.strictEqual(auditValid.passed, true, 'Claims with valid external evidence must pass');
 

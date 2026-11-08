@@ -269,50 +269,72 @@ class IndependentVerifier {
                 verified: false,
                 passed: false,
                 status: 'REJECTED',
-                qualityScore: 25,
-                score: 25,
+                qualityScore: 20,
+                score: 20,
                 checks
             };
         }
-        score += 25;
+        score += 20;
         checks.push({ type: 'fast_no_refusal', passed: true, details: 'No refusal detected' });
 
-        // Check 2: Substantive length and content density (up to 35 points)
+        // Check 2: Prompt Relevance & Topic Alignment (Anti-Fluff Gate: up to 25 points)
+        const stopWords = new Set(['hãy', 'cho', 'tôi', 'biết', 'về', 'các', 'những', 'trong', 'năm', 'và', 'là', 'của', 'được', 'có', 'what', 'the', 'is', 'are', 'in', 'of', 'and', 'for', 'to']);
+        const queryWords = (String(userRequest || '').toLowerCase().match(/[a-z0-9à-ỹ]{3,}/gi) || []).filter(w => !stopWords.has(w));
+        let promptAligned = true;
+        if (queryWords.length > 0) {
+            const textLower = text.toLowerCase();
+            const matchedQueryWords = queryWords.filter(w => textLower.includes(w));
+            const queryRatio = matchedQueryWords.length / queryWords.length;
+            if (queryRatio >= 0.3 || matchedQueryWords.length >= 2) {
+                score += 25;
+                checks.push({ type: 'fast_relevance', passed: true, details: `Prompt alignment verified (${matchedQueryWords.length}/${queryWords.length} key terms matched)` });
+            } else if (matchedQueryWords.length >= 1) {
+                score += 15;
+                checks.push({ type: 'fast_relevance', passed: true, details: `Partial prompt alignment (${matchedQueryWords.length} term matched)` });
+            } else {
+                promptAligned = false;
+                checks.push({ type: 'fast_relevance', passed: false, details: 'Response appears unrelated to core query topic' });
+            }
+        } else {
+            score += 20; // Default when no specific query keywords extracted
+        }
+
+        // Check 3: Substantive length and content density (up to 25 points)
         if (text.length >= 200) {
-            score += 35;
+            score += 25;
             checks.push({ type: 'fast_substance', passed: true, details: `High substantive detail: ${text.length} chars` });
         } else if (text.length >= 80) {
-            score += 25;
+            score += 15;
             checks.push({ type: 'fast_substance', passed: true, details: `Moderate detail: ${text.length} chars` });
         } else if (text.length >= 40) {
-            score += 15;
+            score += 10;
             checks.push({ type: 'fast_substance', passed: true, details: `Minimal length: ${text.length} chars` });
         } else {
             checks.push({ type: 'fast_substance', passed: false, details: 'Response too brief (< 40 chars)' });
         }
 
-        // Check 3: Structured / clean formatting (up to 20 points)
+        // Check 4: Structured layout with code or lists (up to 15 points)
         if ((text.includes('\n') && (text.includes('- ') || text.includes('1.'))) || text.includes('```')) {
-            score += 20;
+            score += 15;
             checks.push({ type: 'fast_structure', passed: true, details: 'Clean structured layout with lists/code' });
         } else if (text.includes('\n') || text.includes(':') || text.includes('-')) {
-            score += 10;
+            score += 8;
             checks.push({ type: 'fast_structure', passed: true, details: 'Basic structured layout' });
         }
 
-        // Check 4: Concrete entities or factual grounding (up to 20 points)
+        // Check 5: Concrete entities or factual grounding (up to 15 points)
         const hasNumbers = /\b\d+(?:\.\d+)?\b/.test(text);
         const hasEntities = /[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/.test(text);
         if (hasNumbers && hasEntities) {
-            score += 20;
+            score += 15;
             checks.push({ type: 'fast_grounding', passed: true, details: 'Contains quantitative data and specific entities' });
         } else if (hasNumbers || hasEntities) {
-            score += 10;
+            score += 8;
             checks.push({ type: 'fast_grounding', passed: true, details: 'Contains partial entity or numerical data' });
         }
 
-        const finalScore = Math.min(100, score);
-        const isVerified = finalScore >= 75;
+        const finalScore = promptAligned ? Math.min(100, score) : Math.min(45, score);
+        const isVerified = finalScore >= 75 && promptAligned;
         return {
             verified: isVerified,
             passed: isVerified,
@@ -439,9 +461,28 @@ class IndependentVerifier {
         if (verifiedSourceTitle) {
             const titleLower = verifiedSourceTitle.toLowerCase();
             const textLower = combinedText.toLowerCase();
-            const words = titleLower.split(/\s+/).filter(w => w.length >= 4);
+            const words = titleLower.split(/\s+/).filter(w => w.length >= 4 && !['article', 'study', 'research', 'journal'].includes(w));
             const overlappingWords = words.filter(w => textLower.includes(w));
-            if (overlappingWords.length >= 1) {
+
+            // Bilingual scientific concept mapping for cross-language validation
+            const scientificConceptMap = {
+                'tế bào': ['cell', 'cellular'],
+                'ung thư': ['tumour', 'tumor', 'cancer', 'oncology', 'carcinoma'],
+                'lâm sàng': ['clinical'],
+                'đáp ứng': ['response'],
+                'miễn dịch': ['immune', 'immunity', 'immunotherapy'],
+                'tăng': ['expansion', 'increase', 'growth', 'upregulated'],
+                'giảm': ['reduction', 'decrease', 'downregulated'],
+                'bệnh nhân': ['patient', 'cohort']
+            };
+            let conceptMatches = 0;
+            for (const [vi, enList] of Object.entries(scientificConceptMap)) {
+                if (textLower.includes(vi) && enList.some(en => titleLower.includes(en))) {
+                    conceptMatches++;
+                }
+            }
+
+            if (overlappingWords.length >= 2 || conceptMatches >= 2 || (words.length > 0 && overlappingWords.length / words.length >= 0.2)) {
                 contentEntailed = true;
             }
         }
@@ -463,15 +504,16 @@ class IndependentVerifier {
             };
         }
 
-        // Update 18 Strict Entailment: A source must be live-verified on Crossref/PubMed/Web and entail content or verifiable metrics
-        if (liveSourceVerified && (claimAudit.passed || contentEntailed || hasMetrics)) {
+        // Update 19 Deep Research Verification:
+        // A live source (DOI/PubMed) + metrics is NOT enough unless claims are supported or content is genuinely entailed!
+        if (liveSourceVerified && (claimAudit.passed || (contentEntailed && (hasMetrics || claimAudit.stats.supported > 0)))) {
             return {
                 type: 'research_live_verification',
                 target: 'claims_and_evidence',
                 passed: true,
                 status: 'APPROVED',
                 claimAudit,
-                details: `Live verified: Nguồn tồn tại thật (${verifiedSourceTitle ? verifiedSourceTitle.slice(0, 60) + '...' : 'URL hoạt động'}), đối chiếu luận điểm (${claimAudit.stats.supported}/${claimAudit.stats.total} claims supported, ${metricMatches.length} metrics) ĐẠT`
+                details: `Live verified: Nguồn tồn tại thật (${verifiedSourceTitle ? verifiedSourceTitle.slice(0, 60) + '...' : 'URL hoạt động'}), đối chiếu luận điểm (${claimAudit.stats.supported}/${claimAudit.stats.total} claims supported, ${metricMatches.length} metrics, ${contentEntailed ? 'content entailed' : ''}) ĐẠT`
             };
         } else {
             return {
@@ -503,13 +545,14 @@ class IndependentVerifier {
         ];
 
         const claims = [];
+        const maxClaims = 50; // Update 19: Expanded capacity (was previously hard-capped at 10)
         for (const sent of rawSentences) {
             if (factualPatterns.some(p => p.test(sent))) {
                 if (!sent.startsWith('#') && !sent.endsWith(':')) {
                     claims.push(sent);
                 }
             }
-            if (claims.length >= 10) break;
+            if (claims.length >= maxClaims) break;
         }
         return claims;
     }
@@ -738,19 +781,36 @@ class IndependentVerifier {
                         criterionPassed = true;
                         detail = 'No factual claims requiring evidence found';
                     } else {
-                        // Anti-circular validation: NEVER validate text using text itself as source!
+                        // Anti-circular validation & Verifiable Provenance check
                         const externalSources = (result.sources || []).filter(s => s && s !== text);
                         if (externalSources.length === 0) {
                             criterionPassed = false;
                             detail = `Claim evidence check failed: No external evidence sources provided for ${claims.length} claims`;
                         } else {
-                            const claimCheck = this.verifyClaimsEvidence(claims, externalSources);
-                            if (claimCheck.passed) {
-                                criterionPassed = true;
-                                detail = `Claim evidence check passed: ${claimCheck.stats.supported}/${claimCheck.stats.total} supported`;
-                            } else {
+                            // Update 19 Verifiable Provenance Check: Sources must carry verifiable identity (URL, DOI, documentId, citation, or file)
+                            const hasVerifiableProvenance = externalSources.some(s => {
+                                if (typeof s === 'object' && s !== null) {
+                                    return Boolean(s.url || s.doi || s.pmid || s.filePath || s.documentId || s.citation);
+                                }
+                                if (typeof s === 'string') {
+                                    return /(?:https?:\/\/)|(?:doi:\s*10\.\d{4,9})|(?:10\.\d{4,9}\/)|(?:pmid:\s*\d+)|(?:\.(?:csv|json|parquet|pdf|txt|xlsx|md)\b)/i.test(s)
+                                        || fs.existsSync(path.isAbsolute(s) ? s : path.resolve(this.baseDir, s));
+                                }
+                                return false;
+                            });
+
+                            if (!hasVerifiableProvenance) {
                                 criterionPassed = false;
-                                detail = `Claim evidence check failed: status ${claimCheck.status} (${claimCheck.stats.supported}/${claimCheck.stats.total} supported)`;
+                                detail = `Claim evidence check failed: External sources lack verifiable provenance (no URL, DOI, document ID, citation, or physical file path)`;
+                            } else {
+                                const claimCheck = this.verifyClaimsEvidence(claims, externalSources);
+                                if (claimCheck.passed) {
+                                    criterionPassed = true;
+                                    detail = `Claim evidence check passed: ${claimCheck.stats.supported}/${claimCheck.stats.total} supported with verified provenance`;
+                                } else {
+                                    criterionPassed = false;
+                                    detail = `Claim evidence check failed: status ${claimCheck.status} (${claimCheck.stats.supported}/${claimCheck.stats.total} supported)`;
+                                }
                             }
                         }
                     }

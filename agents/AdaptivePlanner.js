@@ -273,6 +273,68 @@ class AdaptivePlanner {
     }
 
     /**
+     * Update 19: Synthesize a custom open-ended task DAG for novel requests
+     * Dynamically assigning roles, dependencies, tool budgets, and verification criteria
+     */
+    synthesizeDynamicDag(userRequest, options = {}) {
+        const text = String(userRequest || '').trim();
+        const planId = `DAG_${Date.now().toString(36)}`;
+        const tasks = [];
+
+        // 1. Determine need for domain ingestion / external reconnaissance
+        const needsResearch = /tìm|tra cứu|nghiên cứu|thị trường|phân tích|doi|paper|báo cáo|dữ liệu|cào|crawl|scrape|fetch/i.test(text);
+        // 2. Determine need for technical synthesis / code execution
+        const needsCode = /code|script|tính toán|mô hình|xây dựng|tạo file|xuất file|csv|python|javascript|chạy/i.test(text);
+        // 3. Determine need for empirical verification
+        const needsVerification = /kiểm tra|thẩm định|chính xác|xác nhận|verify|audit|chống sai/i.test(text) || needsCode;
+
+        if (needsResearch || !needsCode) {
+            tasks.push({
+                id: `${planId}_01_RESEARCH`,
+                description: `Thu thập dữ liệu nguồn, trích xuất cấu trúc và kiểm chứng tham số đầu vào cho yêu cầu: ${text}`,
+                assignedTo: 'researcher',
+                priority: 1,
+                dependencies: [],
+                acceptanceCriteria: ['non-empty output', 'claims'],
+                timeoutMs: 60000
+            });
+        }
+
+        if (needsCode) {
+            const deps = tasks.length > 0 ? [tasks[tasks.length - 1].id] : [];
+            tasks.push({
+                id: `${planId}_02_EXECUTE`,
+                description: `Triển khai mã nguồn thực thi, xử lý thuật toán và sản xuất kết quả vật lý cho: ${text}`,
+                assignedTo: 'developer',
+                priority: 1,
+                dependencies: deps,
+                acceptanceCriteria: ['executable_code', 'syntax', 'tool_execution'],
+                timeoutMs: 90000
+            });
+        }
+
+        if (needsVerification && tasks.length > 0) {
+            tasks.push({
+                id: `${planId}_03_AUDIT`,
+                description: `Thẩm định độc lập tính chính xác của sản phẩm, đối chiếu tiêu chí chất lượng và phê duyệt nghiệm thu cho: ${text}`,
+                assignedTo: 'critic',
+                priority: 2,
+                dependencies: [tasks[tasks.length - 1].id],
+                acceptanceCriteria: ['non-empty output'],
+                timeoutMs: 45000
+            });
+        }
+
+        return {
+            mode: 'dynamic_dag',
+            planId,
+            description: `Dynamically synthesized DAG (${tasks.length} nodes) for novel request`,
+            tasks,
+            isDynamicDag: true
+        };
+    }
+
+    /**
      * Dynamic replanning when a task fails, times out, or produces invalid output
      * Tier 4 Multi-Strategy Diagnosis and Targeted Remediation
      */

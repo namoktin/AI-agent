@@ -1,0 +1,6 @@
+{
+  "cold_test_metric_gt_50": {
+    "type": "expression",
+    "expr": "(state.metric || 0) > 50"
+  }
+}

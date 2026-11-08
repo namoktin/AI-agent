@@ -49,19 +49,48 @@ class CheckpointManager {
             checkpoint.updatedAt = new Date().toISOString();
             checkpoint.stageData[stageName] = stateData;
 
-            // Update 18 Tier 4 Atomic Checkpoint Write
+            // Update 19 Crash-Resilient Dual-Buffer Checkpoint Writing
+            const bakPath = `${filePath}.bak`;
             const tempPath = `${filePath}.tmp.${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-            try {
-                fs.writeFileSync(tempPath, JSON.stringify(checkpoint, null, 2), 'utf8');
-                fs.renameSync(tempPath, filePath);
-            } catch (renameErr) {
-                // Windows fallback if renameSync collides or locks
-                if (fs.existsSync(tempPath)) {
-                    fs.copyFileSync(tempPath, filePath);
-                    try { fs.unlinkSync(tempPath); } catch (_) {}
+            const payload = JSON.stringify(checkpoint, null, 2);
+
+            // Step 1: Write and verify temp file integrity
+            fs.writeFileSync(tempPath, payload, 'utf8');
+            const verifyParsed = JSON.parse(fs.readFileSync(tempPath, 'utf8'));
+            if (!verifyParsed || !verifyParsed.taskId) {
+                throw new Error('Integrity verification failed for temporary checkpoint write');
+            }
+
+            // Step 2: Backup existing checkpoint if valid
+            if (fs.existsSync(filePath)) {
+                try {
+                    fs.copyFileSync(filePath, bakPath);
+                } catch (_) {}
+            }
+
+            // Step 3: Atomic rename with Windows retry loop
+            let renamed = false;
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    fs.renameSync(tempPath, filePath);
+                    renamed = true;
+                    break;
+                } catch (renameErr) {
+                    if (attempt < 3) {
+                        const waitMs = attempt * 30;
+                        const start = Date.now();
+                        while (Date.now() - start < waitMs) { /* sync backoff */ }
+                    }
                 }
             }
-            console.log(`📌 [CheckpointManager] Checkpoint atomically saved: Task [${taskId}] at stage [${stageName}]`);
+
+            if (!renamed && fs.existsSync(tempPath)) {
+                // Windows extreme fallback if lock persists
+                fs.copyFileSync(tempPath, filePath);
+                try { fs.unlinkSync(tempPath); } catch (_) {}
+            }
+
+            console.log(`📌 [CheckpointManager] Checkpoint atomically saved with backup: Task [${taskId}] at stage [${stageName}]`);
             return true;
         } catch (e) {
             console.warn('[CheckpointManager] Failed to save checkpoint:', e.message);
@@ -70,17 +99,34 @@ class CheckpointManager {
     }
 
     /**
-     * Load existing checkpoint if available
+     * Load existing checkpoint if available with automatic backup recovery
      */
     loadCheckpoint(taskId) {
-        try {
-            const filePath = this.getCheckpointPath(taskId);
-            if (fs.existsSync(filePath)) {
-                return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        const filePath = this.getCheckpointPath(taskId);
+        const bakPath = `${filePath}.bak`;
+
+        // 1. Try loading primary checkpoint
+        if (fs.existsSync(filePath)) {
+            try {
+                const content = fs.readFileSync(filePath, 'utf8');
+                return JSON.parse(content);
+            } catch (parseErr) {
+                console.warn(`⚠️ [CheckpointManager] Primary checkpoint for [${taskId}] corrupted (${parseErr.message}). Attempting recovery from .bak...`);
             }
-        } catch (e) {
-            console.warn('[CheckpointManager] Failed to load checkpoint:', e.message);
         }
+
+        // 2. Try loading backup checkpoint
+        if (fs.existsSync(bakPath)) {
+            try {
+                const bakContent = fs.readFileSync(bakPath, 'utf8');
+                const recovered = JSON.parse(bakContent);
+                console.log(`✅ [CheckpointManager] Successfully recovered checkpoint for [${taskId}] from backup .bak file`);
+                return recovered;
+            } catch (bakErr) {
+                console.warn(`[CheckpointManager] Backup recovery also failed for [${taskId}]:`, bakErr.message);
+            }
+        }
+
         return null;
     }
 
@@ -90,10 +136,14 @@ class CheckpointManager {
     clearCheckpoint(taskId) {
         try {
             const filePath = this.getCheckpointPath(taskId);
+            const bakPath = `${filePath}.bak`;
             if (fs.existsSync(filePath)) {
                 fs.unlinkSync(filePath);
-                console.log(`🧹 [CheckpointManager] Checkpoint cleared for completed task: [${taskId}]`);
             }
+            if (fs.existsSync(bakPath)) {
+                try { fs.unlinkSync(bakPath); } catch (_) {}
+            }
+            console.log(`🧹 [CheckpointManager] Checkpoint and backup cleared for completed task: [${taskId}]`);
         } catch (e) {}
     }
 }
