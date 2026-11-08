@@ -159,7 +159,7 @@ def execute_task(task_dict, worker_id=0, total_workers=1):
 
     return record
 
-def run_gaia_benchmark(target_level=None, max_tasks=None, fresh=False, workers=4):
+def run_gaia_benchmark(target_level=None, target_levels=None, max_tasks=None, fresh=False, workers=4, reverse_order=False):
     tasks_file = DATA_DIR / "tasks_for_agent.json"
     if not tasks_file.exists():
         print(f"Error: {tasks_file} not found. Please run download_gaia.py first.")
@@ -168,8 +168,16 @@ def run_gaia_benchmark(target_level=None, max_tasks=None, fresh=False, workers=4
     with open(tasks_file, "r", encoding="utf-8") as f:
         tasks = json.load(f)
 
-    if target_level:
+    if target_levels:
+        tasks = [t for t in tasks if t["level"] in target_levels]
+        print(f"🎯 [Filter] Chọn các tầng: {target_levels} (Tổng số tasks: {len(tasks)})")
+    elif target_level:
         tasks = [t for t in tasks if t["level"] == target_level]
+        print(f"🎯 [Filter] Chọn tầng: {target_level} (Tổng số tasks: {len(tasks)})")
+
+    if reverse_order:
+        tasks.sort(key=lambda t: t.get("level", 1), reverse=True)
+        print("🔄 [Priority] Sắp xếp ưu tiên chạy NGƯỢC: Level 3 -> Level 2 -> Level 1!")
 
     if max_tasks:
         tasks = tasks[:max_tasks]
@@ -277,9 +285,12 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--level", type=int, default=None, help="Specific level to run (1, 2, or 3)")
+    parser.add_argument("--levels", type=str, default=None, help="Comma-separated levels to run (e.g. '3,2')")
     parser.add_argument("--max", type=int, default=None, help="Max number of tasks to run")
     parser.add_argument("--workers", type=int, default=4, help="Number of concurrent workers (default: 4)")
     parser.add_argument("--fresh", action="store_true", help="Start fresh benchmark run from task 1 (clear previous raw results)")
+    parser.add_argument("--reverse", action="store_true", help="Run in reverse level order: Level 3 -> Level 2 -> Level 1")
     args = parser.parse_args()
 
-    run_gaia_benchmark(target_level=args.level, max_tasks=args.max, fresh=args.fresh, workers=args.workers)
+    levels_list = [int(x.strip()) for x in args.levels.split(",") if x.strip()] if args.levels else None
+    run_gaia_benchmark(target_level=args.level, target_levels=levels_list, max_tasks=args.max, fresh=args.fresh, workers=args.workers, reverse_order=args.reverse)

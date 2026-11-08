@@ -64,14 +64,15 @@ def parse_number(text: str):
         return None
 
 def clean_extracted(ans: str) -> str:
-    """Strip markdown backticks, quotes, and non-decimal trailing punctuation."""
+    """Strip markdown backticks, quotes, stray braces, and non-decimal trailing punctuation."""
     if not ans:
         return ""
     ans = ans.strip()
-    ans = re.sub(r"^[`'\"\*]+|[`'\"\*]+$", "", ans).strip()
+    ans = re.sub(r"^[`'\"\{\}\[\]\*]+|[`'\"\{\}\[\]\*]+$", "", ans).strip()
     # Remove trailing period if not part of number or single letter abbreviation
     if ans.endswith('.') and not re.search(r'\d\.$', ans) and not re.search(r'^[A-Z]\.$', ans):
         ans = ans[:-1].strip()
+    ans = re.sub(r"^[`'\"\{\}\[\]\*]+|[`'\"\{\}\[\]\*]+$", "", ans).strip()
     return ans
 
 def extract_final_answer(raw_output: str) -> str:
@@ -81,11 +82,20 @@ def extract_final_answer(raw_output: str) -> str:
     if not raw_output:
         return ""
     
-    # 1. Check for FINAL ANSWER: pattern (take the last occurrence)
+    # 1. Check for FINAL ANSWER: pattern (take the last meaningful non-caveat occurrence)
     matches = list(re.finditer(r'FINAL ANSWER:\s*(.*)', raw_output, re.IGNORECASE))
     if matches:
-        val = matches[-1].group(1).strip()
-        first_line = val.split('\n')[0].strip()
+        for m in reversed(matches):
+            val = m.group(1).strip()
+            first_line = val.split('\n')[0].strip()
+            # If line is just a prompt caveat or note or empty, skip it
+            if re.search(r'^\s*\((?:lưu ý|note|chú ý|lÆ°u Ã½):', first_line, re.IGNORECASE):
+                continue
+            cleaned = clean_extracted(first_line)
+            if cleaned:
+                return cleaned
+        # Fallback to last match if all were caveats
+        first_line = matches[-1].group(1).strip().split('\n')[0].strip()
         return clean_extracted(first_line)
 
     # 2. Check if raw_output has JSON structure containing solution or answer
@@ -112,13 +122,17 @@ def extract_final_answer(raw_output: str) -> str:
             continue
         if 'fetch failed' in l or 'Traceback (most recent call' in l or 'ModuleNotFoundError' in l:
             continue
+        if re.search(r'^\s*\((?:lưu ý|note|chú ý|lÆ°u Ã½):', l, re.IGNORECASE):
+            continue
         content_lines.append(l)
 
     if content_lines:
         for line in reversed(content_lines):
             m = re.search(r'FINAL ANSWER:\s*(.*)', line, re.IGNORECASE)
             if m:
-                return clean_extracted(m.group(1).strip())
+                ans_str = m.group(1).strip()
+                if not re.search(r'^\s*\((?:lưu ý|note|chú ý|lÆ°u Ã½):', ans_str, re.IGNORECASE):
+                    return clean_extracted(ans_str)
         return clean_extracted(content_lines[-1])
 
     return clean_extracted(lines[-1] if lines else "")

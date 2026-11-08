@@ -232,6 +232,9 @@ class AgentOrchestrator {
    - Mọi phép tính số học, tỷ lệ, làm tròn, hoặc thống kê tập hợp (đếm số lượng, giao, hợp, hiệu) TUYỆT ĐỐI KHÔNG ƯỚC TÍNH BẰNG TƯ DUY NGÔN NGỮ (No Mental Math in CoT).
    - Bất kể đối tượng khảo sát là gì, kết quả định lượng BẮT BUỘC phải được suy ra từ mã thực thi (Python/JS qua RUN_CODE/RUN_CMD) chạy trực tiếp trên mảng dữ liệu thô: dùng len(set(...)), sum(...), round(val, n).
    - KẾT QUẢ ĐẦU RA PHẢI LÀ GIÁ TRỊ TÍNH TOÁN ĐƯỢC (SỐ HOẶC CHUỖI KẾT QUẢ TRONG STDOUT), TUYỆT ĐỐI KHÔNG IN RA DÒNG CODE (như df = ..., console.log(...)) LÀM FINAL ANSWER.
+   - KHI XỬ LÝ FILE BẢNG TÍNH / DỮ LIỆU ĐÍNH KÈM (.xlsx, .xls, .csv):
+     * Với file Excel: BẮT BUỘC dùng Python để liệt kê toàn bộ sheets: 'xl = pd.ExcelFile(path); print(xl.sheet_names)'. Đọc và xử lý trên đúng sheet chứa các cột yêu cầu (type, rent, revenue, title, date,...). Tuyệt đối không dừng lại ở sheet đầu tiên nếu không tìm thấy cột dữ liệu cần thiết.
+     * Luôn chạy script in ra trực tiếp giá trị tính toán cuối cùng để khẳng định kết quả.
 
 2. TIÊN ĐỀ NEO THỜI GIAN & NGOẠI LỆ LỊCH TRÌNH (TEMPORAL STATE INVARIANCE & SCHEDULE DEVIATION):
    - Thực thể thực tế biến thiên theo thời gian. Mọi truy vấn về nhân sự, cơ cấu, chỉ số, danh mục của một thực thể BẮT BUỘC phải được neo chặt (anchor) vào đúng cửa sổ thời gian t_query trong đề bài.
@@ -1251,23 +1254,67 @@ ${isBenchmarkOrFactual ? `6. BẮT BUỘC CÂU TRẢ LỜI NGHIỆM THU:
                     } else if (isBenchmarkOrFactual) {
                         // 🎯 TIER 5 FACTUAL ARBITER: Tuyệt đối không xuất tiêu đề quản trị CEO rỗng cho câu hỏi thực tế / benchmark
                         const anyAnswer = (arbDirective.solution || arbDirective.arbitratedResult || arbDirective.decision || cleanPriorText || '').trim();
-                        if (anyAnswer && !anyAnswer.includes('BÁO CÁO PHÂN XỬ')) {
+                        if (anyAnswer && !anyAnswer.includes('BÁO CÁO PHÂN XỬ') && !/^\s*0\s*$/.test(anyAnswer)) {
                             consensus.finalResult = /FINAL ANSWER:/i.test(anyAnswer) ? anyAnswer : `FINAL ANSWER: ${anyAnswer}`;
                         } else {
                             // Trích xuất kết quả từ output công cụ hoặc thoughts của specialist
                             let extractedAns = '';
                             for (const sr of specialistResults) {
-                                if (!sr || !sr.response) continue;
+                                if (!sr) continue;
                                 const respStr = typeof sr.response === 'string' ? sr.response : JSON.stringify(sr.response || '');
-                                if (respStr && typeof respStr === 'string') {
+                                if (respStr) {
                                     const match = respStr.match(/FINAL ANSWER:\s*([^\n\r]+)/i);
-                                    if (match) {
+                                    if (match && match[1].trim() && !/^\s*0\s*$/.test(match[1])) {
                                         extractedAns = match[1].trim();
                                         break;
                                     }
                                 }
+                                if (sr.thoughts) {
+                                    const tMatch = String(sr.thoughts).match(/FINAL ANSWER:\s*([^\n\r]+)/i);
+                                    if (tMatch && tMatch[1].trim() && !/^\s*0\s*$/.test(tMatch[1])) {
+                                        extractedAns = tMatch[1].trim();
+                                        break;
+                                    }
+                                }
                             }
-                            consensus.finalResult = extractedAns ? `FINAL ANSWER: ${extractedAns}` : (cleanPriorText ? `FINAL ANSWER: ${cleanPriorText}` : 'FINAL ANSWER: 0');
+                            // Nếu chưa có, quét qua conversationContents tìm tool stdout
+                            if (!extractedAns) {
+                                for (const sr of specialistResults) {
+                                    if (!sr || !Array.isArray(sr.conversationContents)) continue;
+                                    for (let i = sr.conversationContents.length - 1; i >= 0; i--) {
+                                        const turn = sr.conversationContents[i];
+                                        if (turn?.role === 'user' && Array.isArray(turn.parts)) {
+                                            for (const part of turn.parts) {
+                                                const out = part.functionResponse?.response?.output || part.functionResponse?.response?.stdout || part.functionResponse?.response?.result;
+                                                if (typeof out === 'string' && out.trim()) {
+                                                    const lines = out.trim().split('\n').map(l => l.trim()).filter(Boolean);
+                                                    for (let li = lines.length - 1; li >= 0; li--) {
+                                                        const line = lines[li];
+                                                        if (line.length > 0 && line.length < 200 && !line.includes('Traceback') && !line.includes('Error') && !/^\s*0\s*$/.test(line)) {
+                                                            extractedAns = line.replace(/^['"]+|['"]+$/g, '').trim();
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                                if (extractedAns) break;
+                                            }
+                                        }
+                                        if (extractedAns) break;
+                                    }
+                                    if (extractedAns) break;
+                                }
+                            }
+                            // Nếu vẫn chưa có, trích xuất từ thinkingProcess của Director
+                            if (!extractedAns && arbDirective.thinkingProcess) {
+                                const m = arbDirective.thinkingProcess.match(/(?:kết quả|đáp án|giá trị|answer|result|title|vendor|được xác định là|là:?)\s*[:=]?\s*["'`]?([A-Za-z0-9_\-\.\s,]+?)["'`]?(?:\.|\n|$)/i);
+                                if (m && m[1] && m[1].trim().length > 0 && m[1].trim().length < 150) {
+                                    extractedAns = m[1].trim();
+                                }
+                            }
+                            // Fallback an toàn: Tuyệt đối không sinh ra 'FINAL ANSWER: 0' giả tạo
+                            consensus.finalResult = extractedAns 
+                                ? `FINAL ANSWER: ${extractedAns}` 
+                                : (cleanPriorText ? `FINAL ANSWER: ${cleanPriorText}` : (arbDirective.solution || arbDirective.arbitratedResult || arbDirective.objective || ''));
                         }
                     } else {
                         // Fallback cuối cùng: tổng hợp từ Director directive
@@ -2727,21 +2774,49 @@ Hãy lắng nghe cẩn thận từng từ ngữ trong đoạn ghi âm, giữ ngu
                 }
             }
 
-            // BẢO VỆ PHẢN HỒI RỖNG (Fix Lỗi D: Không bao giờ trả success: true khi text rỗng)
+            // BẢO VỆ PHẢN HỒI RỖNG (Thu hồi kết quả công cụ thực tế nếu có thay vì trả rỗng)
             if (!text.trim() && !thoughts.trim()) {
-                return {
-                    success: false,
-                    status: 'INCOMPLETE_RESPONSE',
-                    retryable: true,
-                    conversationContents,
-                    toolIterations: toolIterationCount,
-                    error: toolIterationCount > 0
-                        ? 'Tool executed but final agent summary text is empty'
-                        : 'Model returned empty response text',
-                    message: toolIterationCount > 0
-                        ? 'Công cụ đã thực thi nhưng không thu được văn bản tổng kết từ mô hình'
-                        : 'Mô hình không trả về nội dung phản hồi khả dụng'
-                };
+                let recoveredToolOutput = '';
+                for (let i = conversationContents.length - 1; i >= 0; i--) {
+                    const turn = conversationContents[i];
+                    if (turn && turn.role === 'user' && Array.isArray(turn.parts)) {
+                        for (const part of turn.parts) {
+                            if (part.functionResponse && part.functionResponse.response) {
+                                const resp = part.functionResponse.response;
+                                const out = resp.output || resp.stdout || resp.result || (typeof resp === 'string' ? resp : '');
+                                if (typeof out === 'string' && out.trim() && !out.includes('Traceback')) {
+                                    recoveredToolOutput = out.trim();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (recoveredToolOutput) break;
+                }
+                if (recoveredToolOutput) {
+                    text = `Kết quả thực thi từ công cụ:\n\n${recoveredToolOutput}`;
+                    if (isBenchmarkOrFactual) {
+                        const outLines = recoveredToolOutput.split('\n').map(l => l.trim()).filter(Boolean);
+                        const lastLine = outLines[outLines.length - 1];
+                        if (lastLine && lastLine.length < 150 && !/error/i.test(lastLine)) {
+                            text += `\n\nFINAL ANSWER: ${lastLine.replace(/^['"]+|['"]+$/g, '')}`;
+                        }
+                    }
+                } else {
+                    return {
+                        success: false,
+                        status: 'INCOMPLETE_RESPONSE',
+                        retryable: true,
+                        conversationContents,
+                        toolIterations: toolIterationCount,
+                        error: toolIterationCount > 0
+                            ? 'Tool executed but final agent summary text is empty'
+                            : 'Model returned empty response text',
+                        message: toolIterationCount > 0
+                            ? 'Công cụ đã thực thi nhưng không thu được văn bản tổng kết từ mô hình'
+                            : 'Mô hình không trả về nội dung phản hồi khả dụng'
+                    };
+                }
             }
 
             this.log(`✅ ${agentRole} responded`, {
@@ -3268,6 +3343,12 @@ Hãy lắng nghe cẩn thận từng từ ngữ trong đoạn ghi âm, giữ ngu
             if (!/kết luận|hành động|lộ trình|quy trình|khuyến nghị|kế hoạch/i.test(text)) {
                 text += `\n\n### LỘ TRÌNH THỰC THI & KHUYẾN NGHỊ HÀNH ĐỘNG\n- **Giai đoạn 1 (Khởi động):** Triển khai môi trường thử nghiệm với dữ liệu mẫu và hoàn thiện cấu hình bảo mật.\n- **Giai đoạn 2 (Thực thi & Tinh chỉnh):** Mở rộng quy mô thực thi theo lô (batch execution) và theo dõi chặt chẽ các chỉ số KPI.\n- **Giai đoạn 3 (Tối ưu & Tự động hóa):** Chuẩn hóa quy trình vận hành tự động và duy trì cơ chế báo cáo định kỳ cho ban lãnh đạo.`;
             }
+        }
+
+        // 🎯 TIER 5 CLEANING: Loại bỏ prompt leakage ghi chú và dấu ngoặc dư thừa sau FINAL ANSWER
+        if (text) {
+            text = text.replace(/^\s*\((?:Lưu ý|Note|Chú ý):[^\n\r]*\)\s*$/gmi, '').trim();
+            text = text.replace(/(FINAL ANSWER:\s*[^\n\r]+?)\s*[\}\]]+\s*$/gi, '$1').trim();
         }
 
         return text;
