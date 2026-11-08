@@ -339,11 +339,20 @@ class ModelRouter {
 
     /**
      * Check if a specific model is currently available (not in cooldown)
+     * Supports granular per-key cooldown to prevent blocking other workers
      */
-    isModelAvailable(model) {
+    isModelAvailable(model, apiKey = '') {
         if (!model) return false;
+        const now = Date.now();
+        if (apiKey) {
+            const keyId = apiKey.slice(-6);
+            const keyCooldown = this.modelCooldowns.get(`${model}:${keyId}`);
+            if (keyCooldown && now < keyCooldown) {
+                return false;
+            }
+        }
         const cooldownUntil = this.modelCooldowns.get(model);
-        if (cooldownUntil && Date.now() < cooldownUntil) {
+        if (cooldownUntil && now < cooldownUntil) {
             return false;
         }
         return true;
@@ -390,8 +399,9 @@ class ModelRouter {
 
     /**
      * Record quota / 429 error and update cooldowns with dynamic retryDelay parsing
+     * Granular key-level tracking prevents one worker's 429 from halting other workers
      */
-    recordQuotaError(model, statusCodeOrErr = 429, errorDetails = '') {
+    recordQuotaError(model, statusCodeOrErr = 429, errorDetails = '', apiKey = '') {
         let statusCode = 429;
         let details = errorDetails;
 
@@ -416,14 +426,20 @@ class ModelRouter {
         }
 
         if (statusCode === 429 || statusCode === 503) {
-            this.modelCooldowns.set(model, now + cooldownDuration);
-            console.warn(`⚠️ [ModelRouter Quota Guard] Model [${model}] gặp lỗi ${statusCode}. Dynamic cooldown ${Math.round(cooldownDuration / 1000)}s.`);
+            if (apiKey) {
+                const keyId = apiKey.slice(-6);
+                this.modelCooldowns.set(`${model}:${keyId}`, now + cooldownDuration);
+                console.warn(`⚠️ [ModelRouter Quota Guard] Model [${model}] trên Key (...${keyId}) gặp lỗi ${statusCode}. Cooldown ${Math.round(cooldownDuration / 1000)}s.`);
+            } else {
+                this.modelCooldowns.set(model, now + cooldownDuration);
+                console.warn(`⚠️ [ModelRouter Quota Guard] Model [${model}] gặp lỗi ${statusCode}. Dynamic cooldown ${Math.round(cooldownDuration / 1000)}s.`);
+            }
 
-            // Check if all models in FALLBACK_POOL are currently exhausted
+            // Check if all models in FALLBACK_POOL are currently exhausted for this key
             const pool = this.registry.FALLBACK_POOL || [];
-            const allExhausted = pool.every(m => !this.isModelAvailable(m));
+            const allExhausted = pool.every(m => !this.isModelAvailable(m, apiKey));
 
-            if (allExhausted && statusCode === 429) {
+            if (allExhausted && statusCode === 429 && !apiKey) {
                 this.globalCooldownUntil = now + Math.min(cooldownDuration, 30000); // Max 30s pause for circuit breaker
                 console.warn(`⚠️ [ModelRouter Circuit Breaker] Các model trong pool đang phục hồi nhịp độ quota...`);
             }
@@ -511,14 +527,14 @@ class ModelRouter {
     /**
      * Get fallback model on retry with Quota & Cooldown awareness
      */
-    getFallbackModel(currentModel, attempt = 1) {
+    getFallbackModel(currentModel, attempt = 1, apiKey = '') {
         this.cleanSlidingWindows();
 
         const pool = this.registry.FALLBACK_POOL || [];
         if (pool.length === 0) return this.defaultModel || 'gemini-3.5-flash';
 
         // Ưu tiên chọn model khác model hiện tại VÀ không đang trong thời gian cooldown 429
-        const viable = pool.filter(m => m !== currentModel && this.isModelAvailable(m));
+        const viable = pool.filter(m => m !== currentModel && this.isModelAvailable(m, apiKey));
 
         if (viable.length > 0) {
             const nextModel = viable[(attempt - 1) % viable.length];
@@ -527,7 +543,7 @@ class ModelRouter {
         }
 
         // Nếu tất cả candidate khác đều cooldown, kiểm tra lại toàn bộ pool
-        const anyViable = pool.filter(m => this.isModelAvailable(m));
+        const anyViable = pool.filter(m => this.isModelAvailable(m, apiKey));
         if (anyViable.length > 0) {
             return anyViable[0];
         }

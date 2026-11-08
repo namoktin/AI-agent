@@ -49,8 +49,19 @@ class CheckpointManager {
             checkpoint.updatedAt = new Date().toISOString();
             checkpoint.stageData[stageName] = stateData;
 
-            fs.writeFileSync(filePath, JSON.stringify(checkpoint, null, 2), 'utf8');
-            console.log(`📌 [CheckpointManager] Checkpoint saved: Task [${taskId}] at stage [${stageName}]`);
+            // Update 18 Tier 4 Atomic Checkpoint Write
+            const tempPath = `${filePath}.tmp.${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+            try {
+                fs.writeFileSync(tempPath, JSON.stringify(checkpoint, null, 2), 'utf8');
+                fs.renameSync(tempPath, filePath);
+            } catch (renameErr) {
+                // Windows fallback if renameSync collides or locks
+                if (fs.existsSync(tempPath)) {
+                    fs.copyFileSync(tempPath, filePath);
+                    try { fs.unlinkSync(tempPath); } catch (_) {}
+                }
+            }
+            console.log(`📌 [CheckpointManager] Checkpoint atomically saved: Task [${taskId}] at stage [${stageName}]`);
             return true;
         } catch (e) {
             console.warn('[CheckpointManager] Failed to save checkpoint:', e.message);

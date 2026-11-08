@@ -55,19 +55,19 @@ class StateNode {
         this.taskPayload = config.taskPayload || {};
     }
 
-    canExecute(completedNodeIds = new Set(), state = {}) {
+    canExecute(completedNodeIds = new Set(), state = {}, skippedNodeIds = new Set()) {
         if (this.status === 'COMPLETED' && this.idempotent && this.executedSuccessfully) {
             return false;
         }
-        if (this.status === 'RUNNING' || this.status === 'WAITING_APPROVAL' || this.status === 'WAITING_QUOTA' || this.status === 'WAITING_CREDENTIALS') {
+        if (this.status === 'RUNNING' || this.status === 'WAITING_APPROVAL' || this.status === 'WAITING_QUOTA' || this.status === 'WAITING_CREDENTIALS' || this.status === 'SKIPPED') {
             return false;
         }
 
-        // All dependencies must be in completedNodeIds
-        const depsMet = this.dependencies.every(depId => completedNodeIds.has(depId));
+        // All non-skipped dependencies must be completed
+        const depsMet = this.dependencies.every(depId => completedNodeIds.has(depId) || skippedNodeIds.has(depId));
         if (!depsMet) return false;
 
-        // Condition check if defined
+        // Condition check if defined on node itself
         if (this.condition) {
             try {
                 return Boolean(this.condition(state));
@@ -112,13 +112,16 @@ class StateGraph extends EventEmitter {
         super();
         this.graphId = config.graphId || `graph_${Date.now()}`;
         this.nodes = new Map(); // nodeId -> StateNode
-        this.edges = []; // [{ from, to, conditionFn }]
+        this.edges = []; // [{ from, to, condition, conditionId, branchGroupId, isDefault }]
         this.conditionalLoops = []; // [{ fromNode, toNode, conditionFn, maxLoops }]
         
         // Global State & History
         this.state = config.initialState ? { ...config.initialState } : {};
-        this.completedNodes = new Set();
-        this.failedNodes = new Set();
+        this.completedNodes = new Set(config.completedNodes || []);
+        this.failedNodes = new Set(config.failedNodes || []);
+        this.skippedNodes = new Set(config.skippedNodes || []);
+        this.activeEdges = new Set(config.activeEdges || []);
+        this.inactiveEdges = new Set(config.inactiveEdges || []);
         this.executionHistory = [];
         
         // Runtime Controls
@@ -163,7 +166,7 @@ class StateGraph extends EventEmitter {
         return node;
     }
 
-    addEdge(fromId, toId, conditionFn = null) {
+    addEdge(fromId, toId, conditionFn = null, conditionId = null, branchGroupId = null, isDefault = false) {
         if (!this.nodes.has(fromId)) {
             throw new Error(`StateGraph: fromNode '${fromId}' does not exist.`);
         }
@@ -171,43 +174,69 @@ class StateGraph extends EventEmitter {
             throw new Error(`StateGraph: toNode '${toId}' does not exist.`);
         }
 
-        // Add to dependency list of target node if no condition or default DAG
+        // Add to dependency list of target node
         const toNode = this.nodes.get(toId);
         if (!toNode.dependencies.includes(fromId)) {
             toNode.dependencies.push(fromId);
         }
 
-        this.edges.push({ from: fromId, to: toId, condition: conditionFn });
+        if (conditionId && typeof conditionFn === 'function') {
+            StateGraph.registerCondition(conditionId, conditionFn);
+        }
+
+        // Deduplicate or upgrade existing edge between fromId and toId
+        const existingIdx = this.edges.findIndex(e => e.from === fromId && e.to === toId);
+        const edgeObj = {
+            from: fromId,
+            to: toId,
+            condition: conditionFn,
+            conditionId: conditionId || null,
+            branchGroupId: branchGroupId || null,
+            isDefault: Boolean(isDefault)
+        };
+
+        if (existingIdx !== -1) {
+            // If new edge carries condition or branchGroupId, upgrade existing edge
+            if (conditionFn || conditionId || branchGroupId || isDefault) {
+                this.edges[existingIdx] = edgeObj;
+            }
+        } else {
+            this.edges.push(edgeObj);
+        }
         return this;
     }
 
     /**
      * Tier 4 Conditional Edge: Route between nodes based on dynamic evaluation of runtime state and results
      */
-    addConditionalEdge(fromId, toId, conditionFn) {
+    addConditionalEdge(fromId, toId, conditionFn, conditionId = null) {
         if (!conditionFn || typeof conditionFn !== 'function') {
             return this.addEdge(fromId, toId);
         }
-        return this.addEdge(fromId, toId, conditionFn);
+        return this.addEdge(fromId, toId, conditionFn, conditionId);
     }
 
     /**
      * Tier 4 Branching: Route from source node to alternative target nodes based on condition predicates
      */
-    addBranch(sourceNodeId, branches = [], defaultTarget = null) {
+    addBranch(sourceNodeId, branches = [], defaultTarget = null, branchId = null) {
+        const branchGroupId = branchId || `branch_${sourceNodeId}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
         if (Array.isArray(branches)) {
             for (const b of branches) {
                 if (b && b.target) {
-                    this.addEdge(sourceNodeId, b.target, b.condition || null);
+                    const condFn = typeof b.condition === 'function' ? b.condition : null;
+                    const condId = b.conditionId || (b.name ? b.name : null);
+                    this.addEdge(sourceNodeId, b.target, condFn, condId, branchGroupId, false);
                 }
             }
         } else if (typeof branches === 'object' && branches !== null) {
             for (const [target, condition] of Object.entries(branches)) {
-                this.addEdge(sourceNodeId, target, typeof condition === 'function' ? condition : null);
+                const condFn = typeof condition === 'function' ? condition : null;
+                this.addEdge(sourceNodeId, target, condFn, null, branchGroupId, false);
             }
         }
         if (defaultTarget && this.nodes.has(defaultTarget)) {
-            this.addEdge(sourceNodeId, defaultTarget, null);
+            this.addEdge(sourceNodeId, defaultTarget, null, null, branchGroupId, true);
         }
         return this;
     }
@@ -243,10 +272,158 @@ class StateGraph extends EventEmitter {
         return this;
     }
 
+    /**
+     * Evaluate outgoing conditional edges and branches for a completed or skipped node
+     */
+    _evaluateOutgoingEdges(nodeId) {
+        const outEdges = this.edges.filter(e => e.from === nodeId);
+        if (outEdges.length === 0) return;
+
+        // If the source node is SKIPPED, all of its outgoing edges are inactive!
+        if (this.skippedNodes.has(nodeId)) {
+            for (const edge of outEdges) {
+                this.inactiveEdges.add(`${edge.from}->${edge.to}`);
+                this.activeEdges.delete(`${edge.from}->${edge.to}`);
+            }
+            // Cascade check target nodes: if a target has NO active incoming edges from any parent, skip it too
+            for (const edge of outEdges) {
+                const targetNode = this.nodes.get(edge.to);
+                if (!targetNode || targetNode.status !== 'PENDING') continue;
+
+                const inEdges = this.edges.filter(e => e.to === targetNode.id);
+                const hasActiveIncoming = inEdges.some(e => this.activeEdges.has(`${e.from}->${e.to}`));
+                const allDecided = inEdges.every(e => {
+                    const parent = this.nodes.get(e.from);
+                    return !parent || parent.status === 'COMPLETED' || parent.status === 'SKIPPED';
+                });
+
+                if (allDecided && !hasActiveIncoming) {
+                    targetNode.status = 'SKIPPED';
+                    this.skippedNodes.add(targetNode.id);
+                    this.executionLog.push(`[${targetNode.id}] SKIPPED (Branch condition not met)`);
+                    this.emit('NODE_SKIPPED', { nodeId: targetNode.id, reason: 'Branch condition not met' });
+                    this._evaluateOutgoingEdges(targetNode.id);
+                }
+            }
+            return;
+        }
+
+        // Group outgoing edges by branchGroupId (or standalone)
+        const groups = new Map();
+        for (const edge of outEdges) {
+            const gid = edge.branchGroupId || `standalone_${edge.from}_${edge.to}`;
+            if (!groups.has(gid)) groups.set(gid, []);
+            groups.get(gid).push(edge);
+        }
+
+        for (const [gid, edgeList] of groups.entries()) {
+            if (gid.startsWith('standalone_')) {
+                const edge = edgeList[0];
+                if (typeof edge.condition === 'function') {
+                    let condMet = false;
+                    try {
+                        condMet = Boolean(edge.condition(this.state, this));
+                    } catch (e) {
+                        condMet = false;
+                    }
+                    if (condMet) {
+                        this.activeEdges.add(`${edge.from}->${edge.to}`);
+                        this.inactiveEdges.delete(`${edge.from}->${edge.to}`);
+                    } else {
+                        this.inactiveEdges.add(`${edge.from}->${edge.to}`);
+                        this.activeEdges.delete(`${edge.from}->${edge.to}`);
+                    }
+                } else {
+                    // Unconditional edge
+                    this.activeEdges.add(`${edge.from}->${edge.to}`);
+                    this.inactiveEdges.delete(`${edge.from}->${edge.to}`);
+                }
+            } else {
+                // Branch group: mutually exclusive branches evaluated in priority order
+                let selectedEdge = null;
+                const nonDefaultBranches = edgeList.filter(e => !e.isDefault);
+                const defaultBranch = edgeList.find(e => e.isDefault) || null;
+
+                for (const b of nonDefaultBranches) {
+                    if (typeof b.condition === 'function') {
+                        let isMet = false;
+                        try {
+                            isMet = Boolean(b.condition(this.state, this));
+                        } catch (e) {
+                            isMet = false;
+                        }
+                        if (isMet) {
+                            selectedEdge = b;
+                            break;
+                        }
+                    }
+                }
+
+                if (!selectedEdge && defaultBranch) {
+                    selectedEdge = defaultBranch;
+                }
+
+                for (const edge of edgeList) {
+                    if (selectedEdge && edge === selectedEdge) {
+                        this.activeEdges.add(`${edge.from}->${edge.to}`);
+                        this.inactiveEdges.delete(`${edge.from}->${edge.to}`);
+                    } else {
+                        this.inactiveEdges.add(`${edge.from}->${edge.to}`);
+                        this.activeEdges.delete(`${edge.from}->${edge.to}`);
+                    }
+                }
+            }
+        }
+
+        // Check target nodes: cascade skip if no active incoming edge remains
+        for (const edge of outEdges) {
+            const targetNode = this.nodes.get(edge.to);
+            if (!targetNode || targetNode.status !== 'PENDING') continue;
+
+            const inEdges = this.edges.filter(e => e.to === targetNode.id);
+            const hasActiveIncoming = inEdges.some(e => this.activeEdges.has(`${e.from}->${e.to}`));
+            const allDecided = inEdges.every(e => {
+                const parent = this.nodes.get(e.from);
+                return !parent || parent.status === 'COMPLETED' || parent.status === 'SKIPPED';
+            });
+
+            if (allDecided && !hasActiveIncoming) {
+                targetNode.status = 'SKIPPED';
+                this.skippedNodes.add(targetNode.id);
+                this.executionLog.push(`[${targetNode.id}] SKIPPED (Branch condition not met)`);
+                this.emit('NODE_SKIPPED', { nodeId: targetNode.id, reason: 'Branch condition not met' });
+                this._evaluateOutgoingEdges(targetNode.id);
+            }
+        }
+    }
+
     getReadyNodes() {
         const ready = [];
         for (const [id, node] of this.nodes.entries()) {
-            if (node.status === 'PENDING' && node.canExecute(this.completedNodes, this.state)) {
+            if (node.status !== 'PENDING') continue;
+
+            const inEdges = this.edges.filter(e => e.to === id);
+            if (inEdges.length === 0) {
+                // Entry node
+                if (node.canExecute(this.completedNodes, this.state, this.skippedNodes)) {
+                    ready.push(node);
+                }
+                continue;
+            }
+
+            // Has active incoming edges?
+            const activeInEdges = inEdges.filter(e => this.activeEdges.has(`${e.from}->${e.to}`));
+            if (activeInEdges.length === 0) {
+                continue;
+            }
+
+            // Are all active parents completed?
+            const allActiveParentsCompleted = activeInEdges.every(e => this.completedNodes.has(e.from));
+            if (!allActiveParentsCompleted) {
+                continue;
+            }
+
+            if (node.canExecute(this.completedNodes, this.state, this.skippedNodes)) {
                 ready.push(node);
             }
         }
@@ -275,6 +452,11 @@ class StateGraph extends EventEmitter {
 
         this.status = 'RUNNING';
         this.emit('GRAPH_STARTED', { graphId: this.graphId, state: this.state });
+
+        // Initial evaluation for completed nodes (e.g. from checkpoint resume)
+        for (const cId of this.completedNodes) {
+            this._evaluateOutgoingEdges(cId);
+        }
 
         // Synchronize granted approvals from eventStream before evaluating ready nodes
         for (const node of this.nodes.values()) {
@@ -647,8 +829,18 @@ class StateGraph extends EventEmitter {
                 // Update shared graph state
                 this.state[node.id] = result;
                 if (result && typeof result === 'object') {
-                    Object.assign(this.state, result.stateDelta || {});
+                    if (result.stateDelta && typeof result.stateDelta === 'object') {
+                        Object.assign(this.state, result.stateDelta);
+                    }
+                    for (const [k, v] of Object.entries(result)) {
+                        if (!['success', 'output', 'error', 'message', 'stateDelta'].includes(k)) {
+                            this.state[k] = v;
+                        }
+                    }
                 }
+
+                // Tier 4: Evaluate dynamic conditional edges and branch routes
+                this._evaluateOutgoingEdges(node.id);
 
                 this.executionHistory.push({
                     nodeId: node.id,
@@ -813,9 +1005,18 @@ class StateGraph extends EventEmitter {
             state: this.state,
             completedNodes: Array.from(this.completedNodes),
             failedNodes: Array.from(this.failedNodes),
+            skippedNodes: Array.from(this.skippedNodes || []),
+            activeEdges: Array.from(this.activeEdges || []),
+            inactiveEdges: Array.from(this.inactiveEdges || []),
             stepCounter: this.stepCounter,
             nodes: Array.from(this.nodes.values()).map(n => n.toJSON()),
-            edges: this.edges.map(e => ({ from: e.from, to: e.to })),
+            edges: this.edges.map(e => ({
+                from: e.from,
+                to: e.to,
+                conditionId: e.conditionId || null,
+                branchGroupId: e.branchGroupId || null,
+                isDefault: Boolean(e.isDefault)
+            })),
             conditionalLoops: this.conditionalLoops.map(l => ({
                 from: l.from,
                 to: l.to,
@@ -832,6 +1033,9 @@ class StateGraph extends EventEmitter {
         const graph = new StateGraph({
             graphId: data.graphId,
             initialState: data.state,
+            skippedNodes: data.skippedNodes || [],
+            activeEdges: data.activeEdges || [],
+            inactiveEdges: data.inactiveEdges || [],
             ...config
         });
 
@@ -839,12 +1043,15 @@ class StateGraph extends EventEmitter {
         graph.stepCounter = data.stepCounter || 0;
         graph.completedNodes = new Set(data.completedNodes || []);
         graph.failedNodes = new Set(data.failedNodes || []);
+        graph.skippedNodes = new Set(data.skippedNodes || []);
+        graph.activeEdges = new Set(data.activeEdges || []);
+        graph.inactiveEdges = new Set(data.inactiveEdges || []);
         graph.executionHistory = data.executionHistory || [];
         if (Array.isArray(data.executionLog)) {
             graph.executionLog = [...data.executionLog];
         }
 
-        // Restore nodes with exact persisted state (Fix Lỗi C)
+        // Restore nodes with exact persisted state
         if (Array.isArray(data.nodes)) {
             for (const nData of data.nodes) {
                 const node = new StateNode(nData);
@@ -861,20 +1068,32 @@ class StateGraph extends EventEmitter {
             }
         }
 
-        // Restore edges
+        // Unified condition registry across static registry and runtime configurations
+        const conditionRegistry = new Map([
+            ...StateGraph.conditionRegistry.entries(),
+            ...Object.entries(config.edgeConditions || {}),
+            ...Object.entries(config.loopConditions || {}),
+            ...Object.entries(config.transitionRegistry || {})
+        ]);
+
+        // Restore edges with conditions
         if (Array.isArray(data.edges)) {
             for (const e of data.edges) {
-                graph.addEdge(e.from, e.to);
+                let conditionFn = null;
+                if (e.conditionId && conditionRegistry.has(e.conditionId)) {
+                    conditionFn = conditionRegistry.get(e.conditionId);
+                }
+                graph.addEdge(e.from, e.to, conditionFn, e.conditionId, e.branchGroupId, e.isDefault);
             }
         }
 
-        // Restore conditional loops (Fix Lỗi B: Bảo toàn điều kiện gốc, không tự chế điều kiện lặp mù quáng)
+        // Restore conditional loops
         if (Array.isArray(data.conditionalLoops)) {
             for (const l of data.conditionalLoops) {
                 const condKey = `${l.from}->${l.to}`;
-                const condFn = (config.loopConditions && l.conditionId && config.loopConditions[l.conditionId])
-                    || (config.loopConditions && config.loopConditions[condKey])
-                    || (config.loopConditions && config.loopConditions[l.from])
+                const condFn = (l.conditionId && conditionRegistry.has(l.conditionId) && conditionRegistry.get(l.conditionId))
+                    || (conditionRegistry.has(condKey) && conditionRegistry.get(condKey))
+                    || (conditionRegistry.has(l.from) && conditionRegistry.get(l.from))
                     || null;
 
                 graph.conditionalLoops.push({
@@ -893,10 +1112,16 @@ class StateGraph extends EventEmitter {
     }
 
     /**
-     * Alias for run(initialInput)
+     * Alias for run(initialInput) with state initialization
      */
     async execute(initialInput = {}) {
-        return this.run(initialInput);
+        if (typeof initialInput === 'function') {
+            return this.run(initialInput);
+        }
+        if (initialInput && typeof initialInput === 'object') {
+            Object.assign(this.state, initialInput);
+        }
+        return this.run(null, { initialInput });
     }
 
     /**
@@ -913,5 +1138,12 @@ class StateGraph extends EventEmitter {
         return StateGraph.deserialize(data, config);
     }
 }
+
+StateGraph.conditionRegistry = new Map();
+StateGraph.registerCondition = function(conditionId, fn) {
+    if (conditionId && typeof fn === 'function') {
+        StateGraph.conditionRegistry.set(conditionId, fn);
+    }
+};
 
 module.exports = { StateGraph, StateNode };

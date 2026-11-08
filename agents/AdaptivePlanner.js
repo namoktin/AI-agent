@@ -274,25 +274,70 @@ class AdaptivePlanner {
 
     /**
      * Dynamic replanning when a task fails, times out, or produces invalid output
+     * Tier 4 Multi-Strategy Diagnosis and Targeted Remediation
      */
     replan(failedTask, failureReason, currentPlan, userRequest, directive = {}) {
         const taskId = failedTask?.id || failedTask?.taskId || 'unknown';
         const taskDesc = failedTask?.description || userRequest;
         const assigned = failedTask?.assignedTo || 'developer';
+        const reasonLower = String(failureReason).toLowerCase();
 
         console.warn(`🔄 [AdaptivePlanner] Replanning triggered due to task failure: [${taskId}] - Reason: ${failureReason}`);
+
+        // Tier 4 Multi-Strategy Diagnosis
+        let diagnosedCategory = 'GENERIC_FAILURE';
+        let fallbackStrategy = 'alternative_approach';
+        let suggestedRole = assigned === 'developer' ? 'researcher' : 'developer';
+        let remediationGuidance = '';
+        let recoveryAcceptanceCriteria = ['non-empty output'];
+
+        if (reasonLower.includes('timeout') || reasonLower.includes('timedout') || reasonLower.includes('latency') || reasonLower.includes('quá thời gian') || reasonLower.includes('hết giờ')) {
+            diagnosedCategory = 'TIMEOUT_LATENCY_BOTTLENECK';
+            fallbackStrategy = 'streamlined_execution';
+            suggestedRole = 'developer';
+            remediationGuidance = 'Rút ngắn phạm vi truy vấn, bỏ qua các bước duyệt web sâu không cần thiết và thực hiện tính toán trực tiếp.';
+            recoveryAcceptanceCriteria.push('tool_execution');
+        } else if (reasonLower.includes('tool') || reasonLower.includes('command') || reasonLower.includes('exec') || reasonLower.includes('404')) {
+            diagnosedCategory = 'TOOL_EXECUTION_FAILURE';
+            fallbackStrategy = 'isolated_script_fallback';
+            suggestedRole = 'developer';
+            remediationGuidance = 'Chuyển sang viết mã script Python độc lập để đọc dữ liệu đĩa thay vì gọi lệnh shell trực tiếp.';
+            recoveryAcceptanceCriteria.push('executable_code', 'tool_execution');
+        } else if (reasonLower.includes('syntax') || reasonLower.includes('parse') || reasonLower.includes('cú pháp')) {
+            diagnosedCategory = 'SYNTAX_COMPILATION_ERROR';
+            fallbackStrategy = 'syntax_safe_parsing';
+            suggestedRole = 'developer';
+            remediationGuidance = 'Áp dụng cú pháp an toàn, kiểm tra trước khi thực thi và bọc trong khối try/except.';
+            recoveryAcceptanceCriteria.push('syntax');
+        } else if (reasonLower.includes('deficit') || reasonLower.includes('empty') || reasonLower.includes('rỗng')) {
+            diagnosedCategory = 'EVIDENCE_DATA_DEFICIT';
+            fallbackStrategy = 'deep_factual_retrieval';
+            suggestedRole = 'researcher';
+            remediationGuidance = 'Tìm kiếm các nguồn dữ liệu thay thế và trích xuất số liệu định lượng cụ thể từ tài liệu đính kèm.';
+            recoveryAcceptanceCriteria.push('claims');
+        } else {
+            diagnosedCategory = 'LOGIC_ALIGNMENT_FAILURE';
+            fallbackStrategy = 'orthogonal_role_perspective';
+            suggestedRole = assigned === 'developer' ? 'researcher' : 'developer';
+            remediationGuidance = 'Tiếp cận vấn đề từ góc nhìn chuyên môn đối ứng để kiểm tra lại các giả định ban đầu.';
+        }
 
         const remainingTasks = (currentPlan?.tasks || []).filter(t => (t.id || t.taskId) !== taskId);
         const recoveryTaskId = `REC_${Date.now().toString().slice(-4)}`;
 
         const recoveryTask = {
             id: recoveryTaskId,
-            description: `[RECOVERY] Thực hiện giải pháp thay thế cho nhiệm vụ lỗi [${taskId}]. Nguyên nhân lỗi: ${failureReason}. Mục tiêu gốc: ${taskDesc}`,
-            assignedTo: assigned === 'developer' ? 'researcher' : 'developer',
+            description: `[RECOVERY - ${diagnosedCategory}] ${remediationGuidance} Nhiệm vụ lỗi: [${taskId}]. Lý do: ${failureReason}. Mục tiêu: ${taskDesc}`,
+            assignedTo: suggestedRole,
             priority: 1,
             isRecovery: true,
             recoveredTaskId: taskId,
-            fallbackStrategy: 'alternative_approach',
+            diagnosticCategory: diagnosedCategory,
+            fallbackStrategy: fallbackStrategy,
+            acceptanceCriteria: recoveryAcceptanceCriteria,
+            timeoutMs: diagnosedCategory === 'TIMEOUT_LATENCY_BOTTLENECK'
+                ? Math.max((failedTask.timeoutMs || 60000) * 1.5, 90000)
+                : (failedTask.timeoutMs || 60000),
             parallelizable: false
         };
 

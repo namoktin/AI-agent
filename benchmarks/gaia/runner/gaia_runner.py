@@ -65,7 +65,7 @@ def build_prompt(task_dict):
 
     return "\n\n".join(prompt_parts)
 
-def execute_task(task_dict):
+def execute_task(task_dict, worker_id=0, total_workers=1):
     task_id = task_dict["task_id"]
     level = task_dict["level"]
     prompt = build_prompt(task_dict)
@@ -78,7 +78,9 @@ def execute_task(task_dict):
             "taskId": f"gaia_{task_id}",
             "benchmark": "GAIA",
             "level": level,
-            "attachment": task_dict.get("attachment_path")
+            "attachment": task_dict.get("attachment_path"),
+            "workerId": worker_id,
+            "totalWorkers": total_workers
         }
     }
 
@@ -201,44 +203,53 @@ def run_gaia_benchmark(target_level=None, max_tasks=None, fresh=False, workers=4
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
+    import queue
     file_lock = threading.Lock()
     eval_lock = threading.Lock()
     print_lock = threading.Lock()
+
+    worker_queue = queue.Queue()
+    for w in range(workers):
+        worker_queue.put(w)
 
     def process_task_item(item):
         idx, task = item
         task_id = task["task_id"]
         lvl = task["level"]
-        with print_lock:
-            print(f"\n[Worker-Pool] [{idx}/{len(remaining)}] Running Task {task_id} (Level {lvl})...")
-            print(f"Question preview: {task['question'][:120]}...")
-            if task.get("attachment_path"):
-                print(f"Attachment: {task.get('file_name')}")
+        w_id = worker_queue.get()
+        try:
+            with print_lock:
+                print(f"\n[Worker #{w_id}] [{idx}/{len(remaining)}] Running Task {task_id} (Level {lvl})...")
+                print(f"Question preview: {task['question'][:120]}...")
+                if task.get("attachment_path"):
+                    print(f"Attachment: {task.get('file_name')}")
 
-        record = execute_task(task)
+            record = execute_task(task, worker_id=w_id, total_workers=workers)
 
-        with print_lock:
-            print(f"[Worker-Pool] [{idx}/{len(remaining)}] Finished Task {task_id} in {record['execution_time_seconds']}s | Status: {record['status']}")
+            with print_lock:
+                print(f"[Worker #{w_id}] [{idx}/{len(remaining)}] Finished Task {task_id} in {record['execution_time_seconds']}s | Status: {record['status']}")
 
-        # Thread-safe append to raw_results.jsonl
-        with file_lock:
-            with open(RAW_RESULTS_FILE, "a", encoding="utf-8") as f:
-                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            # Thread-safe append to raw_results.jsonl
+            with file_lock:
+                with open(RAW_RESULTS_FILE, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
-        # Periodically update evaluation report
-        with eval_lock:
-            try:
-                from gaia_evaluator import evaluate_gaia
-                evaluate_gaia()
-            except Exception as eval_err:
-                pass
+            # Periodically update evaluation report
+            with eval_lock:
+                try:
+                    from gaia_evaluator import evaluate_gaia
+                    evaluate_gaia()
+                except Exception as eval_err:
+                    pass
 
-        if record.get("status") == "infra_error":
-            time.sleep(15)
-        else:
-            time.sleep(1)
+            if record.get("status") == "infra_error":
+                time.sleep(5)
+            else:
+                time.sleep(1)
 
-        return record
+            return record
+        finally:
+            worker_queue.put(w_id)
 
     if workers <= 1:
         for idx, task in enumerate(remaining, start=1):

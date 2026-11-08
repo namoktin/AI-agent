@@ -94,14 +94,13 @@ class DynamicEnvironmentDiscovery {
             // Phân loại Database
             capabilities.database.push('sqlite3'); // Python built-in
         } catch (e) {
-            // Fallback danh mục mặc định nếu pip list lỗi
-            capabilities.text_to_speech = ['gTTS', 'edge-tts'];
-            capabilities.speech_to_text = ['whisper'];
-            capabilities.web_scraping = ['requests', 'playwright', 'curl'];
-            capabilities.media_processing = ['ffmpeg', 'pydub'];
-            capabilities.data_analytics = ['pandas', 'numpy'];
-            capabilities.document_pdf = ['pymupdf', 'pdfplumber'];
-            capabilities.database = ['sqlite3'];
+            // Update 18 Anti-Mock: Truthful environment discovery when pip list fails
+            capabilities.scanError = e.message;
+            capabilities.isDegraded = true;
+            // Only populate verified built-in tools, never fake third-party packages!
+            capabilities.database = ['sqlite3']; // Python standard library
+            if (this.isCliAvailable('curl')) capabilities.web_scraping.push('curl');
+            console.warn(`⚠️ [DynamicEnvironmentDiscovery] Environment scan degraded: ${e.message}. Using truthful zero-mock inventory.`);
         }
 
         this._cachedCapabilities = capabilities;

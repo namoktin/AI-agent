@@ -8,10 +8,10 @@
 
 | Cấp độ | Tổng số task | PASS | FAIL | TIMEOUT | INFRA ERROR | Độ chính xác (Accuracy) | Hoàn thành < 5 phút | Thời gian TB (giây) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Level 1 | 53 | 45 | 7 | 0 | 1 | **86.54%** | 90.6% | 116.0s |
-| Level 2 | 50 | 23 | 20 | 5 | 2 | **47.92%** | 70.0% | 243.2s |
+| Level 1 | 53 | 45 | 7 | 0 | 1 | **86.54%** | 90.6% | 113.2s |
+| Level 2 | 50 | 23 | 17 | 5 | 5 | **51.11%** | 54.0% | 298.8s |
 | Level 3 | 0 | 0 | 0 | 0 | 0 | **0.00%** | 0.0% | 0.0s |
-| **Tổng cộng (Overall)** | **103** | **68** | **27** | **5** | **3** | **68.00%** | **80.6%** | **177.7s** |
+| **Tổng cộng (Overall)** | **103** | **68** | **24** | **5** | **6** | **70.10%** | **72.8%** | **203.3s** |
 
 ## 2. Chi tiết từng task
 
@@ -43,7 +43,7 @@
 | `72e110e7-464` | L1 | PASS | `Guatemala` | `Guatemala` | 64.1s |
 | `7673d772-ef8` | L1 | FAIL | `except` | `inference` | 131.1s |
 | `7bd855d8-463` | L1 | PASS | `89706.00` | `89706.00` | 61.0s |
-| `7d4a7d1d-cac` | L1 | FAIL | `13` | `22` | 262.4s |
+| `7d4a7d1d-cac` | L1 | FAIL | `26` | `22` | 117.5s |
 | `840bfca7-4f7` | L1 | PASS | `80GSFC21M0002` | `80GSFC21M0002` | 65.6s |
 | `8e867cd7-cff` | L1 | PASS | `3` | `3` | 50.7s |
 | `9318445f-fe6` | L1 | PASS | `3/4,1/4,3/4,3/4,3/4,1/2,2/4,1/` | `3/4,1/4,3/4,3/4,2/4,1/2,5/35,7` | 61.1s |
@@ -76,30 +76,30 @@
 | `076c8171-9b3` | L2 | PASS | `Finance` | `Finance` | 112.8s |
 | `08c0b6e9-1b4` | L2 | PASS | `orange, white` | `orange, white` | 29.3s |
 | `08cae58d-408` | L2 | PASS | `2018` | `2018` | 30.3s |
-| `08f3a05f-594` | L2 | FAIL | `3` | `2` | 22.3s |
-| `0a3cd321-3e7` | L2 | FAIL | `China, Singapore` | `Brunei, China, Morocco, Singap` | 234.2s |
+| `08f3a05f-594` | L2 | FAIL | `3` | `2` | 92.1s |
+| `0a3cd321-3e7` | L2 | INFRA_ERROR | `` | `Brunei, China, Morocco, Singap` | 350.3s |
 | `0a65cb96-cb6` | L2 | PASS | `Holabird` | `Holabird` | 75.3s |
-| `0b260a57-3f3` | L2 | FAIL | `0.000` | `0.269` | 76.2s |
+| `0b260a57-3f3` | L2 | INFRA_ERROR | `` | `0.269` | 600.0s |
 | `0bb3b44a-ede` | L2 | FAIL | `50` | `536` | 122.0s |
-| `0e9e85b8-52b` | L2 | FAIL | `1836` | `1927` | 81.5s |
+| `0e9e85b8-52b` | L2 | FAIL | `0` | `1927` | 460.6s |
 | `0ff53813-336` | L2 | PASS | `beta geometric` | `beta geometric` | 207.8s |
-| `114d5fd0-e2a` | L2 | FAIL | `19` | `4` | 103.8s |
+| `114d5fd0-e2a` | L2 | FAIL | `0` | `4` | 379.2s |
 | `14569e28-c88` | L2 | PASS | `backtick` | `backtick` | 212.5s |
-| `16d825ff-162` | L2 | FAIL | `5:14 PM` | `6:41 PM` | 211.3s |
+| `16d825ff-162` | L2 | FAIL | `0` | `6:41 PM` | 480.4s |
 | `17b5a6a3-bc8` | L2 | PASS | `34689` | `34689` | 79.8s |
-| `1dcc160f-c18` | L2 | FAIL | `0` | `3` | 191.6s |
-| `20194330-997` | L2 | FAIL | `2` | `4` | 193.7s |
-| `2a649bb1-795` | L2 | FAIL | `3.2.1.14; 3.2.1.18` | `3.1.3.1; 1.11.1.7` | 157.5s |
-| `2b3ef98c-cc0` | L2 | FAIL | `` | `To be or not to be that is the` | 187.8s |
-| `2dfc4c37-fec` | L2 | FAIL | `3` | `6` | 96.0s |
+| `1dcc160f-c18` | L2 | FAIL | `0` | `3` | 448.5s |
+| `20194330-997` | L2 | FAIL | `0` | `4` | 599.7s |
+| `2a649bb1-795` | L2 | INFRA_ERROR | `` | `3.1.3.1; 1.11.1.7` | 600.0s |
+| `2b3ef98c-cc0` | L2 | FAIL | `0` | `To be or not to be that is the` | 538.1s |
+| `2dfc4c37-fec` | L2 | FAIL | `3` | `6` | 144.2s |
 | `32102e3e-d12` | L2 | PASS | `Time-Parking 2: Parallel Unive` | `Time-Parking 2: Parallel Unive` | 69.6s |
-| `33d8ea3b-6c6` | L2 | FAIL | `1` | `2` | 238.0s |
+| `33d8ea3b-6c6` | L2 | FAIL | `` | `2` | 94.3s |
 | `3627a8be-a77` | L2 | PASS | `142` | `142` | 144.3s |
 | `366e2f2b-863` | L2 | PASS | `Shelley's Place` | `Shelley's place` | 22.9s |
 | `3ff6b7a9-a5b` | L2 | PASS | `56000` | `56000` | 40.5s |
 | `4d51c4bf-4b0` | L2 | PASS | `8` | `8` | 111.4s |
 | `4d0aa727-86b` | L2 | PASS | `1 in 3` | `1 in 3` | 169.4s |
-| `42d4198c-589` | L2 | FAIL | `}` | `60` | 385.4s |
+| `42d4198c-589` | L2 | FAIL | `` | `60` | 171.4s |
 | `544b7f0c-173` | L2 | PASS | `A Nightmare on Elm Street` | `A Nightmare on Elm Street` | 440.5s |
 | `54612da3-fd5` | L2 | FAIL | `120` | `60` | 252.4s |
 | `56137764-b4e` | L2 | PASS | `Li Peng` | `Li Peng` | 494.7s |

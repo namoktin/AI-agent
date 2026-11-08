@@ -220,51 +220,105 @@ class IndependentVerifier {
     }
 
     /**
-     * Substantive verification of fast responses (no arbitrary 90)
+     * Substantive verification of fast responses (Zero-based scoring)
      */
     verifyFastResponse(userRequest, fastResult) {
-        if (!fastResult || !fastResult.success || !fastResult.response) {
+        if (!fastResult) {
             return {
                 verified: false,
+                passed: false,
                 status: 'FAILED',
-                qualityScore: 50,
+                qualityScore: 0,
+                score: 0,
                 checks: [{ type: 'fast_response', passed: false, details: 'Fast response missing or returned error' }]
             };
         }
 
-        const text = String(fastResult.response).trim();
-        let score = 75;
+        const isObj = typeof fastResult === 'object';
+        if (isObj && fastResult.success === false) {
+            return {
+                verified: false,
+                passed: false,
+                status: 'FAILED',
+                qualityScore: 0,
+                score: 0,
+                checks: [{ type: 'fast_response', passed: false, details: 'Fast response explicitly failed' }]
+            };
+        }
+
+        const text = String(isObj ? (fastResult.response || fastResult.text || '') : fastResult).trim();
+        if (!text) {
+            return {
+                verified: false,
+                passed: false,
+                status: 'FAILED',
+                qualityScore: 0,
+                score: 0,
+                checks: [{ type: 'fast_response', passed: false, details: 'Fast response empty' }]
+            };
+        }
+
+        let score = 0; // ZERO-BASED SCORING: Points must be earned, no inflated base points
         const checks = [];
 
-        // Check 1: Length and Substance
-        if (text.length >= 40) {
-            score += 10;
-            checks.push({ type: 'fast_substance', passed: true, details: `Length: ${text.length} chars` });
+        // Check 1: Refusal / Error detection (Hard Gate: if refusal, capped at 25 points)
+        const hasRefusal = /tôi không thể|xin lỗi tôi không|error occurred|cannot answer|không thể trả lời/i.test(text);
+        if (hasRefusal) {
+            checks.push({ type: 'fast_no_refusal', passed: false, details: 'Contains refusal or error indicator' });
+            return {
+                verified: false,
+                passed: false,
+                status: 'REJECTED',
+                qualityScore: 25,
+                score: 25,
+                checks
+            };
+        }
+        score += 25;
+        checks.push({ type: 'fast_no_refusal', passed: true, details: 'No refusal detected' });
+
+        // Check 2: Substantive length and content density (up to 35 points)
+        if (text.length >= 200) {
+            score += 35;
+            checks.push({ type: 'fast_substance', passed: true, details: `High substantive detail: ${text.length} chars` });
+        } else if (text.length >= 80) {
+            score += 25;
+            checks.push({ type: 'fast_substance', passed: true, details: `Moderate detail: ${text.length} chars` });
+        } else if (text.length >= 40) {
+            score += 15;
+            checks.push({ type: 'fast_substance', passed: true, details: `Minimal length: ${text.length} chars` });
         } else {
             checks.push({ type: 'fast_substance', passed: false, details: 'Response too brief (< 40 chars)' });
         }
 
-        // Check 2: No refusal/error keywords
-        const hasRefusal = /tôi không thể|xin lỗi tôi không|error occurred|cannot answer/i.test(text);
-        if (!hasRefusal) {
-            score += 7;
-            checks.push({ type: 'fast_no_refusal', passed: true, details: 'No refusal detected' });
-        } else {
-            score -= 15;
-            checks.push({ type: 'fast_no_refusal', passed: false, details: 'Contains refusal or error indicator' });
+        // Check 3: Structured / clean formatting (up to 20 points)
+        if ((text.includes('\n') && (text.includes('- ') || text.includes('1.'))) || text.includes('```')) {
+            score += 20;
+            checks.push({ type: 'fast_structure', passed: true, details: 'Clean structured layout with lists/code' });
+        } else if (text.includes('\n') || text.includes(':') || text.includes('-')) {
+            score += 10;
+            checks.push({ type: 'fast_structure', passed: true, details: 'Basic structured layout' });
         }
 
-        // Check 3: Structured / clean formatting
-        if (text.includes('\n') || text.includes(':') || text.includes('-')) {
-            score += 5;
-            checks.push({ type: 'fast_structure', passed: true, details: 'Clean structured layout' });
+        // Check 4: Concrete entities or factual grounding (up to 20 points)
+        const hasNumbers = /\b\d+(?:\.\d+)?\b/.test(text);
+        const hasEntities = /[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/.test(text);
+        if (hasNumbers && hasEntities) {
+            score += 20;
+            checks.push({ type: 'fast_grounding', passed: true, details: 'Contains quantitative data and specific entities' });
+        } else if (hasNumbers || hasEntities) {
+            score += 10;
+            checks.push({ type: 'fast_grounding', passed: true, details: 'Contains partial entity or numerical data' });
         }
 
         const finalScore = Math.min(100, score);
+        const isVerified = finalScore >= 75;
         return {
-            verified: finalScore >= 75,
-            status: finalScore >= 88 ? 'APPROVED' : (finalScore >= 75 ? 'VERIFIED' : 'NEEDS_REVIEW'),
+            verified: isVerified,
+            passed: isVerified,
+            status: finalScore >= 85 ? 'APPROVED' : (isVerified ? 'VERIFIED' : 'NEEDS_REVIEW'),
             qualityScore: finalScore,
+            score: finalScore,
             checks
         };
     }
@@ -286,24 +340,30 @@ class IndependentVerifier {
         const doiMatches = combinedText.match(/10\.\d{4,9}\/[-._;()/:A-Za-z0-9]+/g) || [];
         const pmidMatches = combinedText.match(/(?:PMID:\s*(\d+))|(?:pubmed\.ncbi\.nlm\.nih\.gov\/(\d+))/gi) || [];
         // 3. Search for quantitative data / metrics (percentages, numbers with units)
-        const metricMatches = combinedText.match(/\b\d+(?:\.\d+)?(?:%|mg|ml|km|kg|ms|s|°C|giây|phút|giờ|USD|VNĐ|triệu|tỷ)\b/gi) || [];
+        const metricMatches = (combinedText.match(/\b\d+(?:\.\d+)?(?:%|mg|ml|km|kg|ms|s|°C|giây|phút|giờ|usd|vnđ|triệu|tỷ|bệnh nhân|người|\b)/gi) || [])
+            .filter(m => /\d/.test(m) && !doiMatches.some(d => d.includes(m)));
 
         let liveSourceVerified = false;
         let verifiedSourceTitle = '';
         let contentEntailed = false;
 
-        // A. Verify DOI via Crossref or doi.org API
-        if (doiMatches.length > 0) {
-            const rawDoi = doiMatches[0].replace(/[.,;:)]+$/, '');
+        // A. Verify DOI via Crossref or doi.org API (Multi-DOI check up to 3)
+        const evidenceSources = [];
+        for (let i = 0; i < Math.min(3, doiMatches.length); i++) {
+            const rawDoi = doiMatches[i].replace(/[.,;:)]+$/, '');
             try {
                 const res = await fetch(`https://api.crossref.org/works/${encodeURIComponent(rawDoi)}`, {
-                    headers: { 'User-Agent': 'CyberAgent/3.5 (mailto:researcher@agent.local)' },
+                    headers: { 'User-Agent': 'CyberAgent/5.5 (mailto:researcher@agent.local)' },
                     signal: AbortSignal.timeout(4000)
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    verifiedSourceTitle = data.message?.title?.[0] || 'Indexed DOI Article';
+                    const title = data.message?.title?.[0] || 'Indexed DOI Article';
+                    const abstract = data.message?.abstract || '';
+                    if (!verifiedSourceTitle) verifiedSourceTitle = title;
                     liveSourceVerified = true;
+                    evidenceSources.push(title);
+                    if (abstract) evidenceSources.push(abstract);
                 }
             } catch (doiErr) {
                 try {
@@ -314,15 +374,16 @@ class IndependentVerifier {
                     });
                     if (doiRes.status >= 200 && doiRes.status < 400) {
                         liveSourceVerified = true;
-                        verifiedSourceTitle = `DOI: ${rawDoi}`;
+                        if (!verifiedSourceTitle) verifiedSourceTitle = `DOI: ${rawDoi}`;
+                        evidenceSources.push(`DOI: ${rawDoi}`);
                     }
                 } catch (e) {}
             }
         }
 
-        // B. Verify PMID via NCBI PubMed API
-        if (!liveSourceVerified && pmidMatches.length > 0) {
-            const idMatch = pmidMatches[0].match(/\d+/);
+        // B. Verify PMID via NCBI PubMed API (Multi-PMID check up to 3)
+        for (let i = 0; i < Math.min(3, pmidMatches.length); i++) {
+            const idMatch = pmidMatches[i].match(/\d+/);
             if (idMatch) {
                 const pmid = idMatch[0];
                 try {
@@ -333,16 +394,18 @@ class IndependentVerifier {
                         const data = await pmidRes.json();
                         if (data.result?.[pmid]?.title) {
                             liveSourceVerified = true;
-                            verifiedSourceTitle = data.result[pmid].title;
+                            const title = data.result[pmid].title;
+                            if (!verifiedSourceTitle) verifiedSourceTitle = title;
+                            evidenceSources.push(title);
                         }
                     }
                 } catch (pmidErr) {}
             }
         }
 
-        // C. Verify Live URL & Sample Content Entailment
+        // C. Verify Live URL & Sample Content Entailment (Multi-URL check up to 3)
         if (urlMatches.length > 0) {
-            for (let i = 0; i < Math.min(2, urlMatches.length); i++) {
+            for (let i = 0; i < Math.min(3, urlMatches.length); i++) {
                 const targetUrl = urlMatches[i].replace(/[.,;:)]+$/, '');
                 try {
                     const res = await fetch(targetUrl, {
@@ -352,14 +415,15 @@ class IndependentVerifier {
                     });
                     if (res.status >= 200 && res.status < 400) {
                         liveSourceVerified = true;
-                        const pageSample = (await res.text()).slice(0, 5000).toLowerCase();
+                        const pageSample = (await res.text()).slice(0, 5000);
+                        evidenceSources.push(pageSample);
+                        const pageSampleLower = pageSample.toLowerCase();
                         // Semantic Concept Overlap: Yêu cầu ít nhất 2 khái niệm cốt lõi cùng xuất hiện
                         const keywords = combinedText.toLowerCase().match(/[a-z0-9_-]{4,}/g) || [];
                         const significantWords = keywords.filter(w => !['https', 'http', 'content', 'title', 'value', 'result', 'research', 'thực', 'hiện', 'nghiên', 'cứu'].includes(w));
-                        const matchedConcepts = significantWords.filter(kw => pageSample.includes(kw));
+                        const matchedConcepts = significantWords.filter(kw => pageSampleLower.includes(kw));
                         if (matchedConcepts.length >= 1) {
                             contentEntailed = true;
-                            break;
                         }
                     }
                 } catch (e) {}
@@ -384,9 +448,6 @@ class IndependentVerifier {
 
         const hasMetrics = metricMatches.length >= 2;
 
-        const evidenceSources = [];
-        if (verifiedSourceTitle) evidenceSources.push(verifiedSourceTitle);
-
         // E. Fine-Grained Claim-Level Fact Checking (SUPPORTED / CONTRADICTED / INSUFFICIENT_EVIDENCE)
         const atomicClaims = this.extractClaims(combinedText);
         const claimAudit = this.verifyClaimsEvidence(atomicClaims, evidenceSources);
@@ -402,7 +463,8 @@ class IndependentVerifier {
             };
         }
 
-        if (liveSourceVerified && (contentEntailed || hasMetrics || claimAudit.passed)) {
+        // Update 18 Strict Entailment: A source must be live-verified on Crossref/PubMed/Web and entail content or verifiable metrics
+        if (liveSourceVerified && (claimAudit.passed || contentEntailed || hasMetrics)) {
             return {
                 type: 'research_live_verification',
                 target: 'claims_and_evidence',
@@ -410,15 +472,6 @@ class IndependentVerifier {
                 status: 'APPROVED',
                 claimAudit,
                 details: `Live verified: Nguồn tồn tại thật (${verifiedSourceTitle ? verifiedSourceTitle.slice(0, 60) + '...' : 'URL hoạt động'}), đối chiếu luận điểm (${claimAudit.stats.supported}/${claimAudit.stats.total} claims supported, ${metricMatches.length} metrics) ĐẠT`
-            };
-        } else if (liveSourceVerified || (doiMatches.length > 0 && hasMetrics)) {
-            return {
-                type: 'research_verification',
-                target: 'claims_and_evidence',
-                passed: true,
-                status: 'VERIFIED',
-                claimAudit,
-                details: `Xác thực định dạng nguồn & số liệu định lượng: ${metricMatches.length} metrics, live source checked`
             };
         } else {
             return {
@@ -653,35 +706,117 @@ class IndependentVerifier {
             }
         }
 
-        // 3. Acceptance Criteria Evaluation
-        if (Array.isArray(node.acceptanceCriteria)) {
+        // 3. Acceptance Criteria Evaluation (Update 18 Tier 4 Strict Verification)
+        if (Array.isArray(node.acceptanceCriteria) && node.acceptanceCriteria.length > 0) {
             for (const criteria of node.acceptanceCriteria) {
                 const cLower = String(criteria).toLowerCase();
-                let criterionPassed = true;
-                let detail = `Criterion verified: ${criteria}`;
+                let criterionPassed = false;
+                let detail = '';
 
                 if (cLower.includes('non-empty') || cLower.includes('không rỗng')) {
-                    const content = result.response || result.data || result.output || '';
-                    if (!content || (typeof content === 'string' && content.trim().length === 0)) {
+                    const content = result.response || result.data || result.output || result.result || '';
+                    if (content && (typeof content !== 'string' || content.trim().length > 0)) {
+                        criterionPassed = true;
+                        detail = `Non-empty output confirmed (type: ${typeof content})`;
+                    } else {
                         criterionPassed = false;
-                        detail = 'Output is empty';
+                        detail = 'Output is empty or whitespace only';
                     }
                 } else if (cLower.includes('syntax') || cLower.includes('cú pháp')) {
                     const fileFail = checks.some(c => c.type.includes('syntax') && !c.passed);
-                    if (fileFail) {
+                    if (!fileFail && !result.error && (!result.stderr || result.stderr.length === 0)) {
+                        criterionPassed = true;
+                        detail = 'Syntax verification passed';
+                    } else {
                         criterionPassed = false;
-                        detail = 'Syntax check failed';
+                        detail = 'Syntax check failed: errors detected in generated code or outputs';
                     }
-                } else if (cLower.includes('claims') || cLower.includes('bằng chứng')) {
+                } else if (cLower.includes('claims') || cLower.includes('bằng chứng') || cLower.includes('fact_check')) {
                     const text = typeof result.response === 'string' ? result.response : JSON.stringify(result);
                     const claims = this.extractClaims(text);
-                    if (claims.length > 0) {
-                        const claimCheck = this.verifyClaimsEvidence(claims, [text, ...(result.sources || [])]);
-                        if (!claimCheck.passed) {
+                    if (claims.length === 0) {
+                        criterionPassed = true;
+                        detail = 'No factual claims requiring evidence found';
+                    } else {
+                        // Anti-circular validation: NEVER validate text using text itself as source!
+                        const externalSources = (result.sources || []).filter(s => s && s !== text);
+                        if (externalSources.length === 0) {
                             criterionPassed = false;
-                            detail = `Claim evidence check failed: status ${claimCheck.status}`;
+                            detail = `Claim evidence check failed: No external evidence sources provided for ${claims.length} claims`;
+                        } else {
+                            const claimCheck = this.verifyClaimsEvidence(claims, externalSources);
+                            if (claimCheck.passed) {
+                                criterionPassed = true;
+                                detail = `Claim evidence check passed: ${claimCheck.stats.supported}/${claimCheck.stats.total} supported`;
+                            } else {
+                                criterionPassed = false;
+                                detail = `Claim evidence check failed: status ${claimCheck.status} (${claimCheck.stats.supported}/${claimCheck.stats.total} supported)`;
+                            }
                         }
                     }
+                } else if (cLower.includes('tool_execution') || cLower.includes('công cụ')) {
+                    const hasToolUsage = (Array.isArray(result.toolCalls) && result.toolCalls.length > 0) ||
+                                         (Array.isArray(result.executedTools) && result.executedTools.length > 0) ||
+                                         (result.toolResults && Object.keys(result.toolResults).length > 0) ||
+                                         (result.success === true && (result.data !== undefined || result.stdout !== undefined));
+                    if (hasToolUsage) {
+                        criterionPassed = true;
+                        detail = 'Tool execution verified successfully';
+                    } else {
+                        criterionPassed = false;
+                        detail = 'Tool execution check failed: no tool calls or verified tool results detected';
+                    }
+                } else if (cLower.includes('executable_code') || cLower.includes('code_execution')) {
+                    const text = typeof result.response === 'string' ? result.response : (result.data ? JSON.stringify(result.data) : '');
+                    const hasCode = /```(?:python|py|javascript|js|bash|sh|sql)[\s\S]+?```/i.test(text) || Boolean(result.codeSnippet || result.executableCode);
+                    const noSyntaxError = !checks.some(c => c.type.includes('syntax') && !c.passed);
+                    if (hasCode && noSyntaxError) {
+                        criterionPassed = true;
+                        detail = 'Executable code verified and syntactically sound';
+                    } else {
+                        criterionPassed = false;
+                        detail = `Executable code check failed: hasCode=${hasCode}, syntaxValid=${noSyntaxError}`;
+                    }
+                } else if (cLower.includes('physical_output') || cLower.includes('file_output') || cLower.includes('tập tin')) {
+                    const hasPhysical = targetFiles.length > 0 && checks.filter(c => c.type === 'physical_file').every(c => c.passed);
+                    if (hasPhysical) {
+                        criterionPassed = true;
+                        detail = `Physical output verified: ${targetFiles.length} file(s) exist on disk`;
+                    } else {
+                        criterionPassed = false;
+                        detail = `Physical output check failed: required files missing or empty (${targetFiles.join(', ')})`;
+                    }
+                } else if (cLower.includes('whisper_transcription') || cLower.includes('audio_transcription')) {
+                    const hasTranscription = Boolean(result.transcription || result.transcript || result.audioText || (result.data && result.data.transcription));
+                    if (hasTranscription) {
+                        criterionPassed = true;
+                        detail = 'Audio transcription output verified';
+                    } else {
+                        criterionPassed = false;
+                        detail = 'Whisper transcription check failed: no transcription text detected';
+                    }
+                } else if (cLower.includes('error_handling')) {
+                    const handled = result.recovered || result.handledError || (result.success !== undefined);
+                    if (handled) {
+                        criterionPassed = true;
+                        detail = 'Error handling verified';
+                    } else {
+                        criterionPassed = false;
+                        detail = 'Error handling criterion failed: unhandled exception or missing recovery';
+                    }
+                } else if (cLower.includes('schema') || cLower.includes('định dạng')) {
+                    const schemaFailed = checks.some(c => c.type === 'output_schema' && !c.passed);
+                    if (!schemaFailed) {
+                        criterionPassed = true;
+                        detail = 'Schema requirement satisfied';
+                    } else {
+                        criterionPassed = false;
+                        detail = 'Schema verification failed';
+                    }
+                } else {
+                    // Update 18 P0 Fix: Strictly reject unhandled or unknown criteria!
+                    criterionPassed = false;
+                    detail = `Criterion unsupported or unhandled by automated validator: "${criteria}". Cannot automatically pass.`;
                 }
 
                 if (!criterionPassed) allPassed = false;

@@ -601,8 +601,32 @@ ${CORE_TIER5_AXIOMS}
      */
     async execute(userRequest, context = {}) {
         const taskId = context?.taskId || `task_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+
+        // Dynamic Worker API Key Partitioning: Allocate dedicated API keys per worker to eliminate 429 collisions
+        const allKeys = (this.apiKeys && this.apiKeys.length > 0) ? this.apiKeys : (this.apiKey ? [this.apiKey] : []);
+        let taskKeys = allKeys;
+        if (context.apiKeys && Array.isArray(context.apiKeys) && context.apiKeys.length > 0) {
+            taskKeys = context.apiKeys;
+        } else if (context.apiKey) {
+            taskKeys = [context.apiKey];
+        } else if (context.workerId !== undefined && allKeys.length > 1) {
+            const totalWorkers = Math.max(1, parseInt(context.totalWorkers, 10) || 4);
+            const workerIdx = Math.max(0, parseInt(context.workerId, 10) || 0) % totalWorkers;
+            const keysPerWorker = Math.floor(allKeys.length / totalWorkers);
+            if (keysPerWorker > 0) {
+                const startIdx = workerIdx * keysPerWorker;
+                const endIdx = (workerIdx === totalWorkers - 1) ? allKeys.length : startIdx + keysPerWorker;
+                taskKeys = allKeys.slice(startIdx, endIdx);
+            } else {
+                taskKeys = [allKeys[workerIdx % allKeys.length]];
+            }
+        }
+
         const taskStore = {
             taskId,
+            apiKeys: taskKeys,
+            currentKeyIndex: 0,
+            apiKey: taskKeys[0] || this.apiKey,
             executionLog: [],
             taskTokenUsage: {
                 promptTokens: 0,
@@ -891,10 +915,11 @@ ${CORE_TIER5_AXIOMS}
                     };
                 }
 
-                // DYNAMIC REPLANNING: Nếu có task thất bại, tìm lại task gốc và kích hoạt Adaptive Replanning
+                // DYNAMIC REPLANNING: Nếu có task thất bại, tìm lại task gốc và kích hoạt Adaptive Replanning (Budget up to 3 attempts)
+                const maxReplanBudget = typeof context.maxReplanAttempts === 'number' ? context.maxReplanAttempts : 3;
                 for (let i = 0; i < specialistResults.length; i++) {
                     const res = specialistResults[i];
-                    if (!res.success && !res.skippedDueToDependency && (context.replanAttempts || 0) < 1) {
+                    if (!res.success && !res.skippedDueToDependency && (context.replanAttempts || 0) < maxReplanBudget) {
                         const failedTaskId = res.taskId || res.id;
                         const originalTask = (taskPlan.tasks || []).find(t => t.id === failedTaskId) || {
                             id: failedTaskId,
@@ -1553,7 +1578,10 @@ ${isBenchmarkOrFactual ? `6. BẮT BUỘC CÂU TRẢ LỜI NGHIỆM THU:
                         checkpointManager: this.checkpointManager,
                         verifier: this.verifier,
                         eventStream: this.eventStream,
-                        nodeActions: context?.nodeActions || null
+                        nodeActions: context?.nodeActions || null,
+                        loopConditions: context?.loopConditions || null,
+                        edgeConditions: context?.edgeConditions || null,
+                        transitionRegistry: context?.transitionRegistry || null
                     });
                     this.activeGraphs.set(taskId, graph);
                 }
@@ -1759,9 +1787,28 @@ ${isBenchmarkOrFactual ? `6. BẮT BUỘC CÂU TRẢ LỜI NGHIỆM THU:
     }
 
     /**
-     * Rotate to next API Key in pool if available
+     * Get effective API key for current execution context (Worker-isolated)
+     */
+    getEffectiveApiKey() {
+        const store = this.asyncLocalStorage.getStore();
+        if (store && store.apiKey) {
+            return store.apiKey;
+        }
+        return this.apiKey;
+    }
+
+    /**
+     * Rotate to next API Key in pool if available (Per-Worker isolated)
      */
     rotateApiKey() {
+        const store = this.asyncLocalStorage.getStore();
+        if (store && store.apiKeys && store.apiKeys.length > 1) {
+            store.currentKeyIndex = (store.currentKeyIndex + 1) % store.apiKeys.length;
+            store.apiKey = store.apiKeys[store.currentKeyIndex];
+            const workerTag = store.currentContext?.workerId !== undefined ? ` [Worker ${store.currentContext.workerId}]` : '';
+            this.log(`🔑 [Key Rotation${workerTag}] Tự động xoay sang API Key dự phòng #${store.currentKeyIndex + 1} (${store.apiKey.slice(0, 6)}...${store.apiKey.slice(-4)})`);
+            return true;
+        }
         if (this.apiKeys && this.apiKeys.length > 1) {
             this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;
             this.apiKey = this.apiKeys[this.currentKeyIndex];
@@ -1805,8 +1852,9 @@ ${isBenchmarkOrFactual ? `6. BẮT BUỘC CÂU TRẢ LỜI NGHIỆM THU:
                 this.log(`⚠️ [Custom AI Fallback] Lỗi kết nối Custom AI (${cErr.message}). Tự động fallback sang Google Gemini API...`);
             }
         }
+        const effectiveKey = this.getEffectiveApiKey();
         return await activeFetch(
-            `${this.baseUrl}/models/${modelName}:generateContent?key=${this.apiKey}`,
+            `${this.baseUrl}/models/${modelName}:generateContent?key=${effectiveKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -2043,15 +2091,19 @@ Hãy lắng nghe cẩn thận từng từ ngữ trong đoạn ghi âm, giữ ngu
                 // Tự động fallback tức thì nếu model chính bị 429 hoặc 503 (Fix Lỗi B: Xin slot mới qua scheduler)
                 if (!response.ok && (response.status === 429 || response.status === 503)) {
                     errBody = await response.text();
-                    this.modelRouter.recordQuotaError(modelName, response.status, errBody);
+                    const activeKey = this.getEffectiveApiKey();
+                    this.modelRouter.recordQuotaError(modelName, response.status, errBody, activeKey);
 
-                    // Ưu tiên 1: Nếu có nhiều API Key trong pool, tự động xoay key qua toàn bộ pool
+                    // Ưu tiên 1: Nếu có nhiều API Key trong pool, tự động xoay key qua toàn bộ pool của worker
                     if (response.status === 429) {
                         let rotatedCount = 0;
-                        const maxRotations = Math.max(0, (this.apiKeys?.length || 1) - 1);
+                        const store = this.asyncLocalStorage.getStore();
+                        const activePool = store?.apiKeys || this.apiKeys || [];
+                        const maxRotations = Math.max(0, activePool.length - 1);
                         while (response.status === 429 && rotatedCount < maxRotations && this.rotateApiKey()) {
                             rotatedCount++;
-                            this.log(`🔄 Thử lại với API Key dự phòng #${this.currentKeyIndex + 1} trên model [${modelName}]...`);
+                            const curKeyIdx = store ? store.currentKeyIndex : this.currentKeyIndex;
+                            this.log(`🔄 Thử lại với API Key dự phòng #${curKeyIdx + 1} trên model [${modelName}]...`);
                             response = await this._callModelApi({ modelName: modelName, requestBody: requestBody, externalSignal, timeoutMs: this.config.timeout || 600000, useCustomAi: isUsingCustomAi });
                             if (response.ok) {
                                 errBody = '';
@@ -2061,7 +2113,8 @@ Hãy lắng nghe cẩn thận từng từ ngữ trong đoạn ghi âm, giữ ngu
                     }
 
                     if (!response.ok && (response.status === 429 || response.status === 503)) {
-                        const altModel = this.modelRouter.getFallbackModel(modelName, attempt + 1);
+                        const curKey = this.getEffectiveApiKey();
+                        const altModel = this.modelRouter.getFallbackModel(modelName, attempt + 1, curKey);
                         if (altModel) {
                             // 1. Giải phóng slot của model cũ
                             if (this.modelRouter && typeof this.modelRouter.releaseDispatchSlot === 'function') {
@@ -2339,21 +2392,26 @@ Hãy lắng nghe cẩn thận từng từ ngữ trong đoạn ghi âm, giữ ngu
                     followUpRes = await this._callModelApi({ modelName: modelName, requestBody: followUpBody, externalSignal, timeoutMs: this.config.timeout || 600000, useCustomAi: isUsingCustomAi });
 
                     if (!followUpRes.ok && (followUpRes.status === 429 || followUpRes.status === 503)) {
-                        this.modelRouter.recordQuotaError(modelName, followUpRes.status);
+                        const activeKey = this.getEffectiveApiKey();
+                        this.modelRouter.recordQuotaError(modelName, followUpRes.status, '', activeKey);
 
-                        // Ưu tiên 1: Tự động xoay API key trong pool khi gặp 429
+                        // Ưu tiên 1: Tự động xoay API key trong pool của worker khi gặp 429
                         if (followUpRes.status === 429) {
                             let rotatedFollowUp = 0;
-                            const maxRotations = Math.max(0, (this.apiKeys?.length || 1) - 1);
+                            const store = this.asyncLocalStorage.getStore();
+                            const activePool = store?.apiKeys || this.apiKeys || [];
+                            const maxRotations = Math.max(0, activePool.length - 1);
                             while (followUpRes.status === 429 && rotatedFollowUp < maxRotations && this.rotateApiKey()) {
                                 rotatedFollowUp++;
-                                this.log(`🔄 Thử lại tool follow-up với API Key dự phòng #${this.currentKeyIndex + 1}...`);
+                                const curKeyIdx = store ? store.currentKeyIndex : this.currentKeyIndex;
+                                this.log(`🔄 Thử lại tool follow-up với API Key dự phòng #${curKeyIdx + 1}...`);
                                 followUpRes = await this._callModelApi({ modelName: modelName, requestBody: followUpBody, externalSignal, timeoutMs: this.config.timeout || 600000, useCustomAi: isUsingCustomAi });
                                 if (followUpRes.ok) break;
                             }
                         }
                         if (!followUpRes.ok) {
-                            const fallbackModel = this.modelRouter.getFallbackModel(modelName, toolIterationCount + 1);
+                            const curKey = this.getEffectiveApiKey();
+                            const fallbackModel = this.modelRouter.getFallbackModel(modelName, toolIterationCount + 1, curKey);
                             if (fallbackModel) {
                             // 1. Giải phóng slot của model cũ (Fix Lỗi B)
                             if (this.modelRouter && typeof this.modelRouter.releaseDispatchSlot === 'function') {
@@ -2486,11 +2544,14 @@ Hãy lắng nghe cẩn thận từng từ ngữ trong đoạn ghi âm, giữ ngu
                             finAttempts++;
                             await new Promise(r => setTimeout(r, 1500));
                             if (this.rotateApiKey()) {
-                                this.log(`🔄 Thử lại finalize với API Key dự phòng #${this.currentKeyIndex + 1}...`);
+                                const store = this.asyncLocalStorage.getStore();
+                                const curKeyIdx = store ? store.currentKeyIndex : this.currentKeyIndex;
+                                this.log(`🔄 Thử lại finalize với API Key dự phòng #${curKeyIdx + 1}...`);
                                 finRes = await this._callModelApi({ modelName: finModel, requestBody: finalizeBody, externalSignal, timeoutMs: this.config.timeout || 600000, useCustomAi: isUsingCustomAi });
                                 if (finRes.ok) break;
                             }
-                            const fallbackModel = this.modelRouter ? this.modelRouter.getFallbackModel(finModel, finAttempts) : null;
+                            const curKey = this.getEffectiveApiKey();
+                            const fallbackModel = this.modelRouter ? this.modelRouter.getFallbackModel(finModel, finAttempts, curKey) : null;
                             if (fallbackModel && fallbackModel !== finModel) {
                                 this.log(`⚠️ Finalize gặp HTTP ${finRes.status}, tự động xoay model sang [${fallbackModel}] (lần ${finAttempts})...`);
                                 finModel = fallbackModel;

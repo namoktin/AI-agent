@@ -46,7 +46,7 @@ def get_failed_tasks():
     failed_items.sort(key=priority_key)
     return [all_tasks[it["task_id"]] for it in failed_items if it["task_id"] in all_tasks]
 
-def run_single_task(task):
+def run_single_task(task, worker_id=0, total_workers=1):
     task_id = task["task_id"]
     prompt = (
         "You are a general AI assistant. Solve the task using available tools, resources, and capabilities. "
@@ -83,7 +83,9 @@ def run_single_task(task):
             "level": task["level"],
             "attachment": attachment_path,
             "attachmentName": attachment_name,
-            "resume": False
+            "resume": False,
+            "workerId": worker_id,
+            "totalWorkers": total_workers
         }
     }
 
@@ -147,9 +149,14 @@ if __name__ == '__main__':
     failed_tasks = get_failed_tasks()
     print(f"=== RETRY RUNNER ({args.workers} Workers with DeepSeek / Custom AI): {len(failed_tasks)} failed tasks queued ===", flush=True)
 
+    import queue
     file_lock = threading.Lock()
     eval_lock = threading.Lock()
     print_lock = threading.Lock()
+
+    worker_queue = queue.Queue()
+    for w in range(args.workers):
+        worker_queue.put(w)
 
     def process_retry_task(item):
         idx, t = item
@@ -157,34 +164,38 @@ if __name__ == '__main__':
         gt_info = ground_truth.get(tid, {})
         gt_ans = str(gt_info.get("final_answer", "")).strip()
 
-        with print_lock:
-            print(f"\n=======================================================", flush=True)
-            print(f"[{idx}/{len(failed_tasks)}] 🔄 [Retry Worker] Retrying Task {tid} (Level {t['level']})...", flush=True)
-            print(f"Question preview: {t['question'][:120]}...", flush=True)
-            if t.get("file_name"):
-                print(f"Attachment: {t.get('file_name')}", flush=True)
+        worker_id = worker_queue.get()
+        try:
+            with print_lock:
+                print(f"\n=======================================================", flush=True)
+                print(f"[{idx}/{len(failed_tasks)}] 🔄 [Worker #{worker_id}] Retrying Task {tid} (Level {t['level']})...", flush=True)
+                print(f"Question preview: {t['question'][:120]}...", flush=True)
+                if t.get("file_name"):
+                    print(f"Attachment: {t.get('file_name')}", flush=True)
 
-        rec = run_single_task(t)
+            rec = run_single_task(t, worker_id=worker_id, total_workers=args.workers)
 
-        pred = extract_final_answer(rec["raw_output"])
-        passed = compare_answers(pred, gt_ans)
-        verdict = "PASS ✅" if passed else "FAIL ❌"
+            pred = extract_final_answer(rec["raw_output"])
+            passed = compare_answers(pred, gt_ans)
+            verdict = "PASS ✅" if passed else "FAIL ❌"
 
-        with print_lock:
-            print(f"Finished in {rec['execution_time_seconds']}s", flush=True)
-            print(f"  Result : {verdict}", flush=True)
-            print(f"  New Ans: {pred}", flush=True)
-            print(f"  GT Ans : {gt_ans}", flush=True)
-            print(f"=======================================================", flush=True)
+            with print_lock:
+                print(f"Finished in {rec['execution_time_seconds']}s [Worker #{worker_id}]", flush=True)
+                print(f"  Result : {verdict}", flush=True)
+                print(f"  New Ans: {pred}", flush=True)
+                print(f"  GT Ans : {gt_ans}", flush=True)
+                print(f"=======================================================", flush=True)
 
-        # Thread-safe re-evaluate benchmark
-        with eval_lock:
-            try:
-                evaluate_gaia()
-            except Exception:
-                pass
-        time.sleep(1)
-        return rec
+            # Thread-safe re-evaluate benchmark
+            with eval_lock:
+                try:
+                    evaluate_gaia()
+                except Exception:
+                    pass
+            time.sleep(1)
+            return rec
+        finally:
+            worker_queue.put(worker_id)
 
     items = list(enumerate(failed_tasks, 1))
     if args.workers <= 1:

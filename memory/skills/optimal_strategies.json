@@ -40,11 +40,11 @@
     ],
     "bestRoute": "Dùng SCRAPE_SOCIAL_MEDIA bóc tách JSON-LD Schema.org VideoObject và thẻ ytd-watch-metadata để lấy chuẩn xác 100% view, like, author.",
     "tokensSaved": 1900,
-    "runsCount": 46,
-    "successCount": 46,
+    "runsCount": 47,
+    "successCount": 47,
     "successRate": 1,
-    "lastOutcomeAt": "2026-11-07T19:19:32.242Z",
-    "wilsonScore": 0.923
+    "lastOutcomeAt": "2026-11-07T19:47:27.122Z",
+    "wilsonScore": 0.924
   },
   "batch_daemon": {
     "pattern": "tiến trình ngầm",
@@ -161,10 +161,10 @@
     ],
     "bestRoute": "Khi thu thập và làm sạch dữ liệu thành CSV: 1) BẮT BUỘC tạo file CSV có dòng Header rõ ràng và >= 1 dòng dữ liệu thực; 2) Không để sót ô NULL hoặc NaN không được chuẩn hóa; 3) Định dạng đúng chuẩn UTF-8 có dấu tiếng Việt chuẩn xác; 4) Dùng RUN_CMD python/node kiểm tra số dòng và tính toàn vẹn của bảng trước khi bàn giao.",
     "tokensSaved": 2100,
-    "runsCount": 12,
-    "successCount": 12,
+    "runsCount": 13,
+    "successCount": 13,
     "successRate": 1,
-    "wilsonScore": 0.757,
-    "lastOutcomeAt": "2026-11-07T16:18:44.460Z"
+    "wilsonScore": 0.772,
+    "lastOutcomeAt": "2026-11-07T19:50:19.624Z"
   }
 }
