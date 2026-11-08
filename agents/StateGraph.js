@@ -76,6 +76,14 @@ class StateNode {
             if (condFn) this.condition = condFn;
         }
 
+        // P0 FIX: FAIL-CLOSED PRINCIPLE
+        // If the node has a conditionId, but no valid condition function can be resolved,
+        // it MUST NOT be permitted to execute! (Fail Closed)
+        if (this.conditionId && !condFn) {
+            console.warn(`[StateNode] ConditionId [${this.conditionId}] unresolvable for node [${this.id}] - failing closed (blocked)`);
+            return false;
+        }
+
         if (condFn) {
             try {
                 return Boolean(condFn(state));
@@ -333,11 +341,22 @@ class StateGraph extends EventEmitter {
 
         for (const [gid, edgeList] of groups.entries()) {
             if (gid.startsWith('standalone_')) {
-                const edge = edgeList[0];
-                if (typeof edge.condition === 'function') {
+                const edge = edgeList.find(e => e.condition || e.conditionId) || edgeList[0];
+                let condFn = edge.condition;
+                if (!condFn && edge.conditionId && typeof StateGraph !== 'undefined' && StateGraph.resolveCondition) {
+                    condFn = StateGraph.resolveCondition(edge.conditionId);
+                    if (condFn) edge.condition = condFn;
+                }
+
+                if (edge.conditionId && !condFn) {
+                    // P0 FIX: FAIL-CLOSED: Edge requires conditionId, but predicate cannot be resolved!
+                    // Do NOT fall back to unconditional edge! Mark inactive.
+                    this.inactiveEdges.add(`${edge.from}->${edge.to}`);
+                    this.activeEdges.delete(`${edge.from}->${edge.to}`);
+                } else if (condFn) {
                     let condMet = false;
                     try {
-                        condMet = Boolean(edge.condition(this.state, this));
+                        condMet = Boolean(condFn(this.state, this));
                     } catch (e) {
                         condMet = false;
                     }
@@ -349,7 +368,7 @@ class StateGraph extends EventEmitter {
                         this.activeEdges.delete(`${edge.from}->${edge.to}`);
                     }
                 } else {
-                    // Unconditional edge
+                    // Genuine unconditional edge (no conditionId and no condition function)
                     this.activeEdges.add(`${edge.from}->${edge.to}`);
                     this.inactiveEdges.delete(`${edge.from}->${edge.to}`);
                 }
@@ -360,10 +379,16 @@ class StateGraph extends EventEmitter {
                 const defaultBranch = edgeList.find(e => e.isDefault) || null;
 
                 for (const b of nonDefaultBranches) {
-                    if (typeof b.condition === 'function') {
+                    let condFn = b.condition;
+                    if (!condFn && b.conditionId && typeof StateGraph !== 'undefined' && StateGraph.resolveCondition) {
+                        condFn = StateGraph.resolveCondition(b.conditionId);
+                        if (condFn) b.condition = condFn;
+                    }
+
+                    if (condFn) {
                         let isMet = false;
                         try {
-                            isMet = Boolean(b.condition(this.state, this));
+                            isMet = Boolean(condFn(this.state, this));
                         } catch (e) {
                             isMet = false;
                         }
@@ -1182,10 +1207,15 @@ class StateGraph extends EventEmitter {
 // Persistent static condition registry
 StateGraph.conditionRegistry = new Map(globalConditionRegistry.getAll());
 
-StateGraph.registerCondition = function(conditionId, fn, descriptor = null) {
-    if (conditionId && typeof fn === 'function') {
-        StateGraph.conditionRegistry.set(conditionId, fn);
-        globalConditionRegistry.register(conditionId, fn, descriptor);
+StateGraph.registerCondition = function(conditionId, fnOrDescriptor, descriptor = null) {
+    if (!conditionId) return;
+    if (typeof fnOrDescriptor === 'function') {
+        StateGraph.conditionRegistry.set(conditionId, fnOrDescriptor);
+        globalConditionRegistry.register(conditionId, fnOrDescriptor, descriptor);
+    } else if (typeof fnOrDescriptor === 'object' && fnOrDescriptor !== null) {
+        globalConditionRegistry.register(conditionId, fnOrDescriptor);
+        const compiled = globalConditionRegistry.get(conditionId);
+        if (compiled) StateGraph.conditionRegistry.set(conditionId, compiled);
     }
 };
 

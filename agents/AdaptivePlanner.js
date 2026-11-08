@@ -273,63 +273,202 @@ class AdaptivePlanner {
     }
 
     /**
-     * Update 19: Synthesize a custom open-ended task DAG for novel requests
-     * Dynamically assigning roles, dependencies, tool budgets, and verification criteria
+     * Update 20: Validate DAG structure, detect cycles via Kahn's algorithm, and return topologically sorted tasks
+     */
+    validateAndToposort(tasks = []) {
+        if (!Array.isArray(tasks) || tasks.length === 0) return [];
+        const taskMap = new Map();
+        const inDegree = new Map();
+        const adj = new Map();
+
+        for (const t of tasks) {
+            taskMap.set(t.id, t);
+            inDegree.set(t.id, 0);
+            adj.set(t.id, []);
+        }
+
+        for (const t of tasks) {
+            const deps = Array.isArray(t.dependencies) ? t.dependencies : [];
+            for (const d of deps) {
+                if (adj.has(d)) {
+                    adj.get(d).push(t.id);
+                    inDegree.set(t.id, inDegree.get(t.id) + 1);
+                }
+            }
+        }
+
+        const queue = [];
+        for (const [id, deg] of inDegree.entries()) {
+            if (deg === 0) queue.push(id);
+        }
+
+        const sorted = [];
+        while (queue.length > 0) {
+            const u = queue.shift();
+            sorted.push(taskMap.get(u));
+            for (const v of adj.get(u)) {
+                inDegree.set(v, inDegree.get(v) - 1);
+                if (inDegree.get(v) === 0) queue.push(v);
+            }
+        }
+
+        if (sorted.length !== tasks.length) {
+            const unvisited = tasks.filter(t => !sorted.some(s => s.id === t.id)).map(t => t.id);
+            throw new Error(`[AdaptivePlanner] Cycle detected in task dependencies: [${unvisited.join(', ')}]`);
+        }
+        return sorted;
+    }
+
+    /**
+     * Update 20: Synthesize an autonomous, open-ended task DAG for novel requests
+     * Dynamically determining role allocation, concurrency matrices, dependency trees,
+     * tool budgets, and verification criteria based on semantic intent and topology
      */
     synthesizeDynamicDag(userRequest, options = {}) {
         const text = String(userRequest || '').trim();
         const planId = `DAG_${Date.now().toString(36)}`;
+
+        // If explicit custom tasks passed, validate and toposort
+        if (Array.isArray(options.customTasks) && options.customTasks.length > 0) {
+            const sorted = this.validateAndToposort(options.customTasks);
+            return {
+                mode: 'dynamic_dag',
+                planId,
+                description: `Custom validated DAG (${sorted.length} nodes)`,
+                tasks: sorted,
+                isDynamicDag: true
+            };
+        }
+
+        // Semantic analysis for autonomous decomposition
+        const isComparison = /so sánh|đối chiếu|\bcompare\b|\bvs\b|đồng thời|song song|hai bên/i.test(text);
+        const needsResearch = /tìm|tra cứu|nghiên cứu|thị trường|phân tích|doi|paper|báo cáo|dữ liệu|cào|crawl|scrape|fetch|thống kê/i.test(text);
+        const needsCode = /code|script|tính toán|mô hình|xây dựng|tạo file|xuất file|csv|python|javascript|chạy|xử lý/i.test(text);
+        const needsSecurity = /bảo mật|security|quét lỗ hổng|audit an toàn|injection|sandbox|phân quyền/i.test(text);
+        const needsVerification = /kiểm tra|thẩm định|chính xác|xác nhận|verify|audit|chống sai|nghiệm thu/i.test(text) || needsCode;
+
         const tasks = [];
 
-        // 1. Determine need for domain ingestion / external reconnaissance
-        const needsResearch = /tìm|tra cứu|nghiên cứu|thị trường|phân tích|doi|paper|báo cáo|dữ liệu|cào|crawl|scrape|fetch/i.test(text);
-        // 2. Determine need for technical synthesis / code execution
-        const needsCode = /code|script|tính toán|mô hình|xây dựng|tạo file|xuất file|csv|python|javascript|chạy/i.test(text);
-        // 3. Determine need for empirical verification
-        const needsVerification = /kiểm tra|thẩm định|chính xác|xác nhận|verify|audit|chống sai/i.test(text) || needsCode;
+        if (isComparison) {
+            // Autonomous Concurrency: Generate multiple parallel exploration nodes
+            const compMatch = text.match(/(?:so sánh|đối chiếu|compare)\s+([^và]+?)\s+(?:và|với|vs)\s+(.+)/i);
+            const targetA = compMatch ? compMatch[1].trim() : 'Đối tượng A';
+            const targetB = compMatch ? compMatch[2].trim() : 'Đối tượng B';
 
-        if (needsResearch || !needsCode) {
+            const nodeA = `${planId}_01_EXPLORE_A`;
+            const nodeB = `${planId}_01_EXPLORE_B`;
+
             tasks.push({
-                id: `${planId}_01_RESEARCH`,
-                description: `Thu thập dữ liệu nguồn, trích xuất cấu trúc và kiểm chứng tham số đầu vào cho yêu cầu: ${text}`,
+                id: nodeA,
+                description: `Nghiên cứu độc lập và thu thập dữ liệu chuyên sâu cho: ${targetA}`,
                 assignedTo: 'researcher',
                 priority: 1,
                 dependencies: [],
+                toolsRequired: ['web_search', 'fetch_page'],
                 acceptanceCriteria: ['non-empty output', 'claims'],
                 timeoutMs: 60000
             });
-        }
 
-        if (needsCode) {
-            const deps = tasks.length > 0 ? [tasks[tasks.length - 1].id] : [];
             tasks.push({
-                id: `${planId}_02_EXECUTE`,
-                description: `Triển khai mã nguồn thực thi, xử lý thuật toán và sản xuất kết quả vật lý cho: ${text}`,
+                id: nodeB,
+                description: `Nghiên cứu độc lập và thu thập dữ liệu chuyên sâu cho: ${targetB}`,
+                assignedTo: 'researcher',
+                priority: 1,
+                dependencies: [],
+                toolsRequired: ['web_search', 'fetch_page'],
+                acceptanceCriteria: ['non-empty output', 'claims'],
+                timeoutMs: 60000
+            });
+
+            const synthNode = `${planId}_02_SYNTHESIS`;
+            tasks.push({
+                id: synthNode,
+                description: `Tổng hợp đối chiếu đa chiều, phân tích điểm tương đồng & dị biệt giữa ${targetA} và ${targetB}`,
                 assignedTo: 'developer',
                 priority: 1,
-                dependencies: deps,
-                acceptanceCriteria: ['executable_code', 'syntax', 'tool_execution'],
+                dependencies: [nodeA, nodeB], // Converges parallel branches!
+                toolsRequired: ['python_runner'],
+                acceptanceCriteria: ['non-empty output'],
                 timeoutMs: 90000
             });
+
+            if (needsVerification) {
+                tasks.push({
+                    id: `${planId}_03_AUDIT`,
+                    description: `Kiểm chứng tính khách quan của dữ liệu đối chiếu và nghiệm thu kết quả so sánh`,
+                    assignedTo: 'critic',
+                    priority: 2,
+                    dependencies: [synthNode],
+                    toolsRequired: [],
+                    acceptanceCriteria: ['non-empty output'],
+                    timeoutMs: 45000
+                });
+            }
+        } else {
+            // Standard multi-stage autonomous pipeline
+            if (needsResearch || !needsCode) {
+                tasks.push({
+                    id: `${planId}_01_RESEARCH`,
+                    description: `Thu thập dữ liệu nguồn, trích xuất cấu trúc và kiểm chứng tham số đầu vào cho yêu cầu: ${text}`,
+                    assignedTo: 'researcher',
+                    priority: 1,
+                    dependencies: [],
+                    toolsRequired: ['web_search', 'fetch_page'],
+                    acceptanceCriteria: ['non-empty output', 'claims'],
+                    timeoutMs: 60000
+                });
+            }
+
+            if (needsCode) {
+                const deps = tasks.length > 0 ? [tasks[tasks.length - 1].id] : [];
+                tasks.push({
+                    id: `${planId}_02_EXECUTE`,
+                    description: `Triển khai mã nguồn thực thi, xử lý thuật toán và sản xuất kết quả vật lý cho: ${text}`,
+                    assignedTo: 'developer',
+                    priority: 1,
+                    dependencies: deps,
+                    toolsRequired: ['python_runner', 'file_writer'],
+                    acceptanceCriteria: ['executable_code', 'syntax', 'tool_execution'],
+                    timeoutMs: 90000
+                });
+            }
+
+            if (needsSecurity) {
+                const deps = tasks.length > 0 ? [tasks[tasks.length - 1].id] : [];
+                tasks.push({
+                    id: `${planId}_02_SECURITY_AUDIT`,
+                    description: `Kiểm tra an ninh và kiểm toán lỗ hổng độc lập cho giải pháp: ${text}`,
+                    assignedTo: 'security_auditor',
+                    priority: 1,
+                    dependencies: deps,
+                    toolsRequired: ['code_scanner'],
+                    acceptanceCriteria: ['non-empty output'],
+                    timeoutMs: 45000
+                });
+            }
+
+            if (needsVerification && tasks.length > 0) {
+                tasks.push({
+                    id: `${planId}_03_AUDIT`,
+                    description: `Thẩm định độc lập tính chính xác của sản phẩm, đối chiếu tiêu chí chất lượng và phê duyệt nghiệm thu cho: ${text}`,
+                    assignedTo: 'critic',
+                    priority: 2,
+                    dependencies: [tasks[tasks.length - 1].id],
+                    toolsRequired: [],
+                    acceptanceCriteria: ['non-empty output'],
+                    timeoutMs: 45000
+                });
+            }
         }
 
-        if (needsVerification && tasks.length > 0) {
-            tasks.push({
-                id: `${planId}_03_AUDIT`,
-                description: `Thẩm định độc lập tính chính xác của sản phẩm, đối chiếu tiêu chí chất lượng và phê duyệt nghiệm thu cho: ${text}`,
-                assignedTo: 'critic',
-                priority: 2,
-                dependencies: [tasks[tasks.length - 1].id],
-                acceptanceCriteria: ['non-empty output'],
-                timeoutMs: 45000
-            });
-        }
+        // Topologically sort and ensure acyclic validity
+        const validatedTasks = this.validateAndToposort(tasks);
 
         return {
             mode: 'dynamic_dag',
             planId,
-            description: `Dynamically synthesized DAG (${tasks.length} nodes) for novel request`,
-            tasks,
+            description: `Autonomous synthesized DAG (${validatedTasks.length} nodes) with topological validation`,
+            tasks: validatedTasks,
             isDynamicDag: true
         };
     }

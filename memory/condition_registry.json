@@ -1,6 +1,14 @@
 {
   "cold_test_metric_gt_50": {
-    "type": "expression",
-    "expr": "(state.metric || 0) > 50"
+    "type": "comparison",
+    "path": "metric",
+    "operator": ">",
+    "value": 50
+  },
+  "cold_proc_metric_gt_50": {
+    "type": "comparison",
+    "path": "metric",
+    "operator": ">",
+    "value": 50
   }
 }

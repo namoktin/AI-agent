@@ -192,7 +192,7 @@ async function runTests() {
         // 2. Acceptance of source with verifiable document provenance
         const auditWithDoc = await verifier.verifyNodeOutput(nodeClaims, {
             response: 'Tỷ lệ tăng trưởng 45% ở 120 đơn vị năm 2026.',
-            sources: [{ documentId: 'GOV-STAT-2026', text: 'Tỷ lệ tăng trưởng 45% ở 120 đơn vị năm 2026 theo cục thống kê.' }]
+            sources: [{ documentId: 'GOV-STAT-2026', verified: true, origin: 'verified_record', text: 'Tỷ lệ tăng trưởng 45% ở 120 đơn vị năm 2026 theo cục thống kê.' }]
         });
         assert.strictEqual(auditWithDoc.passed, true, 'Source with verifiable document ID provenance must pass');
 

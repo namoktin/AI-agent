@@ -597,6 +597,18 @@ ${CORE_TIER5_AXIOMS}
     }
 
     /**
+     * Update 20: First-class autonomous dynamic DAG orchestration
+     * Synthesizes and executes an open-ended topological DAG for novel user requests
+     */
+    async executeDynamicDag(userRequest, options = {}) {
+        return this.execute(userRequest, {
+            ...options,
+            mode: 'dynamic_dag',
+            preferDynamicDag: true
+        });
+    }
+
+    /**
      * 🚀 MAIN EXECUTION PIPELINE
      */
     async execute(userRequest, context = {}) {
@@ -765,7 +777,18 @@ ${CORE_TIER5_AXIOMS}
                 this.log('📌 Resuming STAGE 2 from checkpoint');
             } else {
                 this.log(`🎮 STAGE 2: Adaptive Task Planning (Mode: ${mode.toUpperCase()})`);
-                const adaptivePlan = this.adaptivePlanner.generatePlan(mode, userRequest, directive, context.matchedSkill);
+                let adaptivePlan;
+                if (mode === 'dynamic_dag' || directive?.preferDynamicDag || context?.preferDynamicDag || context?.useDynamicDag) {
+                    this.log(`🌐 [AdaptivePlanner] Synthesizing autonomous Dynamic DAG for request`);
+                    adaptivePlan = this.adaptivePlanner.synthesizeDynamicDag(userRequest, {
+                        mode,
+                        directive,
+                        matchedSkill: context.matchedSkill,
+                        customTasks: context.customTasks
+                    });
+                } else {
+                    adaptivePlan = this.adaptivePlanner.generatePlan(mode, userRequest, directive, context.matchedSkill);
+                }
 
                 if (mode === 'deep_research' || mode === 'autonomous' || mode === 'standard' || context.matchedSkill || (adaptivePlan?.tasks && adaptivePlan.tasks.length > 0)) {
                     this.log(`📐 [AdaptivePlanner] Activated task graph directly (${adaptivePlan.tasks.length} tasks)`);

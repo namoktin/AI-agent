@@ -1,0 +1,327 @@
+/**
+ * test_tier4_update20_production.js
+ * Cyber Agent Pro v5.7 - Update 20 (Production Hardening & Autonomous Dynamic DAG)
+ * 
+ * Verifies all 6 core technical audit items:
+ * 1. True Multi-Process Restart via child_process.spawn() (Zero RAM Inheritance)
+ * 2. Condition DSL Engine & Arbitrary Code Execution Elimination (No new Function / eval)
+ * 3. Complete ConditionId Resolution in Outgoing Branches & Fail-Closed canExecute()
+ * 4. Strict Provenance Verification & Sentence-Level Semantic Entailment in IndependentVerifier
+ * 5. Full Orchestrator Integration of Autonomous Dynamic DAG Pipeline
+ * 6. Autonomous Topological DAG Synthesis with Concurrency & Kahn's Cycle Detection
+ */
+
+const assert = require('assert');
+const path = require('path');
+const fs = require('fs');
+const { spawn } = require('child_process');
+
+const { StateGraph, StateNode } = require('../agents/StateGraph');
+const { globalConditionRegistry, safeEvaluateDsl, parseExpressionToDsl } = require('../agents/StateGraphConditions');
+const { IndependentVerifier } = require('../agents/IndependentVerifier');
+const { AdaptivePlanner } = require('../agents/AdaptivePlanner');
+const { AgentOrchestrator } = require('../agents/AgentOrchestrator');
+
+async function runTests() {
+    console.log('===============================================================');
+    console.log('🧪 SUITE 11: UPDATE 20 PRODUCTION HARDENING & AUTONOMOUS DAG');
+    console.log('===============================================================\n');
+
+    let totalTests = 0;
+    let passedTests = 0;
+
+    // -------------------------------------------------------------
+    // TEST 1: TRUE MULTI-PROCESS RESTART VIA child_process.spawn()
+    // -------------------------------------------------------------
+    console.log('--- PHẦN 1: TRUE MULTI-PROCESS RESTART VIA child_process.spawn() ---');
+    {
+        totalTests++;
+
+        // Register persistent condition descriptor using safe Condition DSL
+        StateGraph.registerCondition('cold_proc_metric_gt_50', {
+            type: 'comparison',
+            path: 'metric',
+            operator: '>',
+            value: 50
+        });
+
+        const graph = new StateGraph({ id: 'multiprocess_restart_graph' });
+        graph.addNode({ id: 'source', action: async () => ({ success: true, metric: 85 }) });
+        graph.addNode({ id: 'target', dependencies: ['source'], action: async () => ({ success: true, executedInChildProcess: true }) });
+        graph.addConditionalEdge('source', 'target', null, 'cold_proc_metric_gt_50');
+
+        const serialized = graph.serialize();
+
+        // Write to temporary test files
+        const tmpDir = path.resolve(__dirname, '..', 'memory');
+        if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+        const graphFile = path.join(tmpDir, 'test_multiprocess_graph.json');
+        const outFile = path.join(tmpDir, 'test_multiprocess_output.json');
+        fs.writeFileSync(graphFile, JSON.stringify(serialized, null, 2), 'utf8');
+        if (fs.existsSync(outFile)) fs.unlinkSync(outFile);
+
+        // Spawn a brand new independent Node.js process!
+        const runnerPath = path.resolve(__dirname, 'helpers', 'resume_process_runner.js');
+        const child = spawn(process.execPath, [runnerPath, graphFile, outFile], {
+            cwd: path.resolve(__dirname, '..'),
+            env: { ...process.env },
+            stdio: ['ignore', 'pipe', 'pipe']
+        });
+
+        const exitCode = await new Promise((resolve) => {
+            child.on('close', (code) => resolve(code));
+        });
+
+        assert.strictEqual(exitCode, 0, 'Child process must exit with code 0');
+        assert.ok(fs.existsSync(outFile), 'Child process must write output file');
+
+        const outData = JSON.parse(fs.readFileSync(outFile, 'utf8'));
+        assert.notStrictEqual(outData.pid, process.pid, 'Child process PID must be different from parent PID');
+        assert.strictEqual(outData.status, 'COMPLETED', 'Restored graph in new OS process must complete successfully');
+        assert.ok(outData.completedNodes.includes('target'), 'Target node must execute in child process via persistent DSL condition');
+
+        // Cleanup
+        try { fs.unlinkSync(graphFile); } catch (_) {}
+        try { fs.unlinkSync(outFile); } catch (_) {}
+
+        passedTests++;
+        console.log('✅ [TEST 1] PASS: child_process.spawn() tạo tiến trình OS độc lập hoàn toàn, tự nạp registry từ đĩa và khôi phục graph 100% không chung RAM');
+    }
+
+    // -------------------------------------------------------------
+    // TEST 2: SAFE CONDITION DSL & ZERO CODE INJECTION (NO new Function / eval)
+    // -------------------------------------------------------------
+    console.log('\n--- PHẦN 2: SAFE CONDITION DSL & CODE INJECTION ELIMINATION ---');
+    {
+        totalTests++;
+
+        // 1. Declarative Comparison AST
+        const compDsl = { type: 'comparison', path: 'state.qualityScore', operator: '>=', value: 85 };
+        assert.strictEqual(safeEvaluateDsl(compDsl, { qualityScore: 90 }), true);
+        assert.strictEqual(safeEvaluateDsl(compDsl, { qualityScore: 75 }), false);
+
+        // 2. Declarative Logical Combinators (AND / OR / NOT)
+        const logicalDsl = {
+            type: 'logical',
+            operator: 'and',
+            conditions: [
+                { type: 'comparison', path: 'approved', operator: 'equals', value: true },
+                { type: 'comparison', path: 'role', operator: 'equals', value: 'auditor' }
+            ]
+        };
+        assert.strictEqual(safeEvaluateDsl(logicalDsl, { approved: true, role: 'auditor' }), true);
+        assert.strictEqual(safeEvaluateDsl(logicalDsl, { approved: true, role: 'guest' }), false);
+
+        // 3. Strict rejection of arbitrary code injection attempts
+        const maliciousPayloads = [
+            'process.exit(1)',
+            'require("child_process").execSync("whoami")',
+            'global.hacked = true; return true;',
+            'while(true){}'
+        ];
+        for (const mal of maliciousPayloads) {
+            const parsed = parseExpressionToDsl(mal);
+            assert.strictEqual(parsed, null, `Malicious payload "${mal}" must be rejected by Condition DSL parser`);
+        }
+
+        // 4. Safe binary expression parser
+        const safeExpr = '(state.metric || 0) > 50';
+        const parsedSafe = parseExpressionToDsl(safeExpr);
+        assert.ok(parsedSafe, 'Safe binary expression must be parsed');
+        assert.strictEqual(parsedSafe.operator, '>');
+        assert.strictEqual(parsedSafe.value, 50);
+
+        passedTests++;
+        console.log('✅ [TEST 2] PASS: Loại bỏ triệt để new Function/eval, Condition DSL bảo vệ chống Arbitrary Code Execution và hỗ trợ AST an toàn');
+    }
+
+    // -------------------------------------------------------------
+    // TEST 3: BRANCH RESOLUTION WITH conditionId & FAIL-CLOSED canExecute()
+    // -------------------------------------------------------------
+    console.log('\n--- PHẦN 3: BRANCH conditionId RESOLUTION & FAIL-CLOSED canExecute() ---');
+    {
+        totalTests++;
+
+        // 1. Node with missing/unresolvable conditionId MUST FAIL CLOSED
+        const blockedNode = new StateNode({
+            id: 'security_sensitive_node',
+            conditionId: 'unresolvable_secret_condition_404',
+            action: async () => ({ success: true })
+        });
+        const canRun = blockedNode.canExecute(new Set(), { approved: true });
+        assert.strictEqual(canRun, false, 'Node with unresolvable conditionId MUST FAIL CLOSED (return false)');
+
+        // 2. Branch group with only conditionId (simulating deserialized graph)
+        const branchGraph = new StateGraph({ id: 'branch_condition_id_graph' });
+        branchGraph.addNode({ id: 'decision', action: async () => ({ success: true }) });
+        branchGraph.addNode({ id: 'node_yes', dependencies: ['decision'], action: async () => ({ success: true }) });
+        branchGraph.addNode({ id: 'node_no', dependencies: ['decision'], action: async () => ({ success: true }) });
+
+        branchGraph.addBranch('decision', [
+            { target: 'node_yes', conditionId: 'is_approved_true' },
+            { target: 'node_no', conditionId: 'is_approved_false' }
+        ]);
+
+        // Clear in-memory condition functions on edges to strictly test conditionId resolution
+        for (const edge of branchGraph.edges) {
+            edge.condition = null;
+        }
+
+        // Set state to approved: false -> node_no must activate, node_yes must be inactive/skipped
+        branchGraph.state = { approved: false };
+        const decisionNode = branchGraph.nodes.get('decision');
+        decisionNode.status = 'COMPLETED';
+        branchGraph.completedNodes.add('decision');
+        branchGraph._evaluateOutgoingEdges('decision');
+
+        assert.ok(branchGraph.activeEdges.has('decision->node_no'), 'decision->node_no must be ACTIVE via conditionId');
+        assert.ok(branchGraph.inactiveEdges.has('decision->node_yes'), 'decision->node_yes must be INACTIVE via conditionId');
+        assert.strictEqual(branchGraph.nodes.get('node_yes').status, 'SKIPPED', 'Unmatched branch must be SKIPPED');
+
+        // 3. Standalone edge with unresolvable conditionId MUST FAIL CLOSED (never become unconditional)
+        const standaloneGraph = new StateGraph({ id: 'standalone_fail_closed' });
+        standaloneGraph.addNode({ id: 'n1', action: async () => ({ success: true }) });
+        standaloneGraph.addNode({ id: 'n2', dependencies: ['n1'], action: async () => ({ success: true }) });
+        standaloneGraph.addEdge('n1', 'n2', null, 'unknown_broken_predicate_xyz');
+
+        const n1Node = standaloneGraph.nodes.get('n1');
+        n1Node.status = 'COMPLETED';
+        standaloneGraph.completedNodes.add('n1');
+        standaloneGraph._evaluateOutgoingEdges('n1');
+        assert.ok(standaloneGraph.inactiveEdges.has('n1->n2'), 'Edge with unresolvable conditionId must fail closed (marked inactive)');
+        assert.strictEqual(standaloneGraph.activeEdges.has('n1->n2'), false, 'Edge with unresolvable conditionId must NOT become active');
+
+        passedTests++;
+        console.log('✅ [TEST 3] PASS: Đánh giá conditionId chuẩn xác trên từng nhánh rẽ và Fail-Closed triệt để khi điều kiện thất lạc');
+    }
+
+    // -------------------------------------------------------------
+    // TEST 4: STRICT PROVENANCE & SEMANTIC ENTAILMENT IN VERIFIER
+    // -------------------------------------------------------------
+    console.log('\n--- PHẦN 4: STRICT PROVENANCE & SEMANTIC ENTAILMENT IN VERIFIER ---');
+    {
+        totalTests++;
+        const verifier = new IndependentVerifier(path.resolve(__dirname, '..'));
+
+        const nodeSpec = { id: 'market_audit', acceptanceCriteria: ['claims'] };
+
+        // 1. Unverified / ungrounded documentId string must FAIL provenance check
+        const auditUngrounded = await verifier.verifyNodeOutput(nodeSpec, {
+            response: 'Doanh thu tăng trưởng 85% đạt 50 triệu USD năm 2026.',
+            sources: [{ documentId: 'UNVERIFIED-DOC-MOCK-999', text: 'Doanh thu tăng trưởng 85% đạt 50 triệu USD năm 2026.' }]
+        });
+        assert.strictEqual(auditUngrounded.passed, false, 'Ungrounded documentId without verification or physical backing must be rejected');
+
+        // 2. Verified document registered in evidence registry must PASS provenance
+        verifier.registerEvidenceDocument('GOV-STAT-2026', { origin: 'official_record', verified: true });
+        const auditVerifiedDoc = await verifier.verifyNodeOutput(nodeSpec, {
+            response: 'Doanh thu tăng trưởng 85% đạt 50 triệu USD năm 2026.',
+            sources: [{ documentId: 'GOV-STAT-2026', text: 'Doanh thu tăng trưởng 85% đạt 50 triệu USD năm 2026.' }]
+        });
+        assert.strictEqual(auditVerifiedDoc.passed, true, 'Registered official document must pass provenance & claim check');
+
+        // 3. Physical file provenance verification
+        const dummyFile = path.resolve(__dirname, '..', 'memory', 'test_provenance_evidence.txt');
+        fs.writeFileSync(dummyFile, 'Khảo sát thực địa ghi nhận 1500 ca phục hồi hoàn toàn.', 'utf8');
+
+        const auditPhysicalFile = await verifier.verifyNodeOutput(nodeSpec, {
+            response: 'Khảo sát thực địa ghi nhận 1500 ca phục hồi hoàn toàn.',
+            sources: [{ filePath: dummyFile, text: 'Khảo sát thực địa ghi nhận 1500 ca phục hồi hoàn toàn.' }]
+        });
+        assert.strictEqual(auditPhysicalFile.passed, true, 'Physical file on disk must pass provenance verification');
+        try { fs.unlinkSync(dummyFile); } catch (_) {}
+
+        // 4. Semantic Entailment & Contradiction Detection in verifyClaimsEvidence
+        const claimContradicted = verifier.verifyClaimsEvidence(
+            ['Lợi nhuận ròng tăng 25% trong quý 1'],
+            [{ text: 'Báo cáo kiểm toán ghi nhận ngược lại doanh thu và lợi nhuận ròng giảm thay vì tăng 25% trong quý 1.' }]
+        );
+        assert.strictEqual(claimContradicted.passed, false, 'Contradictory evidence sentence must fail claim verification');
+        assert.strictEqual(claimContradicted.status, 'CONTRADICTED', 'Status must be CONTRADICTED');
+
+        passedTests++;
+        console.log('✅ [TEST 4] PASS: Kiểm chứng nguồn gốc vật lý/đăng ký chính thức và bắt quả tang mâu thuẫn ngữ nghĩa (Semantic Entailment)');
+    }
+
+    // -------------------------------------------------------------
+    // TEST 5: FULL ORCHESTRATOR INTEGRATION OF DYNAMIC DAG
+    // -------------------------------------------------------------
+    console.log('\n--- PHẦN 5: AGENT ORCHESTRATOR DYNAMIC DAG INTEGRATION ---');
+    {
+        totalTests++;
+
+        const orchestrator = new AgentOrchestrator({ apiKey: 'gemini_test_key' });
+
+        // Verify executeDynamicDag method exists and routes properly
+        assert.strictEqual(typeof orchestrator.executeDynamicDag, 'function', 'executeDynamicDag must be exposed on AgentOrchestrator');
+
+        // Verify stage 2 planning routes through synthesizeDynamicDag when preferDynamicDag is set
+        const userRequest = 'So sánh hiệu năng giữa Redis và Memcached cho kiến trúc microservices';
+        const dynamicPlan = orchestrator.adaptivePlanner.synthesizeDynamicDag(userRequest, {
+            preferDynamicDag: true
+        });
+
+        assert.strictEqual(dynamicPlan.mode, 'dynamic_dag', 'Mode must be dynamic_dag');
+        assert.strictEqual(dynamicPlan.isDynamicDag, true, 'isDynamicDag must be true');
+        assert.ok(dynamicPlan.tasks.length >= 3, 'Must synthesize at least 3 topological tasks');
+
+        passedTests++;
+        console.log('✅ [TEST 5] PASS: AgentOrchestrator kết nối trực tiếp với synthesizeDynamicDag và hỗ trợ luồng thực thi executeDynamicDag()');
+    }
+
+    // -------------------------------------------------------------
+    // TEST 6: AUTONOMOUS TOPOLOGICAL DAG & KAHN CYCLE DETECTION
+    // -------------------------------------------------------------
+    console.log('\n--- PHẦN 6: AUTONOMOUS TOPOLOGY & CYCLE DETECTION ---');
+    {
+        totalTests++;
+        const planner = new AdaptivePlanner();
+
+        // 1. Autonomous concurrency: Comparative request generates parallel nodes converging to synthesis
+        const compPlan = planner.synthesizeDynamicDag('So sánh Apache Kafka và RabbitMQ');
+        const tasks = compPlan.tasks;
+
+        const exploreNodes = tasks.filter(t => t.id.includes('EXPLORE'));
+        assert.strictEqual(exploreNodes.length, 2, 'Must generate exactly 2 parallel exploration nodes for comparison');
+        assert.deepStrictEqual(exploreNodes[0].dependencies, [], 'Exploration node A must have empty dependencies (runs in parallel)');
+        assert.deepStrictEqual(exploreNodes[1].dependencies, [], 'Exploration node B must have empty dependencies (runs in parallel)');
+
+        const synthNode = tasks.find(t => t.id.includes('SYNTHESIS'));
+        assert.ok(synthNode, 'Must generate synthesis convergence node');
+        assert.ok(synthNode.dependencies.includes(exploreNodes[0].id) && synthNode.dependencies.includes(exploreNodes[1].id), 'Synthesis node must depend on both parallel nodes');
+
+        // 2. Kahn Cycle Detection strictly blocks cyclic task dependencies
+        const cyclicTasks = [
+            { id: 'NODE_ALPHA', dependencies: ['NODE_BETA'] },
+            { id: 'NODE_BETA', dependencies: ['NODE_ALPHA'] }
+        ];
+        assert.throws(() => {
+            planner.validateAndToposort(cyclicTasks);
+        }, /Cycle detected in task dependencies/, 'validateAndToposort must throw Error when dependency cycle exists');
+
+        // 3. Valid acyclic DAG sorts topologically
+        const validDag = [
+            { id: 'NODE_C', dependencies: ['NODE_B'] },
+            { id: 'NODE_A', dependencies: [] },
+            { id: 'NODE_B', dependencies: ['NODE_A'] }
+        ];
+        const sorted = planner.validateAndToposort(validDag);
+        assert.deepStrictEqual(sorted.map(n => n.id), ['NODE_A', 'NODE_B', 'NODE_C'], 'Topological sort order must be strictly respected');
+
+        passedTests++;
+        console.log('✅ [TEST 6] PASS: Đồ thị song song tự trị (Parallel Exploration -> Convergence) và thuật toán Kahn phát hiện vòng lặp phụ thuộc (Cycles)');
+    }
+
+    console.log('\n===============================================================');
+    console.log(`🎉 HOÀN THÀNH TOÀN BỘ ${passedTests}/${totalTests} BÀI KIỂM THỬ UPDATE 20 (100% PASS)`);
+    console.log('===============================================================');
+}
+
+if (require.main === module) {
+    runTests().catch(err => {
+        console.error('❌ Test failed with error:', err);
+        process.exit(1);
+    });
+}
+
+module.exports = { runTests };

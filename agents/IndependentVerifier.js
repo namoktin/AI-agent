@@ -10,6 +10,19 @@ const { execSync } = require('child_process');
 class IndependentVerifier {
     constructor(baseDir = process.cwd()) {
         this.baseDir = baseDir;
+        this.evidenceRegistry = new Map();
+    }
+
+    /**
+     * Register a verifiable external document into the evidence registry
+     */
+    registerEvidenceDocument(docId, metadata = {}) {
+        if (!docId) return this;
+        this.evidenceRegistry.set(docId, {
+            ...metadata,
+            registeredAt: Date.now()
+        });
+        return this;
     }
 
     /**
@@ -558,6 +571,51 @@ class IndependentVerifier {
     }
 
     /**
+     * Update 20: Sentence-level semantic entailment window check
+     * Verifies that the numbers and core keywords of a claim appear in the same propositional context
+     */
+    _checkSentenceEntailment(claimLower, numbers, keywords, sources) {
+        const chunks = [];
+        for (const s of sources) {
+            let t = '';
+            if (typeof s === 'string') t = s;
+            else if (s && typeof s === 'object') t = s.text || s.content || s.data || JSON.stringify(s);
+            if (t) {
+                const sentences = t.split(/(?<=[.!?\n])\s+/);
+                for (const sen of sentences) {
+                    if (sen.trim().length > 5) chunks.push(sen.toLowerCase().trim());
+                }
+            }
+        }
+
+        if (chunks.length === 0) return { supported: false, reason: 'No source text available' };
+
+        for (const sent of chunks) {
+            // Contradiction check: sentence mentioning relevant subject keywords but stating negation/failure
+            const subKw = keywords.filter(w => sent.includes(w));
+            if (subKw.length >= 2 && /ngược lại|trái ngược|sai sự thật|bác bỏ|không đạt|thất bại|giảm thay vì tăng|chưa được chứng minh/i.test(sent)) {
+                return { contradicted: true, reason: `Sentence explicitly contradicts claim: "${sent.slice(0, 100)}..."` };
+            }
+
+            // Check numbers
+            const numsInSent = numbers.filter(n => sent.includes(n));
+            const allNumsMatched = numbers.length === 0 || numsInSent.length === numbers.length;
+            const kwsInSent = keywords.filter(w => sent.includes(w));
+
+            if (allNumsMatched && (kwsInSent.length >= 2 || (keywords.length <= 1 && kwsInSent.length === keywords.length))) {
+                return {
+                    supported: true,
+                    sentence: sent,
+                    matchedNumbers: numsInSent,
+                    matchedKeywords: kwsInSent
+                };
+            }
+        }
+
+        return { supported: false, reason: 'No single sentence or local window contains all claimed metrics with required subject keywords' };
+    }
+
+    /**
      * Fact-check individual claims against evidence sources
      * Categorizes into SUPPORTED, CONTRADICTED, INSUFFICIENT_EVIDENCE
      */
@@ -611,36 +669,31 @@ class IndependentVerifier {
             const keywords = (claimLower.match(/[a-z0-9à-ỹ]{4,}/gi) || [])
                 .filter(w => !['trong', 'những', 'được', 'nhiều', 'thực', 'hiện', 'nghiên', 'cứu', 'thông', 'tin', 'cho', 'rằng'].includes(w));
 
-            const matchedNumbers = numbers.filter(n => sourcesText.includes(n));
-            const matchedKeywords = keywords.filter(w => sourcesText.includes(w));
-
-            const numberRatio = numbers.length > 0 ? (matchedNumbers.length / numbers.length) : 1;
-            const keywordRatio = keywords.length > 0 ? (matchedKeywords.length / keywords.length) : 0;
-
-            if ((numbers.length > 0 && numberRatio >= 0.7 && matchedKeywords.length >= 2) || (matchedKeywords.length >= 4 && keywordRatio >= 0.5)) {
+            const entailment = this._checkSentenceEntailment(claimLower, numbers, keywords, sources);
+            if (entailment.contradicted) {
+                contradicted++;
+                results.push({
+                    claim,
+                    status: 'CONTRADICTED',
+                    confidence: 0.9,
+                    reason: entailment.reason
+                });
+            } else if (entailment.supported) {
                 supported++;
                 results.push({
                     claim,
                     status: 'SUPPORTED',
-                    confidence: Math.min(0.98, 0.7 + (matchedKeywords.length * 0.05)),
-                    matchedEvidence: { numbers: matchedNumbers, keywords: matchedKeywords.slice(0, 5) },
-                    reason: `Được hỗ trợ bởi bằng chứng nguồn (${matchedKeywords.length} từ khóa, ${matchedNumbers.length} số liệu khớp)`
-                });
-            } else if (matchedKeywords.length >= 2) {
-                insufficient++;
-                results.push({
-                    claim,
-                    status: 'INSUFFICIENT_EVIDENCE',
-                    confidence: 0.55,
-                    reason: 'Nguồn có nhắc đến chủ đề nhưng chưa đủ đối chiếu trực tiếp toàn bộ dữ kiện'
+                    confidence: Math.min(0.98, 0.75 + (entailment.matchedKeywords.length * 0.05)),
+                    matchedEvidence: { numbers: entailment.matchedNumbers, keywords: entailment.matchedKeywords.slice(0, 5) },
+                    reason: `Được hỗ trợ ngữ nghĩa bởi bằng chứng nguồn: "${entailment.sentence.slice(0, 80)}..."`
                 });
             } else {
                 insufficient++;
                 results.push({
                     claim,
                     status: 'INSUFFICIENT_EVIDENCE',
-                    confidence: 0.3,
-                    reason: 'Không tìm thấy bằng chứng đối ứng trong nguồn'
+                    confidence: 0.45,
+                    reason: entailment.reason || 'Nguồn không trực tiếp xác nhận mệnh đề và số liệu trong cùng ngữ cảnh'
                 });
             }
         }
@@ -787,14 +840,40 @@ class IndependentVerifier {
                             criterionPassed = false;
                             detail = `Claim evidence check failed: No external evidence sources provided for ${claims.length} claims`;
                         } else {
-                            // Update 19 Verifiable Provenance Check: Sources must carry verifiable identity (URL, DOI, documentId, citation, or file)
+                            // Update 20 Strict Provenance Check: Sources must carry physically verifiable or registered identity
                             const hasVerifiableProvenance = externalSources.some(s => {
                                 if (typeof s === 'object' && s !== null) {
-                                    return Boolean(s.url || s.doi || s.pmid || s.filePath || s.documentId || s.citation);
+                                    // 1. Physical file on disk
+                                    if (s.filePath) {
+                                        const p = path.isAbsolute(s.filePath) ? s.filePath : path.resolve(this.baseDir, s.filePath);
+                                        return fs.existsSync(p) && fs.statSync(p).isFile() && fs.statSync(p).size > 0;
+                                    }
+                                    // 2. Syntactically valid URL
+                                    if (s.url && /^https?:\/\/[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:\/.*)?$/i.test(s.url)) return true;
+                                    // 3. Syntactically valid DOI or PMID
+                                    if (s.doi && /(?:doi:\s*)?10\.\d{4,9}\/[-._;()/:A-Za-z0-9]+/i.test(s.doi)) return true;
+                                    if (s.pmid && /^\d{6,9}$/.test(String(s.pmid))) return true;
+                                    // 4. Verifiable documentId: must be registered in evidenceRegistry, verified, or official regulatory/standards authority
+                                    if (s.documentId) {
+                                        if (this.evidenceRegistry.has(s.documentId)) return true;
+                                        if (s.verified === true || s.sha256 || s.origin === 'tool_execution' || s.origin === 'verified_record' || s.official === true) return true;
+                                        if (/^(?:SEC|GOV|ISO|RFC|IEEE|W3C|FDA|WHO|PATENT|USPTO)-/i.test(s.documentId)) return true;
+                                        return false; // Free-floating unverified mock documentId rejected
+                                    }
+                                    return false;
                                 }
                                 if (typeof s === 'string') {
-                                    return /(?:https?:\/\/)|(?:doi:\s*10\.\d{4,9})|(?:10\.\d{4,9}\/)|(?:pmid:\s*\d+)|(?:\.(?:csv|json|parquet|pdf|txt|xlsx|md)\b)/i.test(s)
-                                        || fs.existsSync(path.isAbsolute(s) ? s : path.resolve(this.baseDir, s));
+                                    if (/^https?:\/\/[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:\/.*)?$/i.test(s)) return true;
+                                    if (/(?:doi:\s*)?10\.\d{4,9}\/[-._;()/:A-Za-z0-9]+/i.test(s)) return true;
+                                    if (/pmid:\s*\d{6,9}/i.test(s)) return true;
+                                    const p = path.isAbsolute(s) ? s : path.resolve(this.baseDir, s);
+                                    if (fs.existsSync(p)) {
+                                        try {
+                                            const stat = fs.statSync(p);
+                                            return stat.isFile() && stat.size > 0;
+                                        } catch (_) { return false; }
+                                    }
+                                    return false;
                                 }
                                 return false;
                             });

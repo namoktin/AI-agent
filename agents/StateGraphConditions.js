@@ -1,9 +1,10 @@
 /**
  * StateGraphConditions.js
- * Cyber Agent Pro v5.5 - Persistent Transition & Condition Registry
+ * Cyber Agent Pro v5.7 - Hardened Persistent Condition Registry & Condition DSL
  * 
  * Provides built-in verifiable condition predicates that persist across server restarts,
- * and handles persistent serialization/restoration of dynamic graph conditions.
+ * and handles persistent serialization/restoration of dynamic graph conditions
+ * using a safe, declarative AST/DSL without eval or new Function (Zero Arbitrary Code Execution).
  */
 
 const fs = require('fs');
@@ -25,6 +26,135 @@ const builtInConditions = {
     'requires_research': (state) => Boolean(state.missingData || state.requiresResearch),
     'requires_code': (state) => Boolean(state.requiresCode || state.hasCodeTask)
 };
+
+/**
+ * Safely extract a property by dotted path without prototype pollution or code injection
+ */
+function safeGet(obj, pathStr) {
+    if (!obj || typeof obj !== 'object' || typeof pathStr !== 'string') return undefined;
+    const cleanPath = pathStr.replace(/^state\./, '').trim();
+    if (!cleanPath) return obj;
+    const parts = cleanPath.split('.');
+    let curr = obj;
+    for (const p of parts) {
+        if (!p || p === '__proto__' || p === 'constructor' || p === 'prototype') return undefined;
+        if (curr == null) return undefined;
+        curr = curr[p];
+    }
+    return curr;
+}
+
+/**
+ * Safely evaluate a declarative condition DSL descriptor against state and graph
+ * Supported types:
+ * 1. 'comparison': { type: 'comparison', path: 'state.metric', operator: '>', value: 50 }
+ * 2. 'logical': { type: 'logical', operator: 'and'|'or'|'not', conditions: [ ... ] }
+ * 3. 'key_equals': { type: 'key_equals', key: 'approved', value: true }
+ */
+function safeEvaluateDsl(dsl, state, graph) {
+    if (!dsl || typeof dsl !== 'object') return false;
+
+    // Logical Combinators
+    if (dsl.type === 'logical') {
+        const op = String(dsl.operator || 'and').toLowerCase();
+        const conditions = Array.isArray(dsl.conditions) ? dsl.conditions : [];
+        if (op === 'and') return conditions.every(c => safeEvaluateDsl(c, state, graph));
+        if (op === 'or') return conditions.some(c => safeEvaluateDsl(c, state, graph));
+        if (op === 'not') {
+            const target = conditions[0] || dsl.condition;
+            return !safeEvaluateDsl(target, state, graph);
+        }
+        return false;
+    }
+
+    // Key-Equals shorthand
+    if (dsl.type === 'key_equals') {
+        const val = safeGet(state, dsl.key);
+        return val === dsl.value;
+    }
+
+    // Comparison AST
+    if (dsl.type === 'comparison' || !dsl.type) {
+        const pathStr = dsl.path || dsl.key || '';
+        const val = safeGet(state, pathStr);
+        const target = dsl.value;
+        const op = String(dsl.operator || 'equals').toLowerCase();
+
+        switch (op) {
+            case 'equals':
+            case '==':
+            case '===':
+                return val === target;
+            case 'not_equals':
+            case '!=':
+            case '!==':
+                return val !== target;
+            case 'gt':
+            case '>':
+                return Number(val) > Number(target);
+            case 'gte':
+            case '>=':
+                return Number(val) >= Number(target);
+            case 'lt':
+            case '<':
+                return Number(val) < Number(target);
+            case 'lte':
+            case '<=':
+                return Number(val) <= Number(target);
+            case 'in':
+                return Array.isArray(target) && target.includes(val);
+            case 'contains':
+                if (typeof val === 'string') return val.includes(String(target));
+                if (Array.isArray(val)) return val.includes(target);
+                return false;
+            case 'exists':
+                return val !== undefined && val !== null && val !== '';
+            case 'truthy':
+                return Boolean(val);
+            case 'falsy':
+                return !val;
+            default:
+                return val === target;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Safely parse a simple legacy binary expression string into safe DSL AST
+ * STRICT: Rejects any complex statements, function calls, or malicious syntax
+ */
+function parseExpressionToDsl(expr) {
+    if (!expr || typeof expr !== 'string') return null;
+    const trimmed = expr.trim();
+
+    // Match pattern: (state.path || 0) > 50 or state.path === true
+    const match = trimmed.match(/^(?:\(?\s*state\.([a-zA-Z0-9_.]+)(?:\s*\|\|\s*0)?\s*\)?)\s*(===|==|!==|!=|>=|<=|>|<)\s*([a-zA-Z0-9_.-]+|'[^']*'|"[^"]*")$/);
+    if (!match) return null;
+
+    const path = match[1];
+    const rawOp = match[2];
+    const rawVal = match[3];
+
+    let op = rawOp;
+    if (rawOp === '===' || rawOp === '==') op = 'equals';
+    else if (rawOp === '!==' || rawOp === '!=') op = 'not_equals';
+
+    let val = rawVal;
+    if (rawVal === 'true') val = true;
+    else if (rawVal === 'false') val = false;
+    else if (rawVal === 'null') val = null;
+    else if (!isNaN(Number(rawVal))) val = Number(rawVal);
+    else val = rawVal.replace(/^['"]|['"]$/g, '');
+
+    return {
+        type: 'comparison',
+        path,
+        operator: op,
+        value: val
+    };
+}
 
 class PersistentConditionRegistry {
     constructor() {
@@ -49,25 +179,38 @@ class PersistentConditionRegistry {
             const data = JSON.parse(raw);
             if (data && typeof data === 'object') {
                 for (const [id, desc] of Object.entries(data)) {
-                    if (desc.type === 'expression' && typeof desc.expr === 'string') {
-                        try {
-                            // Safe expression evaluation: state => expr
-                            const fn = new Function('state', 'graph', `return Boolean(${desc.expr});`);
-                            this.conditions.set(id, fn);
-                            this.descriptors.set(id, desc);
-                        } catch (e) {
-                            console.warn(`[ConditionRegistry] Failed to recompile condition [${id}]:`, e.message);
-                        }
-                    } else if (desc.type === 'key_equals') {
-                        const fn = (state) => state && state[desc.key] === desc.value;
-                        this.conditions.set(id, fn);
-                        this.descriptors.set(id, desc);
-                    }
+                    this._compileAndRegister(id, desc, false);
                 }
             }
         } catch (e) {
             console.warn('[ConditionRegistry] Error loading persisted conditions:', e.message);
         }
+    }
+
+    _compileAndRegister(id, desc, persist = true) {
+        if (!desc || typeof desc !== 'object') return false;
+
+        let dslObj = desc;
+
+        // Legacy expression format: convert to DSL AST (NEVER use new Function or eval!)
+        if (desc.type === 'expression' && typeof desc.expr === 'string') {
+            const parsed = parseExpressionToDsl(desc.expr);
+            if (!parsed) {
+                console.warn(`[ConditionRegistry] REJECTED unsafe or unparseable expression for [${id}]: "${desc.expr}". Only safe Condition DSL is permitted.`);
+                return false;
+            }
+            dslObj = parsed;
+        }
+
+        // Pure safe DSL evaluation closure
+        const fn = (state, graph) => safeEvaluateDsl(dslObj, state, graph);
+        this.conditions.set(id, fn);
+        this.descriptors.set(id, dslObj);
+
+        if (persist) {
+            this._persist();
+        }
+        return true;
     }
 
     _persist() {
@@ -93,31 +236,25 @@ class PersistentConditionRegistry {
         if (typeof fnOrDescriptor === 'function') {
             this.conditions.set(id, fnOrDescriptor);
             if (descriptor && typeof descriptor === 'object') {
-                this.descriptors.set(id, descriptor);
-                this._persist();
+                this._compileAndRegister(id, descriptor, true);
             }
         } else if (typeof fnOrDescriptor === 'object' && fnOrDescriptor !== null) {
-            const desc = fnOrDescriptor;
-            if (desc.type === 'expression' && typeof desc.expr === 'string') {
-                const fn = new Function('state', 'graph', `return Boolean(${desc.expr});`);
-                this.conditions.set(id, fn);
-                this.descriptors.set(id, desc);
-                this._persist();
-            } else if (desc.type === 'key_equals') {
-                const fn = (state) => state && state[desc.key] === desc.value;
-                this.conditions.set(id, fn);
-                this.descriptors.set(id, desc);
-                this._persist();
-            }
+            this._compileAndRegister(id, fnOrDescriptor, true);
         }
         return this;
     }
 
     get(id) {
+        // If not in cache, try reloading from disk in case another process updated the file
+        if (!this.conditions.has(id)) {
+            this._loadPersisted();
+        }
         return this.conditions.get(id) || null;
     }
 
     has(id) {
+        if (this.conditions.has(id)) return true;
+        this._loadPersisted();
         return this.conditions.has(id);
     }
 
@@ -130,5 +267,8 @@ const globalConditionRegistry = new PersistentConditionRegistry();
 
 module.exports = {
     globalConditionRegistry,
-    builtInConditions
+    builtInConditions,
+    safeGet,
+    safeEvaluateDsl,
+    parseExpressionToDsl
 };
