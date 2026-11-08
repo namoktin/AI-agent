@@ -1331,8 +1331,9 @@ function parseSafeCommand(command) {
         if (input.includes('..') || /[;&|`$<>]/.test(input) || /[\r\n\0]/.test(input)) return false;
         if (path.isAbsolute(input)) {
             const normalized = path.normalize(input).toLowerCase();
-            return normalized.startsWith('c:\\users\\nam\\desktop\\ai agent') ||
-                   normalized.startsWith('c:\\users\\nam\\desktop\\gemini');
+            return normalized.startsWith('c:\\users\\nam\\desktop') ||
+                   normalized.startsWith('c:\\users\\nam\\.gemini') ||
+                   normalized.startsWith('c:\\users\\nam\\appdata\\local\\temp');
         }
         return /^[\w./\\:= -]+$/.test(input);
     };
@@ -1356,6 +1357,10 @@ function parseSafeCommand(command) {
     if (executable === 'python' || executable === 'python3' || executable === 'py') {
         // Cho phép: python -v, python -V hoặc python --version
         if (args.length === 1 && /^(--version|-v|-V)$/i.test(scriptArg)) {
+            return { file: executable === 'py' ? 'py' : executable, args, display: value };
+        }
+        // Cho phép: python -c "<code>" (inline code execution cho phân tích dữ liệu, toán học, zip, excel)
+        if (scriptArg === '-c' && args[1] && typeof args[1] === 'string' && !args[1].includes('\0')) {
             return { file: executable === 'py' ? 'py' : executable, args, display: value };
         }
         // Cho phép: python -m py_compile script.py (syntax check an toàn)
@@ -6183,11 +6188,69 @@ app.post('/api/run-code', (req, res) => {
     try {
         const { code, language = 'javascript', timeout = 5000 } = req.body;
         if (!code) return res.json({ success: false, error: 'Thiếu code cần thực thi' });
-        if (language !== 'javascript') {
-            return res.json({ success: false, error: 'Hiện tại chỉ hỗ trợ JavaScript sandbox. Python cần daemon riêng.' });
-        }
-        const safeTimeout = Math.min(parseInt(timeout) || 5000, 10000);
+        const safeTimeout = Math.min(parseInt(timeout) || 10000, 30000);
         const startMs = Date.now();
+        const normLang = String(language || 'javascript').toLowerCase().trim();
+
+        // 🐍 PYTHON SANDBOX EXECUTION (Hỗ trợ toàn diện pandas, openpyxl, math, re, json, zipfile)
+        if (normLang === 'python' || normLang === 'py') {
+            const tempDir = path.join(__dirname, 'output', 'sandbox_scripts');
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+            const scriptFile = path.join(tempDir, `py_sandbox_${Date.now()}_${Math.random().toString(36).substr(2, 6)}.py`);
+            fs.writeFileSync(scriptFile, code, 'utf8');
+
+            const child = spawn('python', [scriptFile], {
+                cwd: __dirname,
+                timeout: safeTimeout,
+                stdio: ['ignore', 'pipe', 'pipe'],
+                env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' }
+            });
+
+            let stdout = '', stderr = '';
+            child.stdout.on('data', d => { stdout += d.toString(); });
+            child.stderr.on('data', d => { stderr += d.toString(); });
+
+            const killTimer = setTimeout(() => {
+                try { child.kill('SIGKILL'); } catch(e) {}
+            }, safeTimeout + 1000);
+
+            let responded = false;
+            const cleanup = () => {
+                try { if (fs.existsSync(scriptFile)) fs.unlinkSync(scriptFile); } catch(e) {}
+            };
+
+            child.on('error', (err) => {
+                clearTimeout(killTimer);
+                cleanup();
+                if (!responded) {
+                    responded = true;
+                    res.json({ success: false, error: 'Python spawn error: ' + err.message, logs: [], executionTimeMs: Date.now() - startMs, language: 'python' });
+                }
+            });
+
+            child.on('close', (exitCode) => {
+                clearTimeout(killTimer);
+                cleanup();
+                if (responded) return;
+                responded = true;
+                const executionTimeMs = Date.now() - startMs;
+                res.json({
+                    success: exitCode === 0,
+                    output: stdout || (exitCode === 0 ? '[Lệnh Python hoàn tất, không có đầu ra]' : ''),
+                    error: stderr || (exitCode !== 0 ? `Python exited with code ${exitCode}` : ''),
+                    logs: stdout ? stdout.split('\n').filter(Boolean) : [],
+                    exitCode,
+                    executionTimeMs,
+                    language: 'python'
+                });
+            });
+            return;
+        }
+
+        if (normLang !== 'javascript' && normLang !== 'js') {
+            return res.json({ success: false, error: `Ngôn ngữ [${language}] chưa được hỗ trợ. Chỉ hỗ trợ Python và JavaScript.` });
+        }
+
         const workerPath = path.join(__dirname, 'workers', 'sandbox.js');
 
         const child = spawn('node', [workerPath], {

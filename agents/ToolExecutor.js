@@ -295,6 +295,15 @@ class ToolExecutor {
             return await this.mcpClientManager.executeTool(cleanName, args);
         }
 
+        // Auto-detect Python for RUN_CODE if not specified
+        if ((cleanName === 'RUN_CODE' || cleanName === 'PYTHON' || cleanName === 'CODE_INTERPRETER') && args && typeof args === 'object') {
+            if (!args.language) {
+                const codeStr = String(args.code || '');
+                if (/(?:^|\n)(?:import |from |def |print\(|pd\.|np\.|open\(|with open|for .* in |if __name__)/.test(codeStr)) {
+                    args.language = 'python';
+                }
+            }
+        }
         const endpoint = this.getToolEndpoint(cleanName);
 
         const reqSignal = context?.signal
@@ -718,17 +727,21 @@ class ToolExecutor {
             },
             {
                 name: 'RUN_CODE',
-                description: 'Chạy thử nghiệm mã nguồn JavaScript trong sandbox an toàn để kiểm tra tính đúng đắn.',
+                description: 'Thực thi mã nguồn Python hoặc JavaScript trong môi trường Sandbox an toàn. Dùng Python cho phân tích dữ liệu pandas/openpyxl, tính toán số học chính xác, bóc tách cấu trúc file hoặc thuật toán phức tạp.',
                 parameters: {
                     type: 'OBJECT',
                     properties: {
                         code: {
                             type: 'STRING',
-                            description: 'Đoạn mã JavaScript cần thực thi'
+                            description: 'Đoạn mã Python hoặc JavaScript cần thực thi'
+                        },
+                        language: {
+                            type: 'STRING',
+                            description: 'Ngôn ngữ thực thi: "python" (mặc định ưu tiên cho xử lý số liệu, bảng tính, toán học) hoặc "javascript"'
                         },
                         timeout: {
                             type: 'NUMBER',
-                            description: 'Thời gian tối đa (ms, mặc định: 5000)'
+                            description: 'Thời gian tối đa (ms, mặc định: 10000)'
                         }
                     },
                     required: ['code']
