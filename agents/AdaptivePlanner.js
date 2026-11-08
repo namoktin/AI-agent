@@ -273,27 +273,43 @@ class AdaptivePlanner {
     }
 
     /**
-     * Update 20: Validate DAG structure, detect cycles via Kahn's algorithm, and return topologically sorted tasks
+     * Update 21: Strict DAG validation: Duplicate ID rejection, missing dependency rejection, node/edge bounds, and Kahn's cycle detection
      */
     validateAndToposort(tasks = []) {
         if (!Array.isArray(tasks) || tasks.length === 0) return [];
+        if (tasks.length > 50) {
+            throw new Error('[AdaptivePlanner] DAG exceeds maximum node limit (50)');
+        }
+
         const taskMap = new Map();
         const inDegree = new Map();
         const adj = new Map();
+        let totalEdges = 0;
 
+        // Check for duplicate IDs
         for (const t of tasks) {
+            if (!t || !t.id) throw new Error('[AdaptivePlanner] Task missing required id');
+            if (taskMap.has(t.id)) {
+                throw new Error(`[AdaptivePlanner] Duplicate task ID [${t.id}] in DAG`);
+            }
             taskMap.set(t.id, t);
             inDegree.set(t.id, 0);
             adj.set(t.id, []);
         }
 
+        // Strict missing dependency check & adjacency building
         for (const t of tasks) {
             const deps = Array.isArray(t.dependencies) ? t.dependencies : [];
+            totalEdges += deps.length;
+            if (totalEdges > 200) {
+                throw new Error('[AdaptivePlanner] DAG exceeds maximum edge limit (200)');
+            }
             for (const d of deps) {
-                if (adj.has(d)) {
-                    adj.get(d).push(t.id);
-                    inDegree.set(t.id, inDegree.get(t.id) + 1);
+                if (!taskMap.has(d)) {
+                    throw new Error(`[AdaptivePlanner] Invalid DAG: Task [${t.id}] depends on non-existent task [${d}]`);
                 }
+                adj.get(d).push(t.id);
+                inDegree.set(t.id, inDegree.get(t.id) + 1);
             }
         }
 
@@ -317,6 +333,36 @@ class AdaptivePlanner {
             throw new Error(`[AdaptivePlanner] Cycle detected in task dependencies: [${unvisited.join(', ')}]`);
         }
         return sorted;
+    }
+
+    /**
+     * Update 21: Convert dynamic DAG plan into a full StateGraph runtime instance
+     * Enabling checkpointing, pause/resume, conditional routing, and self-healing
+     */
+    generateStateGraphFromDynamicDag(dynamicPlan, options = {}) {
+        const { StateGraph } = require('./StateGraph');
+        const planId = dynamicPlan.planId || `DAG_${Date.now()}`;
+        const graph = new StateGraph({
+            id: planId,
+            maxParallelNodes: options.maxParallelNodes || 5,
+            strict: true
+        });
+
+        const tasks = this.validateAndToposort(dynamicPlan.tasks || []);
+        for (const t of tasks) {
+            graph.addNode({
+                id: t.id,
+                type: t.assignedTo || 'specialist',
+                description: t.description,
+                assignedTo: t.assignedTo,
+                dependencies: t.dependencies || [],
+                acceptanceCriteria: t.acceptanceCriteria || [],
+                timeoutMs: t.timeoutMs || 60000,
+                toolsRequired: t.toolsRequired || []
+            });
+        }
+
+        return graph;
     }
 
     /**

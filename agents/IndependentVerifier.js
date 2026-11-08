@@ -457,7 +457,7 @@ class IndependentVerifier {
                         const keywords = combinedText.toLowerCase().match(/[a-z0-9_-]{4,}/g) || [];
                         const significantWords = keywords.filter(w => !['https', 'http', 'content', 'title', 'value', 'result', 'research', 'thực', 'hiện', 'nghiên', 'cứu'].includes(w));
                         const matchedConcepts = significantWords.filter(kw => pageSampleLower.includes(kw));
-                        if (matchedConcepts.length >= 1) {
+                        if (matchedConcepts.length >= 2) {
                             contentEntailed = true;
                         }
                     }
@@ -517,25 +517,28 @@ class IndependentVerifier {
             };
         }
 
-        // Update 19 Deep Research Verification:
-        // A live source (DOI/PubMed) + metrics is NOT enough unless claims are supported or content is genuinely entailed!
-        if (liveSourceVerified && (claimAudit.passed || (contentEntailed && (hasMetrics || claimAudit.stats.supported > 0)))) {
+        // Update 21 Strict Deep Research Verification:
+        // Generic URLs require claimAudit.passed === true!
+        // Verified academic DOI/PubMed sources require verified title with strong scientific concept entailment
+        if (liveSourceVerified && (claimAudit.passed || (verifiedSourceTitle && contentEntailed && hasMetrics))) {
             return {
                 type: 'research_live_verification',
                 target: 'claims_and_evidence',
                 passed: true,
                 status: 'APPROVED',
                 claimAudit,
-                details: `Live verified: Nguồn tồn tại thật (${verifiedSourceTitle ? verifiedSourceTitle.slice(0, 60) + '...' : 'URL hoạt động'}), đối chiếu luận điểm (${claimAudit.stats.supported}/${claimAudit.stats.total} claims supported, ${metricMatches.length} metrics, ${contentEntailed ? 'content entailed' : ''}) ĐẠT`
+                details: `Live verified: Nguồn tồn tại thật (${verifiedSourceTitle ? verifiedSourceTitle.slice(0, 60) + '...' : 'URL hoạt động'}), đối chiếu luận điểm (${claimAudit.stats.supported}/${claimAudit.stats.total} claims supported) ĐẠT`
             };
         } else {
             return {
                 type: 'research_verification',
                 target: 'claims_and_evidence',
                 passed: false,
-                status: 'UNVERIFIED',
+                status: claimAudit.status === 'CONTRADICTED' ? 'CONTRADICTED' : (claimAudit.passed ? 'UNVERIFIED_SOURCE' : 'INSUFFICIENT_EVIDENCE'),
                 claimAudit,
-                details: `Nguồn học thuật (DOI/PMID/URL) không thể xác thực trên hệ thống hoặc thiếu dữ liệu đối chiếu độc lập (${claimAudit.stats.insufficient}/${claimAudit.stats.total} claims unverified)`
+                details: !liveSourceVerified 
+                    ? 'Nguồn học thuật (DOI/PMID/URL) không thể xác thực trên hệ thống thực tế' 
+                    : `Bằng chứng nguồn không đủ để chứng minh các luận điểm nghiên cứu (${claimAudit.stats.insufficient}/${claimAudit.stats.total} claims unverified)`
             };
         }
     }
@@ -855,9 +858,13 @@ class IndependentVerifier {
                                     if (s.pmid && /^\d{6,9}$/.test(String(s.pmid))) return true;
                                     // 4. Verifiable documentId: must be registered in evidenceRegistry, verified, or official regulatory/standards authority
                                     if (s.documentId) {
+                                        if (s.verified === false) return false; // Explicitly unverified must be rejected
                                         if (this.evidenceRegistry.has(s.documentId)) return true;
                                         if (s.verified === true || s.sha256 || s.origin === 'tool_execution' || s.origin === 'verified_record' || s.official === true) return true;
-                                        if (/^(?:SEC|GOV|ISO|RFC|IEEE|W3C|FDA|WHO|PATENT|USPTO)-/i.test(s.documentId)) return true;
+                                        if (/^(?:SEC|GOV|ISO|RFC|IEEE|W3C|FDA|WHO|PATENT|USPTO)-/i.test(s.documentId)) {
+                                            if (/fake|mock|unverified|unproven/i.test(s.documentId)) return false;
+                                            return s.verified !== false && s.official !== false;
+                                        }
                                         return false; // Free-floating unverified mock documentId rejected
                                     }
                                     return false;

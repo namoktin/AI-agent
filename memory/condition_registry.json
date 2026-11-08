@@ -10,5 +10,11 @@
     "path": "metric",
     "operator": ">",
     "value": 50
+  },
+  "metric_gt_50": {
+    "type": "comparison",
+    "path": "metric",
+    "operator": ">",
+    "value": 50
   }
 }

@@ -26,6 +26,7 @@ class StateNode {
         this.conditionId = config.conditionId || (typeof config.condition === 'string' ? config.condition : null);
         this.acceptanceCriteria = Array.isArray(config.acceptanceCriteria) ? [...config.acceptanceCriteria] : [];
         this.action = typeof config.action === 'function' ? config.action : null;
+        this.actionId = config.actionId || (typeof config.action === 'string' ? config.action : null);
         this.requiresApproval = Boolean(config.requiresApproval || config.type === 'human_approval');
         this.approvalDescription = config.approvalDescription || config.description || '';
         this.transitions = Array.isArray(config.transitions) ? config.transitions : [];
@@ -104,6 +105,7 @@ class StateNode {
             assignedTo: this.assignedTo,
             dependencies: this.dependencies,
             conditionId: this.conditionId || null,
+            actionId: this.actionId || null,
             acceptanceCriteria: this.acceptanceCriteria,
             requiresApproval: this.requiresApproval,
             approvalDescription: this.approvalDescription,
@@ -477,14 +479,24 @@ class StateGraph extends EventEmitter {
         let actualExecutor = executorFn;
         if (typeof actualExecutor !== 'function') {
             actualExecutor = async (node, state, graph, executionContext = {}) => {
-                if (typeof node.action === 'function') {
+                let actionFn = typeof node.action === 'function' ? node.action : null;
+                if (!actionFn && node.actionId && typeof StateGraph !== 'undefined' && StateGraph.resolveAction) {
+                    actionFn = StateGraph.resolveAction(node.actionId);
+                    if (actionFn) node.action = actionFn;
+                }
+
+                if (actionFn) {
                     node.abortSignal = executionContext.signal || null;
-                    if (node.action.length >= 4) {
-                        return await node.action(node, state, graph, executionContext);
-                    } else if (node.action.length === 3) {
-                        return await node.action(node, state, graph);
+                    if (actionFn.length >= 4) {
+                        return await actionFn(node, state, graph, executionContext);
+                    } else if (actionFn.length === 3) {
+                        return await actionFn(node, state, graph);
                     }
-                    return await node.action(state, graph);
+                    return await actionFn(state, graph);
+                }
+
+                if (options.strict || graph.strict) {
+                    throw new Error(`[StateGraph] StateNode [${node.id}] has no executable action or registered actionId`);
                 }
                 return { success: true };
             };
@@ -1133,7 +1145,8 @@ class StateGraph extends EventEmitter {
                     node.conditionId = nData.conditionId;
                 }
                 const actionFn = (config.nodeActions && config.nodeActions[node.id])
-                    || (config.nodeExecutors && config.nodeExecutors[node.id]);
+                    || (config.nodeExecutors && config.nodeExecutors[node.id])
+                    || (nData.actionId && typeof StateGraph !== 'undefined' && StateGraph.resolveAction && StateGraph.resolveAction(nData.actionId));
                 if (typeof actionFn === 'function') {
                     node.action = actionFn;
                 }
@@ -1222,6 +1235,20 @@ StateGraph.registerCondition = function(conditionId, fnOrDescriptor, descriptor 
 StateGraph.resolveCondition = function(conditionId) {
     if (!conditionId) return null;
     return StateGraph.conditionRegistry.get(conditionId) || globalConditionRegistry.get(conditionId) || null;
+};
+
+// Global Node Action Registry for cross-process action restoration
+StateGraph.actionRegistry = new Map();
+
+StateGraph.registerAction = function(actionId, fn) {
+    if (actionId && typeof fn === 'function') {
+        StateGraph.actionRegistry.set(actionId, fn);
+    }
+};
+
+StateGraph.resolveAction = function(actionId) {
+    if (!actionId) return null;
+    return StateGraph.actionRegistry.get(actionId) || null;
 };
 
 module.exports = { StateGraph, StateNode };

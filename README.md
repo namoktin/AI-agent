@@ -1,4 +1,4 @@
-# 🚀 CYBER AGENT PRO v5.7 // UPDATE 20 PRODUCTION HARDENING & AUTONOMOUS DAG
+# 🚀 CYBER AGENT PRO v5.8 // UPDATE 21 PRODUCTION RESILIENCE & STRICT DAG
 
 > **Nền tảng AI Đa Tác Nhân Tự Hành (Hierarchical & Graph-based Multi-Agent Framework) thế hệ mới: Tự lập kế hoạch thích ứng, điều phối đồ thị trạng thái (StateGraph), tương tác Web App động, kiểm chứng kết quả thực nghiệm và tự chữa lành lỗi (Self-Healing).**
 

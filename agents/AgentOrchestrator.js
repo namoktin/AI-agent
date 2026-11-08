@@ -832,15 +832,28 @@ ${CORE_TIER5_AXIOMS}
                     matchedSkill: context.matchedSkill || null,
                     groundingResult: context.groundingResult || null
                 };
-                const shouldUseGraph = mode === 'graph' || context.useGraph === true || (context.useGraph !== false && (mode === 'autonomous' || mode === 'graph') && typeof this.adaptivePlanner.generateStateGraph === 'function');
+                const isDynamicDag = mode === 'dynamic_dag' || taskPlan?.isDynamicDag === true;
+                const shouldUseGraph = mode === 'graph' || isDynamicDag || context.useGraph === true || (context.useGraph !== false && (mode === 'autonomous' || mode === 'graph') && typeof this.adaptivePlanner.generateStateGraph === 'function');
                 if (shouldUseGraph) {
-                    const { graph } = this.adaptivePlanner.generateStateGraph(mode, userRequest, directive, context.matchedSkill, {
-                        graphId: taskId,
-                        taskId: taskId,
-                        checkpointManager: this.checkpointManager,
-                        verifier: this.verifier,
-                        eventStream: this.eventStream
-                    });
+                    let graph;
+                    if (isDynamicDag && typeof this.adaptivePlanner.generateStateGraphFromDynamicDag === 'function') {
+                        graph = this.adaptivePlanner.generateStateGraphFromDynamicDag(taskPlan, {
+                            graphId: taskId,
+                            taskId: taskId,
+                            checkpointManager: this.checkpointManager,
+                            verifier: this.verifier,
+                            eventStream: this.eventStream
+                        });
+                    } else {
+                        const generated = this.adaptivePlanner.generateStateGraph(mode, userRequest, directive, context.matchedSkill, {
+                            graphId: taskId,
+                            taskId: taskId,
+                            checkpointManager: this.checkpointManager,
+                            verifier: this.verifier,
+                            eventStream: this.eventStream
+                        });
+                        graph = generated.graph || generated;
+                    }
                     const graphRunResult = await this.executeGraph(graph, enrichedContext);
 
                     // If paused waiting for human approval, return early with state & details
@@ -1524,11 +1537,8 @@ ${isBenchmarkOrFactual ? `6. BẮT BUỘC CÂU TRẢ LỜI NGHIỆM THU:
             );
 
             if (batch.length === 0) {
-                // Phá vỡ vòng lặp phụ thuộc nếu có: lấy task đầu tiên tiếp theo
-                const fallbackTask = remaining.shift();
-                completed.add(fallbackTask.id);
-                batches.push([fallbackTask]);
-                continue;
+                // Update 21 Strict Fail-Fast: Reject circular dependencies immediately instead of masking with fallback shift
+                throw new Error(`[AgentOrchestrator] Circular dependency detected in tasks: [${remaining.map(t => t.id).join(', ')}]`);
             }
 
             batch.forEach(task => {
@@ -1540,9 +1550,8 @@ ${isBenchmarkOrFactual ? `6. BẮT BUỘC CÂU TRẢ LỜI NGHIỆM THU:
             batches.push(batch);
         }
 
-        // Nếu vẫn còn sót do dependency lỗi
         if (remaining.length > 0) {
-            batches.push(remaining);
+            throw new Error(`[AgentOrchestrator] Unresolved dependencies in remaining tasks: [${remaining.map(t => t.id).join(', ')}]`);
         }
 
         return batches;

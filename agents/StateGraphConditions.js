@@ -44,6 +44,66 @@ function safeGet(obj, pathStr) {
     return curr;
 }
 
+const ALLOWED_LOGICAL_OPS = new Set(['and', 'or', 'not']);
+const ALLOWED_COMPARISON_OPS = new Set([
+    'equals', '==', '===',
+    'not_equals', '!=', '!==',
+    'gt', '>',
+    'gte', '>=',
+    'lt', '<',
+    'lte', '<=',
+    'in',
+    'contains',
+    'exists',
+    'truthy',
+    'falsy'
+]);
+
+/**
+ * Update 21: Strict schema validator for Condition DSL descriptors
+ * Limits nesting depth to 5, max child conditions to 20, validates operators and field paths
+ */
+function validateDslDescriptor(dsl, depth = 0) {
+    if (!dsl || typeof dsl !== 'object') return false;
+    if (depth > 5) return false; // Enforce nesting depth limit
+
+    const type = dsl.type || 'comparison';
+
+    if (type === 'logical') {
+        const op = String(dsl.operator || 'and').toLowerCase();
+        if (!ALLOWED_LOGICAL_OPS.has(op)) return false;
+
+        const conditions = Array.isArray(dsl.conditions) ? dsl.conditions : [];
+        if (op === 'not') {
+            const target = (conditions.length > 0) ? conditions[0] : dsl.condition;
+            if (!target || typeof target !== 'object') return false;
+            return validateDslDescriptor(target, depth + 1);
+        }
+
+        // For 'and' or 'or', conditions must be non-empty array with <= 20 items
+        if (conditions.length === 0 || conditions.length > 20) return false;
+        return conditions.every(c => validateDslDescriptor(c, depth + 1));
+    }
+
+    if (type === 'key_equals') {
+        if (!dsl.key || typeof dsl.key !== 'string') return false;
+        if (/__(?:proto|lookup[GS]etter)__|constructor|prototype/.test(dsl.key)) return false;
+        return true;
+    }
+
+    if (type === 'comparison') {
+        const op = String(dsl.operator || 'equals').toLowerCase();
+        if (!ALLOWED_COMPARISON_OPS.has(op)) return false;
+
+        const pathStr = dsl.path || dsl.key;
+        if (!pathStr || typeof pathStr !== 'string') return false;
+        if (/__(?:proto|lookup[GS]etter)__|constructor|prototype/.test(pathStr)) return false;
+        return true;
+    }
+
+    return false;
+}
+
 /**
  * Safely evaluate a declarative condition DSL descriptor against state and graph
  * Supported types:
@@ -52,7 +112,7 @@ function safeGet(obj, pathStr) {
  * 3. 'key_equals': { type: 'key_equals', key: 'approved', value: true }
  */
 function safeEvaluateDsl(dsl, state, graph) {
-    if (!dsl || typeof dsl !== 'object') return false;
+    if (!validateDslDescriptor(dsl)) return false;
 
     // Logical Combinators
     if (dsl.type === 'logical') {
@@ -61,7 +121,8 @@ function safeEvaluateDsl(dsl, state, graph) {
         if (op === 'and') return conditions.every(c => safeEvaluateDsl(c, state, graph));
         if (op === 'or') return conditions.some(c => safeEvaluateDsl(c, state, graph));
         if (op === 'not') {
-            const target = conditions[0] || dsl.condition;
+            const target = (conditions.length > 0) ? conditions[0] : dsl.condition;
+            if (!target) return false; // Fail closed on missing NOT target
             return !safeEvaluateDsl(target, state, graph);
         }
         return false;
@@ -114,7 +175,7 @@ function safeEvaluateDsl(dsl, state, graph) {
             case 'falsy':
                 return !val;
             default:
-                return val === target;
+                return false; // Strict: Unrecognized operator fails closed
         }
     }
 
@@ -202,6 +263,12 @@ class PersistentConditionRegistry {
             dslObj = parsed;
         }
 
+        // Schema validation
+        if (!validateDslDescriptor(dslObj)) {
+            console.warn(`[ConditionRegistry] REJECTED invalid condition descriptor schema for [${id}]`);
+            return false;
+        }
+
         // Pure safe DSL evaluation closure
         const fn = (state, graph) => safeEvaluateDsl(dslObj, state, graph);
         this.conditions.set(id, fn);
@@ -270,5 +337,8 @@ module.exports = {
     builtInConditions,
     safeGet,
     safeEvaluateDsl,
-    parseExpressionToDsl
+    parseExpressionToDsl,
+    validateDslDescriptor,
+    ALLOWED_LOGICAL_OPS,
+    ALLOWED_COMPARISON_OPS
 };

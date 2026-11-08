@@ -6444,7 +6444,7 @@ app.post('/api/v2/execute', async (req, res) => {
                     agentCalls: stats.agentCallsCount,
                     totalTokens: stats.totalTokens || 0
                 },
-                version: 'v5.7-tier4'
+                version: 'v5.8-tier4'
             });
         }
 
@@ -6489,7 +6489,7 @@ app.post('/api/v2/execute', async (req, res) => {
                 billingUsage: stats.billingUsage || null,
                 model: (useCustomAi || context.useCustomAi) ? (process.env.CUSTOM_AI_MODEL || 'deepseek-v4-pro') : (process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite')
             },
-            version: 'v5.7-tier4'
+            version: 'v5.8-tier4'
         });
 
     } catch (error) {
@@ -6741,7 +6741,7 @@ app.post('/api/v2/tasks/:taskId/resume', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 const serverInstance = app.listen(PORT, '127.0.0.1', () => {
     console.log('===============================================================');
-    console.log('🔥 CYBER AGENT PRO v5.7 // UPDATE 20 PRODUCTION HARDENING & AUTONOMOUS DAG');
+    console.log('🔥 CYBER AGENT PRO v5.8 // UPDATE 21 PRODUCTION RESILIENCE & STRICT DAG');
     console.log(`🌐 Máy chủ: http://localhost:${PORT}`);
     console.log(`🧠 Kho trí nhớ: ${EXPERIENCES_FILE}`);
     console.log(`🔐 Bảo mật: Auth=${!!process.env.AGENT_SECRET_KEY ? 'ON' : 'OFF (localhost-only)'}, RateLimit=ON, CORS=restricted`);
