@@ -6741,7 +6741,7 @@ app.post('/api/v2/tasks/:taskId/resume', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 const serverInstance = app.listen(PORT, '127.0.0.1', () => {
     console.log('===============================================================');
-    console.log('🔥 CYBER AGENT PRO v5.8 // UPDATE 21 PRODUCTION RESILIENCE & STRICT DAG');
+    console.log('🔥 CYBER AGENT PRO v5.8 // UPDATE 22 HARDENED CRASH RECOVERY & TRUE STATEGRAPH DAG');
     console.log(`🌐 Máy chủ: http://localhost:${PORT}`);
     console.log(`🧠 Kho trí nhớ: ${EXPERIENCES_FILE}`);
     console.log(`🔐 Bảo mật: Auth=${!!process.env.AGENT_SECRET_KEY ? 'ON' : 'OFF (localhost-only)'}, RateLimit=ON, CORS=restricted`);

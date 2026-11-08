@@ -47,12 +47,30 @@ async function runTests() {
             {
                 agent: 'researcher',
                 success: true,
-                response: 'Nghiên cứu về tế bào T trong đáp ứng lâm sàng miễn dịch ung thư. DOI: 10.1038/s41586-020-2056-8. Tỷ lệ đáp ứng tăng 45% ở 120 bệnh nhân.'
+                response: 'Nghiên cứu về tế bào T trong đáp ứng lâm sàng miễn dịch ung thư. DOI: 10.1038/s41586-020-2056-8. Tỷ lệ đáp ứng tăng 45% ở 120 bệnh nhân.',
+                sources: [
+                    'Tạp chí Nature (DOI: 10.1038/s41586-020-2056-8) xác nhận tỷ lệ đáp ứng tăng 45% ở 120 bệnh nhân trong thử nghiệm lâm sàng điều trị miễn dịch ung thư.'
+                ]
             }
         ];
         const res = await verifier.verifyResearchClaims(specialistResults);
-        assert.strictEqual(res.passed, true, 'DOI thật và có số liệu định lượng phải được pass');
+        assert.strictEqual(res.passed, true, 'DOI thật và có số liệu định lượng khớp nguồn phải được pass');
         assert.ok(res.details.includes('Live verified') || res.details.includes('Xác thực định dạng'), 'Phải có chứng cứ xác minh');
+    });
+
+    await it('Verifier từ chối nghiên cứu có số liệu định lượng bịa đặt (ungrounded numbers) dù có DOI thật', async () => {
+        const specialistResults = [
+            {
+                agent: 'researcher',
+                success: true,
+                response: 'Nghiên cứu về tế bào T ung thư. DOI: 10.1038/s41586-020-2056-8. Tỷ lệ hồi phục đạt 99.9% ở 50000 bệnh nhân.',
+                sources: [
+                    'Tạp chí Nature (DOI: 10.1038/s41586-020-2056-8): Peripheral T cell expansion predicts tumour infiltration and clinical response.'
+                ]
+            }
+        ];
+        const res = await verifier.verifyResearchClaims(specialistResults);
+        assert.strictEqual(res.passed, false, 'Số liệu bịa đặt (99.9% ở 50000 bệnh nhân) không có trong nguồn phải bị từ chối');
     });
 
     await it('Verifier bắt lỗi và từ chối DOI giả mạo hoặc không có nguồn', async () => {

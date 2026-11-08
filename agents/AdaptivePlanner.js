@@ -336,16 +336,21 @@ class AdaptivePlanner {
     }
 
     /**
-     * Update 21: Convert dynamic DAG plan into a full StateGraph runtime instance
-     * Enabling checkpointing, pause/resume, conditional routing, and self-healing
+     * Update 22: Convert dynamic DAG plan into a full StateGraph runtime instance
+     * Explicitly binding graphId, taskId, checkpointManager, verifier, eventStream, and strict enforcement
      */
     generateStateGraphFromDynamicDag(dynamicPlan, options = {}) {
         const { StateGraph } = require('./StateGraph');
-        const planId = dynamicPlan.planId || `DAG_${Date.now()}`;
+        const graphId = options.graphId || options.taskId || dynamicPlan.planId || `DAG_${Date.now()}`;
         const graph = new StateGraph({
-            id: planId,
+            graphId: graphId,
+            id: graphId,
+            taskId: options.taskId || graphId,
+            checkpointManager: options.checkpointManager || null,
+            verifier: options.verifier || null,
+            eventStream: options.eventStream || null,
             maxParallelNodes: options.maxParallelNodes || 5,
-            strict: true
+            strict: options.strict !== false
         });
 
         const tasks = this.validateAndToposort(dynamicPlan.tasks || []);

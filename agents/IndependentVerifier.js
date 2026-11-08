@@ -384,6 +384,17 @@ class IndependentVerifier {
 
         // A. Verify DOI via Crossref or doi.org API (Multi-DOI check up to 3)
         const evidenceSources = [];
+        for (const res of specialistResults) {
+            if (Array.isArray(res.sources)) {
+                for (const s of res.sources) {
+                    if (typeof s === 'string' && s.trim()) {
+                        evidenceSources.push(s.trim());
+                    } else if (s && typeof s === 'object' && s.text) {
+                        evidenceSources.push(s.text.trim());
+                    }
+                }
+            }
+        }
         for (let i = 0; i < Math.min(3, doiMatches.length); i++) {
             const rawDoi = doiMatches[i].replace(/[.,;:)]+$/, '');
             try {
@@ -517,10 +528,10 @@ class IndependentVerifier {
             };
         }
 
-        // Update 21 Strict Deep Research Verification:
-        // Generic URLs require claimAudit.passed === true!
-        // Verified academic DOI/PubMed sources require verified title with strong scientific concept entailment
-        if (liveSourceVerified && (claimAudit.passed || (verifiedSourceTitle && contentEntailed && hasMetrics))) {
+        // Update 22 Strict Deep Research Verification:
+        // Zero False-Positive Research Claim Bypass:
+        // Verified sources strictly require liveSourceVerified AND claimAudit.passed === true
+        if (liveSourceVerified && claimAudit.passed) {
             return {
                 type: 'research_live_verification',
                 target: 'claims_and_evidence',
@@ -704,11 +715,23 @@ class IndependentVerifier {
         const total = claims.length;
         const supportedRatio = total > 0 ? supported / total : 0;
 
+        // Update 22 Strict Quantitative Claim Verification:
+        // Any claim with specific numbers or metrics MUST be verified with concrete source evidence.
+        // Even if supportedRatio >= 0.7, ungrounded quantitative claims fail the audit immediately!
+        const ungroundedQuantitativeClaims = results.filter(r => 
+            r.status !== 'SUPPORTED' && 
+            (/\d+(?:\.\d+)?(?:%|mg|ml|km|kg|ms|s|°C|giây|phút|giờ|usd|vnđ|triệu|tỷ|bệnh nhân|người|\b)/i.test(r.claim) ||
+             (/\b\d+(?:\.\d+)?\b/.test(r.claim) && !/DOI|PMID|http/i.test(r.claim)))
+        );
+
         let status = 'APPROVED';
         let passed = true;
 
         if (contradicted > 0) {
             status = 'CONTRADICTED';
+            passed = false;
+        } else if (ungroundedQuantitativeClaims.length > 0) {
+            status = 'INSUFFICIENT_EVIDENCE';
             passed = false;
         } else if (supported === 0 && total > 0) {
             status = 'UNVERIFIED';

@@ -1,4 +1,4 @@
-# 🚀 CYBER AGENT PRO v5.8 // UPDATE 21 PRODUCTION RESILIENCE & STRICT DAG
+# 🚀 CYBER AGENT PRO v5.8 // UPDATE 22 HARDENED CRASH RECOVERY & TRUE STATEGRAPH DAG
 
 > **Nền tảng AI Đa Tác Nhân Tự Hành (Hierarchical & Graph-based Multi-Agent Framework) thế hệ mới: Tự lập kế hoạch thích ứng, điều phối đồ thị trạng thái (StateGraph), tương tác Web App động, kiểm chứng kết quả thực nghiệm và tự chữa lành lỗi (Self-Healing).**
 
@@ -7,7 +7,7 @@
 [![Puppeteer](https://img.shields.io/badge/Puppeteer-Stealth-orange.svg)](https://pptr.dev/)
 [![Gemini](https://img.shields.io/badge/AI-Google%20Gemini%203.x-8E75C2.svg)](https://ai.google.dev/)
 [![Architecture](https://img.shields.io/badge/Architecture-StateGraph%20%2B%20Orchestrator-00ffff.svg)](#-2-kiến-trúc-hệ-thống-v20)
-[![Tests](https://img.shields.io/badge/Tests-46%2F46%20Passing%20(100%25)-success.svg)](#-5-kiểm-thử-toàn-diện-automated-testing)
+[![Tests](https://img.shields.io/badge/Tests-74%2F74%20Passing%20(100%25)-success.svg)](#-5-kiểm-thử-toàn-diện-automated-testing)
 [![License: ISC](https://img.shields.io/badge/License-ISC-yellow.svg)](https://opensource.org/licenses/ISC)
 
 ---

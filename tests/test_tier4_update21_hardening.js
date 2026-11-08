@@ -23,87 +23,101 @@ const { AgentOrchestrator } = require('../agents/AgentOrchestrator');
 
 async function runTests() {
     console.log('===============================================================');
-    console.log('🧪 SUITE 12: UPDATE 21 PRODUCTION RESILIENCE & STRICT DAG');
+    console.log('🧪 SUITE 12: UPDATE 22 HARDENED CRASH RECOVERY & TRUE STATEGRAPH DAG');
     console.log('===============================================================\n');
 
     let totalTests = 0;
     let passedTests = 0;
 
     // -------------------------------------------------------------
-    // TEST 1: COLD RESTART WITH REAL ACTION EXECUTION & PHYSICAL ARTIFACT
+    // TEST 1: TRUE TWO-PROCESS CRASH SIMULATION & HARDENED ARTIFACT RECOVERY (P0)
     // -------------------------------------------------------------
-    console.log('--- PHẦN 1: COLD RESTART REAL ACTION EXECUTION & ARTIFACT ---');
+    console.log('--- PHẦN 1: TRUE TWO-PROCESS CRASH & ARTIFACT RECOVERY ---');
     {
         totalTests++;
 
-        // Register persistent condition
-        StateGraph.registerCondition('metric_gt_50', {
-            type: 'comparison',
-            path: 'metric',
-            operator: '>',
-            value: 50
-        });
-
-        const graph = new StateGraph({ id: 'real_action_restart_graph', strict: true });
-        graph.addNode({
-            id: 'init_node',
-            action: async () => ({ success: true, metric: 85 })
-        });
-        graph.addNode({
-            id: 'worker_node',
-            dependencies: ['init_node'],
-            actionId: 'calculate_and_write_artifact', // Binds to registered action in child process!
-            action: async () => ({ success: true })
-        });
-        graph.addConditionalEdge('init_node', 'worker_node', null, 'metric_gt_50');
-
-        const serialized = graph.serialize();
-        assert.strictEqual(serialized.nodes[1].actionId, 'calculate_and_write_artifact', 'actionId must be serialized in toJSON()');
-
         const tmpDir = path.resolve(__dirname, '..', 'memory');
         if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
-        const graphFile = path.join(tmpDir, 'test_cold_action_graph.json');
-        const outFile = path.join(tmpDir, 'test_cold_action_out.json');
-        const artifactPath = path.join(tmpDir, 'cold_restart_artifact.json');
+        const checkpointFile = path.join(tmpDir, 'test_two_proc_checkpoint.json');
+        const traceFile = path.join(tmpDir, 'test_two_proc_trace.json');
+        const outFile = path.join(tmpDir, 'test_two_proc_out.json');
+        const artifactPath = path.join(tmpDir, 'final_recovery_artifact.json');
 
-        fs.writeFileSync(graphFile, JSON.stringify(serialized, null, 2), 'utf8');
-        if (fs.existsSync(outFile)) fs.unlinkSync(outFile);
-        if (fs.existsSync(artifactPath)) fs.unlinkSync(artifactPath);
+        // Cleanup stale test files
+        try { fs.unlinkSync(checkpointFile); } catch (_) {}
+        try { fs.unlinkSync(traceFile); } catch (_) {}
+        try { fs.unlinkSync(outFile); } catch (_) {}
+        try { fs.unlinkSync(artifactPath); } catch (_) {}
 
-        // Spawn child process
-        const runnerPath = path.resolve(__dirname, 'helpers', 'resume_process_runner.js');
-        const child = spawn(process.execPath, [runnerPath, graphFile, outFile], {
+        // STEP 1: Launch Process A (runs Node 1 & 2, checkpoints at Node 3, abruptly crashes with code 99)
+        const crashPath = path.resolve(__dirname, 'helpers', 'crash_process_a.js');
+        const childA = spawn(process.execPath, [crashPath, checkpointFile, traceFile], {
             cwd: path.resolve(__dirname, '..'),
             env: { ...process.env },
             stdio: ['ignore', 'pipe', 'pipe']
         });
 
-        const exitCode = await new Promise((resolve) => child.on('close', (code) => resolve(code)));
-        assert.strictEqual(exitCode, 0, 'Child process must exit with code 0');
+        const exitCodeA = await new Promise((resolve) => childA.on('close', (code) => resolve(code)));
+        assert.strictEqual(exitCodeA, 99, 'Process A must deliberately terminate with crash exit code 99');
+        assert.ok(fs.existsSync(checkpointFile), 'Checkpoint file must be persisted to disk prior to crash');
 
+        // STEP 2: Strict Mode Verification (node without action throws immediately, no silent { success: true })
+        const strictGraph = new StateGraph({ id: 'strict_mode_guard_graph', strict: true });
+        strictGraph.addNode({ id: 'ghost_action_node' });
+        await assert.rejects(async () => {
+            await strictGraph.execute();
+        }, /has no executable action or registered actionId/, 'Strict mode StateGraph must throw on unexecutable node');
+
+        // STEP 3: Launch Process B (spawned fresh with zero RAM state, reads checkpoint, executes Node 3 & 4)
+        const resumePath = path.resolve(__dirname, 'helpers', 'resume_process_b.js');
+        const childB = spawn(process.execPath, [resumePath, checkpointFile, outFile, artifactPath, traceFile], {
+            cwd: path.resolve(__dirname, '..'),
+            env: { ...process.env },
+            stdio: ['ignore', 'pipe', 'pipe']
+        });
+
+        const exitCodeB = await new Promise((resolve) => childB.on('close', (code) => resolve(code)));
+        assert.strictEqual(exitCodeB, 0, 'Process B must resume and exit cleanly with code 0');
+
+        assert.ok(fs.existsSync(outFile), 'Output report from Process B must exist');
         const outData = JSON.parse(fs.readFileSync(outFile, 'utf8'));
-        assert.notStrictEqual(outData.pid, process.pid, 'Child process must have separate OS PID');
-        assert.strictEqual(outData.status, 'COMPLETED', 'Restored graph must complete');
+        assert.notStrictEqual(outData.pid, process.pid, 'Process B must run in a separate OS PID');
+        assert.strictEqual(outData.status, 'COMPLETED', 'Resumed StateGraph in Process B must reach COMPLETED status');
+        assert.ok(outData.completedNodes.includes('node_1'), 'Node 1 must remain completed');
+        assert.ok(outData.completedNodes.includes('node_2'), 'Node 2 must remain completed');
+        assert.ok(outData.completedNodes.includes('node_3'), 'Node 3 must complete in Process B');
+        assert.ok(outData.completedNodes.includes('node_4'), 'Node 4 must complete in Process B');
 
-        // Verify REAL computational artifact created by child process
-        assert.ok(fs.existsSync(artifactPath), 'Physical deliverable artifact must be written to disk by child process');
+        // STEP 4: Verify Physical Deliverable Artifact on Disk
+        assert.ok(fs.existsSync(artifactPath), 'Physical recovery deliverable artifact must exist on disk');
         const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
-        assert.strictEqual(artifact.computedMetric, 170, 'Real action calculation must run (85 * 2 = 170)');
-        assert.strictEqual(artifact.processPid, outData.pid, 'Artifact must be generated by child process PID');
+        assert.strictEqual(artifact.finalValue, 70, 'Calculated computational value must be correct ((20 + 15) * 2 = 70)');
+        assert.strictEqual(artifact.processPid, outData.pid, 'Deliverable must be created by Process B');
+        assert.strictEqual(artifact.recoveredSuccessfully, true);
+
+        // STEP 5: Verify Execution Trace: Node 1 and Node 2 were NOT re-executed in Process B
+        const trace = JSON.parse(fs.readFileSync(traceFile, 'utf8'));
+        const rerun1 = trace.filter(t => t.node === 'node_1_UNEXPECTED_RERUN');
+        const rerun2 = trace.filter(t => t.node === 'node_2_UNEXPECTED_RERUN');
+        assert.strictEqual(rerun1.length, 0, 'Node 1 must NOT be re-executed in Process B');
+        assert.strictEqual(rerun2.length, 0, 'Node 2 must NOT be re-executed in Process B');
+        assert.ok(trace.some(t => t.node === 'node_3_resumed'), 'Node 3 must be resumed in Process B');
+        assert.ok(trace.some(t => t.node === 'node_4_executed'), 'Node 4 must be executed in Process B');
 
         // Cleanup
-        try { fs.unlinkSync(graphFile); } catch (_) {}
+        try { fs.unlinkSync(checkpointFile); } catch (_) {}
+        try { fs.unlinkSync(traceFile); } catch (_) {}
         try { fs.unlinkSync(outFile); } catch (_) {}
         try { fs.unlinkSync(artifactPath); } catch (_) {}
 
         passedTests++;
-        console.log('✅ [TEST 1] PASS: Cold Restart thực thi Action thật, tính toán dữ liệu và tạo Artifact vật lý thực tế trên đĩa');
+        console.log('✅ [TEST 1] PASS: True Two-Process Crash & Recovery (Process A exit 99 -> Process B resume 0 -> không chạy lại Node cũ, tạo Artifact chuẩn)');
     }
 
     // -------------------------------------------------------------
-    // TEST 2: DYNAMIC DAG ROUTED THROUGH StateGraph RUNTIME
+    // TEST 2: DYNAMIC DAG ROUTED THROUGH StateGraph RUNTIME WITH PERSISTENT CHECKPOINTS
     // -------------------------------------------------------------
-    console.log('\n--- PHẦN 2: DYNAMIC DAG EXECUTED VIA StateGraph RUNTIME ---');
+    console.log('\n--- PHẦN 2: DYNAMIC DAG EXECUTED VIA StateGraph RUNTIME WITH CHECKPOINTS ---');
     {
         totalTests++;
 
@@ -114,9 +128,18 @@ async function runTests() {
         const dynamicPlan = planner.synthesizeDynamicDag('So sánh Apache Spark và Apache Flink');
         assert.strictEqual(dynamicPlan.isDynamicDag, true);
 
-        // Convert into StateGraph runtime instance
-        const graph = planner.generateStateGraphFromDynamicDag(dynamicPlan);
+        // Convert into StateGraph runtime instance with full persistence wiring
+        const graphId = `DAG_TEST_${Date.now()}`;
+        const graph = planner.generateStateGraphFromDynamicDag(dynamicPlan, {
+            graphId,
+            taskId: graphId,
+            checkpointManager: orchestrator.checkpointManager,
+            verifier: orchestrator.verifier,
+            strict: false // Allow dynamic DAG steps to execute with default resolution
+        });
         assert.ok(graph instanceof StateGraph, 'Dynamic DAG must generate a full StateGraph runtime instance');
+        assert.strictEqual(graph.graphId, graphId, 'Graph must bind passed graphId');
+        assert.strictEqual(graph.checkpointManager, orchestrator.checkpointManager, 'Graph must bind orchestrator checkpointManager');
         assert.strictEqual(graph.nodes.size, dynamicPlan.tasks.length, 'StateGraph node count must equal task count');
 
         // Verify all nodes and edges have proper topology and dependencies in StateGraph
@@ -126,8 +149,45 @@ async function runTests() {
         assert.ok(synthNode, 'Synthesis node must exist in StateGraph');
         assert.ok(synthNode.dependencies.includes(exploreA.id), 'Synthesis node must have dependencies configured in StateGraph');
 
+        // Execute dynamic DAG via StateGraph with specialist executor and verify checkpoint persistence
+        await graph.execute(async (node) => ({
+            success: true,
+            response: `Kết quả phân tích hoàn thành xuất sắc cho node [${node.id}]`,
+            sources: [{
+                url: 'https://spark.apache.org/docs/latest/',
+                text: `Tài liệu kỹ thuật chính thức đối chiếu cho ${node.id}`,
+                verified: true
+            }]
+        }));
+        assert.strictEqual(graph.status, 'COMPLETED');
+        const loadedCheckpoint = orchestrator.checkpointManager.loadCheckpoint(graphId);
+        assert.ok(loadedCheckpoint, 'StateGraph dynamic DAG execution must write persistent checkpoints to disk');
+        assert.strictEqual(loadedCheckpoint.taskId, graphId);
+        assert.strictEqual(loadedCheckpoint.stageData[loadedCheckpoint.lastStage].status, 'COMPLETED');
+
+        // Clean up checkpoint
+        orchestrator.checkpointManager.clearCheckpoint(graphId);
+
+        // Orchestrator executeGraph on Dynamic DAG end-to-end
+        const e2eTaskId = `E2E_DAG_${Date.now()}`;
+        const e2eGraph = planner.generateStateGraphFromDynamicDag(dynamicPlan, {
+            graphId: e2eTaskId,
+            taskId: e2eTaskId,
+            checkpointManager: orchestrator.checkpointManager,
+            verifier: orchestrator.verifier
+        });
+        const e2eRun = await orchestrator.executeGraph(e2eGraph, {
+            nodeActions: {
+                [dynamicPlan.tasks[0].id]: async () => ({ success: true, response: 'Spark data', sources: [{ url: 'https://spark.apache.org', verified: true }] }),
+                [dynamicPlan.tasks[1].id]: async () => ({ success: true, response: 'Flink data', sources: [{ url: 'https://flink.apache.org', verified: true }] }),
+                [dynamicPlan.tasks[2].id]: async () => ({ success: true, response: 'Spark vs Flink comparison analysis', sources: [{ url: 'https://spark.apache.org', verified: true }] })
+            }
+        });
+        assert.strictEqual(e2eRun.status, 'COMPLETED', 'Orchestrator.executeGraph on Dynamic DAG must complete');
+        orchestrator.checkpointManager.clearCheckpoint(e2eTaskId);
+
         passedTests++;
-        console.log('✅ [TEST 2] PASS: Dynamic DAG được chuyển đổi thành StateGraph runtime đầy đủ và chạy trong môi trường đồ thị');
+        console.log('✅ [TEST 2] PASS: Dynamic DAG được chuyển đổi thành StateGraph runtime đầy đủ, gắn CheckpointManager và ghi checkpoint trên đĩa');
     }
 
     // -------------------------------------------------------------
@@ -148,15 +208,6 @@ async function runTests() {
         assert.strictEqual(rejectedMockOfficial.passed, false, 'Mock official document explicitly marked unverified must be rejected');
 
         // 2. Deep Research Verification MUST require claimAudit.passed === true
-        // If claims are contradicted or unverified, it MUST NOT approve even if liveSourceVerified is true!
-        const fakeSpecialistResults = [
-            {
-                agent: 'researcher',
-                response: 'Thuốc X làm tăng tỷ lệ tử vong 80% ở 500 bệnh nhân lâm sàng.',
-                sources: ['https://nature.com/articles/fake-study']
-            }
-        ];
-
         // Even with liveSourceVerified simulated, if claims are unproven, it must fail!
         const claimAudit = verifier.verifyClaimsEvidence(
             ['Thuốc X làm tăng tỷ lệ tử vong 80% ở 500 bệnh nhân lâm sàng.'],
@@ -164,8 +215,23 @@ async function runTests() {
         );
         assert.strictEqual(claimAudit.passed, false, 'Contradicted claims must fail audit');
 
+        // 3. Quantitative Claim Strictness: Any quantitative claim with numbers without evidence MUST FAIL
+        const fakeNumbersClaim = verifier.verifyClaimsEvidence(
+            ['Thuốc Y giúp tăng tỷ lệ hồi phục 98.5% ở 1500 bệnh nhân.'],
+            ['Tài liệu nghiên cứu ghi nhận thuốc Y an toàn trong thử nghiệm ban đầu.']
+        );
+        assert.strictEqual(fakeNumbersClaim.passed, false, 'Ungrounded quantitative numbers (98.5% ở 1500 bệnh nhân) must fail audit');
+        assert.strictEqual(fakeNumbersClaim.status, 'INSUFFICIENT_EVIDENCE');
+
+        // 4. Grounded Quantitative Claim PASSES
+        const groundedNumbersClaim = verifier.verifyClaimsEvidence(
+            ['Thuốc Y giúp tăng tỷ lệ hồi phục 98.5% ở 1500 bệnh nhân.'],
+            ['Tài liệu nghiên cứu xác nhận thuốc Y giúp tăng tỷ lệ hồi phục 98.5% ở 1500 bệnh nhân lâm sàng.']
+        );
+        assert.strictEqual(groundedNumbersClaim.passed, true, 'Grounded quantitative claim must pass audit');
+
         passedTests++;
-        console.log('✅ [TEST 3] PASS: Evidence Verifier loại bỏ hoàn toàn đường tắt false-positive, bắt buộc claimAudit.passed === true');
+        console.log('✅ [TEST 3] PASS: Evidence Verifier loại bỏ hoàn toàn đường tắt false-positive, số liệu định lượng bắt buộc có bằng chứng đối chiếu');
     }
 
     // -------------------------------------------------------------
@@ -238,7 +304,7 @@ async function runTests() {
     }
 
     console.log('\n===============================================================');
-    console.log(`🎉 HOÀN THÀNH TOÀN BỘ ${passedTests}/${totalTests} BÀI KIỂM THỬ UPDATE 21 (100% PASS)`);
+    console.log(`🎉 HOÀN THÀNH TOÀN BỘ ${passedTests}/${totalTests} BÀI KIỂM THỬ UPDATE 22 (100% PASS)`);
     console.log('===============================================================');
 }
 

@@ -59,7 +59,7 @@ class StateNode {
     }
 
     canExecute(completedNodeIds = new Set(), state = {}, skippedNodeIds = new Set()) {
-        if (this.status === 'COMPLETED' && this.idempotent && this.executedSuccessfully) {
+        if (this.status === 'COMPLETED' || completedNodeIds.has(this.id)) {
             return false;
         }
         if (this.status === 'RUNNING' || this.status === 'WAITING_APPROVAL' || this.status === 'WAITING_QUOTA' || this.status === 'WAITING_CREDENTIALS' || this.status === 'SKIPPED') {
@@ -129,7 +129,9 @@ class StateNode {
 class StateGraph extends EventEmitter {
     constructor(config = {}) {
         super();
-        this.graphId = config.graphId || `graph_${Date.now()}`;
+        this.graphId = config.graphId || config.id || `graph_${Date.now()}`;
+        this.strict = Boolean(config.strict);
+        this.taskId = config.taskId || null;
         this.nodes = new Map(); // nodeId -> StateNode
         this.edges = []; // [{ from, to, condition, conditionId, branchGroupId, isDefault }]
         this.conditionalLoops = []; // [{ fromNode, toNode, conditionFn, maxLoops }]
@@ -524,6 +526,9 @@ class StateGraph extends EventEmitter {
             } else if (node.status === 'WAITING_QUOTA') {
                 // Tự động chuyển node WAITING_QUOTA sang PENDING để thực thi khi khởi động lại luồng
                 node.status = 'PENDING';
+            } else if (node.status === 'RUNNING' && !this.completedNodes.has(node.id)) {
+                // Tự động khôi phục node bị ngắt quãng do process crash/restart sang PENDING để chạy tiếp
+                node.status = 'PENDING';
             }
         }
 
@@ -640,6 +645,11 @@ class StateGraph extends EventEmitter {
             }
 
             if (this.status === 'COMPLETED') {
+                if (this.checkpointManager && typeof this.checkpointManager.saveCheckpoint === 'function') {
+                    try {
+                        this.checkpointManager.saveCheckpoint(this.graphId, 'completed', this.serialize());
+                    } catch (e) {}
+                }
                 this.emit('GRAPH_COMPLETED', { graphId: this.graphId, state: this.state });
             }
 
@@ -906,6 +916,12 @@ class StateGraph extends EventEmitter {
 
             } catch (err) {
                 lastError = err;
+                if (err.message && err.message.includes('has no executable action')) {
+                    // Strict Fail-Fast: throw configuration/action contract violation immediately without retrying
+                    node.status = 'FAILED';
+                    this.failedNodes.add(node.id);
+                    throw err;
+                }
                 if (!abortController.signal.aborted && err.message?.includes('timed out')) {
                     abortController.abort(err);
                 }
@@ -1056,11 +1072,11 @@ class StateGraph extends EventEmitter {
      * Resume a paused or waiting StateGraph
      */
     async resume(executorFn = null, context = {}) {
-        if (this.status === 'WAITING_APPROVAL' || this.status === 'PAUSED' || this.status === 'WAITING_QUOTA' || this.status === 'WAITING_CREDENTIALS' || this.status === 'FAILED') {
+        if (this.status === 'WAITING_APPROVAL' || this.status === 'PAUSED' || this.status === 'WAITING_QUOTA' || this.status === 'WAITING_CREDENTIALS' || this.status === 'FAILED' || this.status === 'RUNNING') {
             this.status = 'RUNNING';
         }
         for (const node of this.nodes.values()) {
-            if (node.status === 'WAITING_QUOTA' || node.status === 'WAITING_CREDENTIALS') {
+            if (node.status === 'WAITING_QUOTA' || node.status === 'WAITING_CREDENTIALS' || (node.status === 'RUNNING' && !this.completedNodes.has(node.id))) {
                 node.status = 'PENDING';
             }
         }
@@ -1070,6 +1086,8 @@ class StateGraph extends EventEmitter {
     serialize() {
         return {
             graphId: this.graphId,
+            strict: Boolean(this.strict),
+            taskId: this.taskId || null,
             status: this.status,
             state: this.state,
             completedNodes: Array.from(this.completedNodes),
@@ -1101,12 +1119,17 @@ class StateGraph extends EventEmitter {
 
     static deserialize(data, config = {}) {
         const graph = new StateGraph({
-            graphId: data.graphId,
+            graphId: data.graphId || config.graphId || config.id,
+            strict: config.strict !== undefined ? Boolean(config.strict) : Boolean(data.strict),
+            taskId: data.taskId || config.taskId || null,
             initialState: data.state,
             skippedNodes: data.skippedNodes || [],
             recoveredNodes: data.recoveredNodes || [],
             activeEdges: data.activeEdges || [],
             inactiveEdges: data.inactiveEdges || [],
+            checkpointManager: config.checkpointManager || null,
+            verifier: config.verifier || null,
+            eventStream: config.eventStream || null,
             ...config
         });
 
@@ -1136,6 +1159,9 @@ class StateGraph extends EventEmitter {
         if (Array.isArray(data.nodes)) {
             for (const nData of data.nodes) {
                 const node = new StateNode(nData);
+                if (node.status === 'RUNNING' && !graph.completedNodes.has(node.id)) {
+                    node.status = 'PENDING';
+                }
                 node.retryCount = typeof nData.retryCount === 'number' ? nData.retryCount : node.retryCount;
                 node.loopIteration = typeof nData.loopIteration === 'number' ? nData.loopIteration : node.loopIteration;
                 node.tokensUsed = typeof nData.tokensUsed === 'number' ? nData.tokensUsed : node.tokensUsed;
@@ -1192,14 +1218,14 @@ class StateGraph extends EventEmitter {
     /**
      * Alias for run(initialInput) with state initialization
      */
-    async execute(initialInput = {}) {
+    async execute(initialInput = {}, options = {}) {
         if (typeof initialInput === 'function') {
-            return this.run(initialInput);
+            return this.run(initialInput, options);
         }
         if (initialInput && typeof initialInput === 'object') {
             Object.assign(this.state, initialInput);
         }
-        return this.run(null, { initialInput });
+        return this.run(null, { initialInput, ...options, strict: this.strict || options.strict });
     }
 
     /**
